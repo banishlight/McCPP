@@ -16,15 +16,15 @@ public:
 	void SetOctet(Byte idx, Byte value);
 	static IPAddress LocalAddress();
 	bool IsValid() const noexcept { return isValid; }
-	std::string  ToString() const;
+	string ToString() const;
 
 
 	bool operator==(const IPAddress& right);
 	bool operator!=(const IPAddress& right);
 	bool operator==(bool b);
 
-	std::ostream& operator<<(std::ostream& os, const IPAddress& addr);
-	std::wostream& operator<<(std::wostream& os, const IPAddress& addr);
+	//std::ostream& operator<<(std::ostream& os, const IPAddress& addr);
+	//std::wostream& operator<<(std::wostream& os, const IPAddress& addr);
 private:
 	bool isValid;
 	UInt32 addr;

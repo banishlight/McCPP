@@ -94,9 +94,10 @@
     <ClCompile Include="src\network\HandshakeTCP.cpp" />
     <ClCompile Include="src\network\IPAddress.cpp" />
     <ClCompile Include="src\network\LoginServer.cpp" />
-    <ClCompile Include="src\network\PackData.cpp" />
     <ClCompile Include="src\network\Position.cpp" />
     <ClCompile Include="src\network\RCONServer.cpp" />
+    <ClCompile Include="src\network\Socket.cpp" />
+    <ClCompile Include="src\network\TCPSocket.cpp" />
     <ClCompile Include="src\network\VarIntLong.cpp" />
   </ItemGroup>
   <ItemDefinitionGroup />

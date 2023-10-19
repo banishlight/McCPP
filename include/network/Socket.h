@@ -5,13 +5,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <netdb.h>
-#include "../Standards.h"
 
-class IPAddress;
+#include "DataBuffer.h"
+#include "../Standards.h"
+#include "IPAddress.h"
+
+
 
 class Socket
 {
 public:
+	enum Status { CONNECT, DISCONNECT, ERROR };
+	enum Type { TCP, UDP };
 	//Methods
 	Socket(Socket&& rhs) = default; // std move constructor
 	Socket& operator=(Socket&& rhs) = default; //set move operator
@@ -28,11 +33,11 @@ public:
 	virtual size Send(const Byte* data, size size) = 0;
 	virtual DataBuffer Receive(size amount) = 0;
 	virtual size Receive(DataBuffer& buffer, size amount) = 0;
+	virtual void SetBlocking(bool block)=0;
 	//Attributes
 	bool isBlocking;
 	Type type;
-	enum Status { CONNECT, DISCONNECT, ERROR };
-	enum Type { TCP, UDP };
+	
 	Status status;
 	Int32 sockHandle;
 

@@ -5,7 +5,7 @@
 #include "../../include/Standards.h"
 UInt32 VarInt::EncodedLength(UInt32 index){
 	UInt32 result = 0;
-	while (this->varIntBuf[index + result] > this->CONTINUE_BIT) {
+	while (this->varIntBuf[index + result] > CONTINUE_BIT) {
 		result++;
 	}
 	result++;
@@ -19,8 +19,8 @@ Int32 VarInt::ReadVarInt(Int32* sock, Int32* readVal) {
 	//Unpacks a varInt from the datastream into a 32bit integer
 
 		Int32 unpackedVarint = 0;
-		Int8 tmp = 0x80;
-		Int8 i = 0;
+		Byte tmp = 0x80;
+		Byte i = 0;
 
 		while (tmp & 0x80) {
 			*readVal = read(*sock, &tmp, 1);
