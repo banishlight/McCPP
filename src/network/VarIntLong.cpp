@@ -10,7 +10,7 @@ UInt32 VarInt::EncodedLength(UInt32 index){
 	}
 	result++;
 	if (index + result > 5) {
-		throw new std::exception();
+		throw std::exception();
 	}
 	return result;
 }

@@ -3,6 +3,7 @@
 #include <memory>
 #include <netinet/in.h>
 typedef std::string string;
+typedef std::size_t size;
 typedef signed long long Int64;
 typedef signed int Int32;
 typedef signed short Int16;
