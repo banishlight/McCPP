@@ -76,13 +76,8 @@
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
     <ClInclude Include="include\network\DataBuffer.h" />
-    <ClInclude Include="include\network\HandshakeTCP.h" />
     <ClInclude Include="include\network\IPAddress.h" />
-    <ClInclude Include="include\network\LoginServer.h" />
     <ClInclude Include="include\network\Position.h" />
-    <ClInclude Include="include\network\RCONServer.h" />
-    <ClInclude Include="include\network\Server.h" />
-    <ClInclude Include="include\network\ServerStatus.h" />
     <ClInclude Include="include\network\Socket.h" />
     <ClInclude Include="include\network\TCPSocket.h" />
     <ClInclude Include="include\network\VarIntLong.h" />
@@ -91,11 +86,8 @@
   <ItemGroup>
     <ClCompile Include="src\MinecraftServer.cpp" />
     <ClCompile Include="src\network\DataBuffer.cpp" />
-    <ClCompile Include="src\network\HandshakeTCP.cpp" />
     <ClCompile Include="src\network\IPAddress.cpp" />
-    <ClCompile Include="src\network\LoginServer.cpp" />
     <ClCompile Include="src\network\Position.cpp" />
-    <ClCompile Include="src\network\RCONServer.cpp" />
     <ClCompile Include="src\network\Socket.cpp" />
     <ClCompile Include="src\network\TCPSocket.cpp" />
     <ClCompile Include="src\network\VarIntLong.cpp" />
