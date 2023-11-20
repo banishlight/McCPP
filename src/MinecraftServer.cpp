@@ -3,12 +3,12 @@
 #include <pthread.h>
 #include "../include/Standards.h"
 #include "../include/network/VarIntLong.h"
-#include "../include/network/HandshakeTCP.h"
+// #include "../include/network/HandshakeTCP.h" *Removed*
 int main()
 {
     std::cout << "A C++ Minecraft Server" << std::endl;
     const char* ip = "15.235.13.44";
-   // ProcessHandshake(764,25565,ip);
+    // ProcessHandshake(764,25565,ip);
     return 0;
 }
 
