@@ -28,3 +28,21 @@ typedef Byte ColourID;
   ((byte) & 0x02 ? '1' : '0'), \
   ((byte) & 0x01 ? '1' : '0')
 
+// Data types DONE
+// Boolean
+// Short
+// Unsigned Short
+// Int
+// Long
+// String
+// Varint ?
+// VarLong ?
+
+// Data types TODO
+// Byte
+// Unsigned Byte
+// Float
+// Double
+// Text Component
+// JSON Text Component
+// Identifier

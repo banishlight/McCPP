@@ -1,8 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <pthread.h>
-#include "../include/Standards.h"
-#include "../include/network/VarIntLong.h"
+#include "../include/Standards.hpp"
+#include "../include/network/VarIntLong.hpp"
 // #include "../include/network/HandshakeTCP.h" *Removed*
 int main()
 {

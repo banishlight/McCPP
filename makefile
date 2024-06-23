@@ -1,18 +1,18 @@
-CC = mvcc
+CC = g++
 
 CC_FLAGS = -Wall -Wextra
 
 
-OBJS = 
+OBJS = MinecraftServer.o
 
-LFLAGS = -lm
+LFLAGS = -lm -lboost_system
 
 
 .PHONY: all
 
-all: 
+all: McServer
 
-McServer: 
-
-MinecraftServer.o: MinecraftServer.cpp
-	$(CC) -c MinecraftServer.cpp -o MinecraftServer.o $(CC_FLAGS)
+McServer: $(OBJS)
+	$(CC) $(OBJS) -o McCPP $(LFLAGS) $(CC_FLAGS)
+MinecraftServer.o: 
+	$(CC) -c MinecraftServer.cpp -o MinecraftServer.o $(CC_FLAGS) $(LFLAGS)

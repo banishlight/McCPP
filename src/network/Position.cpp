@@ -1,5 +1,5 @@
-#include "../../include/Standards.h"
-#include "../../include/network/Position.h"
+#include "../../include/Standards.hpp"
+#include "../../include/network/Position.hpp"
 #include <vector>
 
 Position::Position(Int32 posX =0 , Int32 posY = 0, Int32 posZ = 0)

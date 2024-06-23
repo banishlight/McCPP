@@ -1,8 +1,8 @@
-#include "../../include/network/VarIntLong.h"
+#include "../../include/network/VarIntLong.hpp"
 
 #include <unistd.h>
 
-#include "../../include/Standards.h"
+#include "../../include/Standards.hpp"
 UInt32 VarInt::EncodedLength(UInt32 index){
 	UInt32 result = 0;
 	while (this->varIntBuf[index + result] > CONTINUE_BIT) {

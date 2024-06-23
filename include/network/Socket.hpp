@@ -6,9 +6,9 @@
 #include <unistd.h>
 #include <netdb.h>
 
-#include "DataBuffer.h"
-#include "../Standards.h"
-#include "IPAddress.h"
+#include "DataBuffer.hpp"
+#include "../Standards.hpp"
+#include "IPAddress.hpp"
 
 
 
