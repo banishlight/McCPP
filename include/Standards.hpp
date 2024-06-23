@@ -37,6 +37,7 @@ typedef Byte ColourID;
 // String
 // Varint ?
 // VarLong ?
+// Byte array ?
 
 // Data types TODO
 // Byte
@@ -46,3 +47,15 @@ typedef Byte ColourID;
 // Text Component
 // JSON Text Component
 // Identifier
+// Entity Metadata
+// Slot
+// NBT
+// Position
+// Angle
+// UUID (See Boost library for 128bit number arithmatic)
+// Bitset
+// Fixed Bitset
+// Optional X
+// Array of X
+// X Enum
+// 
