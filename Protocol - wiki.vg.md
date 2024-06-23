@@ -370,20 +370,19 @@ public long readVarLong() {
 }
 ```
 
-```
-<span></span><span>public</span> <span>void</span> <span>writeVarInt</span><span>(</span><span>int</span> <span>value</span><span>)</span> <span>{</span>
-    <span>while</span> <span>(</span><span>true</span><span>)</span> <span>{</span>
-        <span>if</span> <span>((</span><span>value</span> <span>&amp;</span> <span>~</span><span>SEGMENT_BITS</span><span>)</span> <span>==</span> <span>0</span><span>)</span> <span>{</span>
-            <span>writeByte</span><span>(</span><span>value</span><span>);</span>
-            <span>return</span><span>;</span>
-        <span>}</span>
+```C++
+public void writeVarInt(int value) {
+    while(true) {
+        if ((value & ~SEGMENT_BITS) == 0) {
+            writeByte(value);
+            return;
+        }
+        writeByte((value & SEGMENT_BITS) | CONTINUE_BIT);
 
-        <span>writeByte</span><span>((</span><span>value</span> <span>&amp;</span> <span>SEGMENT_BITS</span><span>)</span> <span>|</span> <span>CONTINUE_BIT</span><span>);</span>
-
-        <span>// Note: &gt;&gt;&gt; means that the sign bit is shifted with the rest of the number rather than being left alone</span>
-        <span>value</span> <span>&gt;&gt;&gt;=</span> <span>7</span><span>;</span>
-    <span>}</span>
-<span>}</span>
+        // Note: means that the sign bit is shifted with the rest of the number rather than being left alone
+        value >>>= 7;
+    }
+}
 ```
 
 ```

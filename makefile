@@ -16,3 +16,8 @@ McServer: $(OBJS)
 	$(CC) $(OBJS) -o McCPP $(LFLAGS) $(CC_FLAGS)
 MinecraftServer.o: 
 	$(CC) -c MinecraftServer.cpp -o MinecraftServer.o $(CC_FLAGS) $(LFLAGS)
+
+Standards.o:
+
+
+Packets.o:
