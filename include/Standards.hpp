@@ -28,6 +28,12 @@ typedef Byte ColourID;
   ((byte) & 0x02 ? '1' : '0'), \
   ((byte) & 0x01 ? '1' : '0')
 
+
+
+void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z) {
+
+}
+
 // Data types DONE
 // Boolean
 // Short
