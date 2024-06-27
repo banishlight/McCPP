@@ -15,7 +15,7 @@ class Properties {
             Hard
         };
 
-        Properties::Properties() {
+        Properties() {
             // if the file exists, loadValues().
             // if it does not, generateDefault().
             std::ifstream file("server.properties");

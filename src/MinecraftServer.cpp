@@ -2,8 +2,8 @@
 #include <vector>
 #include <pthread.h>
 #include "../include/Standards.hpp"
-// #include "../include/network/VarIntLong.hpp"
-// #include "../include/network/HandshakeTCP.h" *Removed*
+#include "../include/Properties.hpp"
+
 int main()
 {
     std::cout << "A C++ Minecraft Server" << std::endl;
@@ -11,6 +11,7 @@ int main()
     // ProcessHandshake(764,25565,ip);
 
     // Initialize Configs
+    Properties myProperties = Properties();
 
     // Initialize World
 
