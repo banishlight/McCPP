@@ -11,7 +11,7 @@ class Connection {
     };
 
         Connection() { 
-            
+            Connection_State myState = Handshake;
         }
 
         ~Connection() { 
