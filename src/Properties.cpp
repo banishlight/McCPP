@@ -1,5 +1,5 @@
-#include "../include/Standards.h"
-#include "../include/Properties.h"
+#include "../include/Standards.hpp"
+#include "../include/Properties.hpp"
 #include <fstream>
 #include <string>
 #include <sstream>
