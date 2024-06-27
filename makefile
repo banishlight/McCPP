@@ -2,22 +2,28 @@ CC = g++
 
 CC_FLAGS = -Wall -Wextra
 
-
-OBJS = MinecraftServer.o
+INCLUDES = include/ include/network/
+SRC = MinecraftServer.cpp network/VarIntLong.cpp Position.cpp
+OBJS = $(SRCS:.cpp=.o)
 
 LFLAGS = -lm -lboost_system
 
+MAIN = McCPP
 
-.PHONY: all
+.PHONY: clean depend
 
-all: McServer
+all: $(MAIN)
+	@echo Compiling the Server!
 
-McServer: $(OBJS)
-	$(CC) $(OBJS) -o McCPP $(LFLAGS) $(CC_FLAGS)
-MinecraftServer.o: 
-	$(CC) -c MinecraftServer.cpp -o MinecraftServer.o $(CC_FLAGS) $(LFLAGS)
+$(MAIN): $(OBJS)
+	$(CC) $(OBJS) -o $(MAIN) $(LFLAGS) $(CC_FLAGS)
 
-Standards.o:
+.cpp.o:
+	$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@
 
 
-Packets.o:
+clean: 
+	$(RM) *.o *~ $(MAIN)
+
+depend: $(SRCS)
+    makedepend $(INCLUDES) $^
