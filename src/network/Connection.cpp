@@ -2,14 +2,6 @@
 
 class Connection {
     public:
-    enum Connection_State {
-        Handshake,
-        Status,
-        Login,
-        Play,
-        Closed
-    };
-
         Connection() { 
             Connection_State myState = Handshake;
         }
@@ -19,5 +11,11 @@ class Connection {
         }
 
     private:
-
+    enum Connection_State {
+        Handshake,
+        Status,
+        Login,
+        Play,
+        Closed
+    };
 };
