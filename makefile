@@ -7,7 +7,7 @@ SRC = MinecraftServer.cpp network/VarIntLong.cpp Position.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 LFLAGS = -lm -lboost_system
-
+FILES = server.properties
 MAIN = McCPP
 
 .PHONY: clean depend
@@ -23,7 +23,7 @@ $(MAIN): $(OBJS)
 
 
 clean: 
-	$(RM) *.o *~ $(MAIN)
+	$(RM) *.o *~ $(MAIN) $(FILES) 
 
 depend: $(SRCS)
     makedepend $(INCLUDES) $^
