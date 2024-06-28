@@ -16,6 +16,8 @@ typedef unsigned char UInt8;
 
 typedef unsigned char Byte;
 typedef Byte ColourID;
+typedef unsigned char ByteArray[256];
+typedef string JsonTextComponent;
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -30,9 +32,7 @@ typedef Byte ColourID;
 
 
 
-void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z) {
-
-}
+void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z);
 
 // Data types DONE
 // Boolean
@@ -44,6 +44,7 @@ void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z) {
 // Varint ?
 // VarLong ?
 // Byte array ?
+// JSON Text Component ?
 
 // Data types TODO
 // Byte
@@ -51,7 +52,7 @@ void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z) {
 // Float
 // Double
 // Text Component
-// JSON Text Component
+
 // Identifier
 // Entity Metadata
 // Slot

@@ -1,2 +1,15 @@
 #include "../Standards.hpp"
 
+
+// Handshake State
+// No Handshake Packet
+
+// Status State
+void client_Status_Reponse(string json_response);
+void client_Ping_Response(long payload);
+
+// Login State
+void client_Disconnect_login(JsonTextComponent reason);
+void client_Encryption_Request(string server_id, VarInt public_key_length, ByteArray public_key, VarInt verify_token_length, ByteArray verify_token, bool should_auth);
+void client_Login_Success();
+
