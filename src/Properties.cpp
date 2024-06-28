@@ -126,10 +126,10 @@ class Properties {
             MyFile << "player-idle-timeout=" + std::to_string(player_idle_timeout) + "\n";
             MyFile << "prevent-proxy-connections=" + std::to_string(prevent_proxy_connections) + "\n";
             MyFile << "pvp=" + std::to_string(pvp) + "\n";
-            MyFile << "query-port=" + query_port + "\n";
+            MyFile << "query.port=" + query_port + "\n";
             MyFile << "rate-limit=" + std::to_string(rate_limit) + "\n";
-            MyFile << "rcon-password=" + rcon_password + "\n";
-            MyFile << "rcon-port=" + rcon_port + "\n";
+            MyFile << "rcon.password=" + rcon_password + "\n";
+            MyFile << "rcon.port=" + rcon_port + "\n";
             MyFile << "require-resource-pack=" + std::to_string(require_resource_pack) + "\n";
             MyFile << "resource-pack=" + resource_pack + "\n";
             MyFile << "resource-pack-prompt=" + resource_pack_prompt + "\n";
@@ -294,16 +294,16 @@ class Properties {
                     pvp = false;
                 }
             }
-            else if (identifier.compare("query-port")) {
+            else if (identifier.compare("query.port")) {
                 query_port = value;
             }
             else if (identifier.compare("rate-limit")) {
                 rate_limit = std::stoi(value);
             }
-            else if (identifier.compare("rcon-password")) {
+            else if (identifier.compare("rcon.password")) {
                 rcon_password = value;
             }
-            else if (identifier.compare("rcon-port")) {
+            else if (identifier.compare("rcon.port")) {
                 rcon_port = value;
             }
             else if (identifier.compare("require-resource-pack")) {
