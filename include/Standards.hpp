@@ -18,6 +18,14 @@ typedef unsigned char Byte;
 typedef Byte ColourID;
 typedef unsigned char ByteArray[256];
 typedef string JsonTextComponent;
+typedef Int64 UUID; // needs to be 128bit int
+
+typedef struct { // Property array in Login Success 
+  string name;
+  string value;
+  bool is_signed;
+  string signature; // only if signed is true
+} LoginProperty;
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
