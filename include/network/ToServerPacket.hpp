@@ -14,3 +14,5 @@ void server_Encryption_Response(VarInt shared_secret_length, ByteArray shared_se
 void server_Login_Plugin_Response(VarInt message_id, bool success, ByteArray data);
 void server_Login_Acknowledged(void);
 void server_Cookie_Reponse_login(int key, bool has_payload, VarInt payload_length, ByteArray payload);
+
+// Configuration State

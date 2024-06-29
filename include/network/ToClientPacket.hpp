@@ -13,8 +13,8 @@ void client_Disconnect_login(JsonTextComponent reason);
 void client_Encryption_Request(string server_id, VarInt public_key_length, ByteArray public_key, VarInt verify_token_length, ByteArray verify_token, bool should_auth);
 void client_Login_Success(UUID uuid, string username, VarInt num_of_prop, LoginProperty properties[], bool strict_error_handling); // Look into how to parameterize Property array struct
 void client_Set_Compression(VarInt threshold);
-void client_Login_Plugin_Request(VarInt message_id, int channel, ByteArray data); // Channel needs to be of type Identifier (isn't made yet)
-void client_Cookie_Request(int key); // Needs Identifier type
+void client_Login_Plugin_Request(VarInt message_id, Identifier channel, ByteArray data); // Channel needs to be of type Identifier (isn't made yet)
+void client_Cookie_Request(Identifier key); // Needs Identifier type
 
-
+// Configuration State
 
