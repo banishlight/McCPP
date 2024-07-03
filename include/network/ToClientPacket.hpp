@@ -1,5 +1,17 @@
 #include "../Standards.hpp"
 
+struct LoginProperty { // Property array in Login Success 
+  string name;
+  string value;
+  bool is_signed;
+  string signature; // only if signed is true
+};
+
+struct ConfigEntries {
+  Identifier registryID;
+  VarInt entryCount;
+
+};
 
 // Handshake State
 // No Handshake Packet

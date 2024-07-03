@@ -23,18 +23,7 @@ typedef Int64 UUID; // needs to be 128bit int
 typedef string Identifier;
 typedef string TextComponent;
 
-struct LoginProperty { // Property array in Login Success 
-  string name;
-  string value;
-  bool is_signed;
-  string signature; // only if signed is true
-};
 
-struct ConfigEntries {
-  Identifier registryID;
-  VarInt entryCount;
-
-};
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
