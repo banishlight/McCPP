@@ -11,7 +11,7 @@ int main()
     // ProcessHandshake(764,25565,ip);
 
     // Initialize Configs
-    Properties myProperties = Properties();
+    Properties* myProperties = new Properties();
 
     // Initialize World
 

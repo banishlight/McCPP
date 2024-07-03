@@ -25,8 +25,10 @@ class Properties {
         }
 
         ~Properties() {
-            
+            // maybe save changes to the properties that might've taken place while it was running?
         }
+
+        static Properties *instance;
 
         // Defaults for Vanilla found here https://minecraft.fandom.com/wiki/Server.properties
         bool allow_flight = false;; 

@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <netinet/in.h>
+#include "network/VarIntLong.hpp"
 typedef std::string string;
 typedef std::size_t size;
 typedef signed long long Int64;
@@ -20,13 +21,20 @@ typedef unsigned char ByteArray[256];
 typedef string JsonTextComponent;
 typedef Int64 UUID; // needs to be 128bit int
 typedef string Identifier;
+typedef string TextComponent;
 
-typedef struct { // Property array in Login Success 
+struct LoginProperty { // Property array in Login Success 
   string name;
   string value;
   bool is_signed;
   string signature; // only if signed is true
-} LoginProperty;
+};
+
+struct ConfigEntries {
+  Identifier registryID;
+  VarInt entryCount;
+
+};
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
