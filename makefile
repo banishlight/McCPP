@@ -1,6 +1,9 @@
 CC = g++
-
 CC_FLAGS = -Wall -Wextra
+
+NVCC = nvcc
+NVCC_FLAGS = 
+NV_LIB = -lcuda -lcudart
 
 INCLUDES = include/ include/network/
 SRC = MinecraftServer.cpp network/VarIntLong.cpp Position.cpp
