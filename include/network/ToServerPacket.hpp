@@ -23,4 +23,4 @@ void server_Acknowledge_Finish_Config(void);
 void server_Keep_Alive(Int64 id);
 void server_Pong(Int32 id);
 void server_Resource_Pack_Response(UUID uuid, VarInt result);
-void server_Known_Packs(VarInt pack_count, string[] name_space, string[] id);
+void server_Known_Packs(VarInt pack_count, string* name_space, string* id, string* version);
