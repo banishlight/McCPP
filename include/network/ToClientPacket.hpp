@@ -35,4 +35,14 @@ void client_Disconnect_config(TextComponent reason);
 void client_Finish_Configuration(void);
 void client_Keep_Alive_config(long keepAliveID);
 void client_Ping_config(int ID);
-void client_Reset_Chat();
+void client_Reset_Chat(void);
+void client_Registry_Data(Identifier reg_id, VarInt entry_count, Identifier* entry_id, bool* has_data, void* nbt); // unsure of nbt data type?
+void client_Remove_resource_Pack(bool has_uuid, UUID uuid);
+void client_Add_Resource_Pack(UUID uuid, string url, string hash, bool forced, bool has_prompt, TextComponent prompt);
+void client_Store_Cookie(Identifier key, VarInt payload_len, ByteArray payload);
+void client_Transfer(string host, VarInt port);
+void client_Feature_Flags(VarInt total_feat, Identifier* feat_flags);
+void client_Update_Tags(VarInt len, Identifier registry, void* tag_arr); // TODO: Create tag array data type (prob just a struct)
+void client_Known_Packs(VarInt count, string name_space[], string id[], string ver[]);
+void client_Custom_Report_Detail(VarInt count, string title[], string desc[]);
+void client_ServerLink(VarInt count, bool is_buitin[], VarInt label[], string URL[]);
