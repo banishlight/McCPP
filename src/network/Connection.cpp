@@ -2,20 +2,19 @@
 
 class Connection {
     public:
-        Connection() { 
-            Connection_State myState = Handshake;
+        Connection::Connection() { 
+            this->myState = Connection_State::Handshake;
         }
 
-        ~Connection() { 
+        Connection::~Connection() { 
 
         }
 
     private:
-    enum Connection_State {
-        Handshake,
-        Status,
-        Login,
-        Play,
-        Closed
-    };
+        void Connection::decode_packet(void* packet) {
+            // determine packet ID
+            int packetID;
+            // get connection state
+            
+        }
 };
