@@ -15,6 +15,6 @@ class Connection {
             // determine packet ID
             int packetID;
             // get connection state
-            
+            switch(myState)
         }
 };
