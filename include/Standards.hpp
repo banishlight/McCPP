@@ -3,7 +3,7 @@
 #include <string>
 #include <memory>
 #include <netinet/in.h>
-#include <network/VarIntLong.hpp>
+
 typedef std::string string;
 typedef std::size_t size;
 typedef signed long long Int64;
@@ -43,6 +43,7 @@ void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z);
 
 
 #endif
+
 // Data types DONE
 // Boolean
 // Short
