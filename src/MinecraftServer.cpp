@@ -1,8 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <pthread.h>
-#include "../include/Standards.hpp"
-#include "../include/Properties.hpp"
+#include <Standards.hpp>
+#include <Properties.hpp>
 
 int main()
 {

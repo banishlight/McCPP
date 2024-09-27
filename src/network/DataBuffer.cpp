@@ -1,5 +1,5 @@
-#include "../../include/Standards.hpp"
-#include "../../include/network/DataBuffer.hpp"
+#include <Standards.hpp>
+#include <network/DataBuffer.hpp>
 #include <iomanip>
 #include <vector>
 #include <algorithm>

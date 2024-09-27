@@ -5,7 +5,7 @@ LDFLAGS :=
 SRC_DIR := src
 BUILD_DIR := build
 BIN_DIR := bin
-INCLUDE_DIR := include include/network
+INCLUDE_DIR := include
 TARGET := $(BIN_DIR)/MinecraftServer
 
 # Source and object files
@@ -20,19 +20,19 @@ all: directories $(TARGET)
 
 # Link the final executable
 $(TARGET): $(OBJ)
-    $(CXX) $(OBJ) -o $@ $(LDFLAGS)
+	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
 
 # Compile each source file into an object file
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
-    $(CXX) $(CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
 
 # Create necessary directories
 directories:
-    mkdir -p $(BUILD_DIR) $(BIN_DIR)
+	mkdir -p $(BUILD_DIR) $(BIN_DIR)
 
 # Clean up
 clean:
-    rm -rf $(BUILD_DIR) $(BIN_DIR) $(DEPS) $(TARGET)
+	rm -rf $(BUILD_DIR) $(BIN_DIR) $(DEPS) $(TARGET)
 
 # Include dependency files
 -include $(DEPS)

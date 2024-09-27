@@ -1,7 +1,7 @@
 #pragma once
-#include "DataBuffer.hpp"
-#include "Socket.hpp"
-#include "../Standards.hpp"
+#include <network/DataBuffer.hpp>
+#include <network/Socket.hpp>
+#include <Standards.hpp>
 class TCPSocket : public Socket
 {
 	

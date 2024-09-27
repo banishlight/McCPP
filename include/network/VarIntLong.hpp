@@ -1,7 +1,7 @@
 #pragma once
 #include <exception>
 #include <vector>
-#include "../Standards.hpp"
+#include <Standards.hpp>
 
 class VarInt
 {

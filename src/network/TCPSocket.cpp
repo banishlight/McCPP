@@ -1,7 +1,6 @@
-#include "../../include/Standards.hpp"
-#include "../../include/network/TCPSocket.hpp"
-
-#include "../../include/network/IPAddress.hpp"
+#include <Standards.hpp>
+#include <network/TCPSocket.hpp>
+#include <network/IPAddress.hpp>
 
 TCPSocket::TCPSocket() :Socket(Socket::TCP), port((0))
 {

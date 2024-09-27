@@ -1,6 +1,6 @@
-#include "../../include/Standards.hpp"
-#include "../../include/network/Socket.hpp"
-#include "../../include/network/IPAddress.hpp"
+#include <Standards.hpp>
+#include <network/Socket.hpp>
+#include <network/IPAddress.hpp>
 #include <fcntl.h>
 
 Socket::Socket(Type type) : sockHandle(-1), type(type),isBlocking(false),status(DISCONNECT)

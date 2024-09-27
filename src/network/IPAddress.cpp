@@ -1,5 +1,5 @@
-#include "../../include/Standards.hpp"
-#include "../../include/network/IPAddress.hpp"
+#include <Standards.hpp>
+#include <network/IPAddress.hpp>
 #include <regex>
 const std::regex IPRegex(R":(^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$):");
 const std::wregex IPRegexW(LR":(^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$):");

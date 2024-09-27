@@ -1,4 +1,4 @@
-#include "../../include/network/Connection.hpp"
+#include <network/Connection.hpp>
 
 class Connection {
     public:

@@ -1,7 +1,6 @@
 #pragma once
 #include <vector>
-
-#include "../Standards.hpp"
+#include <Standards.hpp>
 
 class IPAddress
 {

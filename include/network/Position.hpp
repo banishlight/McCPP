@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "../../include/Standards.hpp"
+#include <Standards.hpp>
 class Position
 {
 public:
