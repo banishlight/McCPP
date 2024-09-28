@@ -28,6 +28,7 @@ string Properties::difficulty_to_string(Difficulties d) {
         case Normal: return "normal";
         case Hard: return "hard";
         case Peaceful: return "peaceful";
+        default: return "normal";
     }
 }
 
