@@ -19,8 +19,11 @@ Properties::~Properties() {
     // maybe save changes to the properties that might've taken place while it was running?
 }
 
-
-
+// This  is a thread safe singleton starting with C++11
+Properties& Properties::getProperties() {
+    static Properties singleton;
+    return singleton;
+}
 
 string Properties::difficulty_to_string(Difficulties d) {
     switch(d) {

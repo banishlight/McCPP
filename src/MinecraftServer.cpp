@@ -1,5 +1,5 @@
 #include <iostream>
-#include <vector>
+
 #include <pthread.h>
 #include <Standards.hpp>
 #include <Properties.hpp>
@@ -12,15 +12,14 @@ int main()
     // ProcessHandshake(764,25565,ip);
 
     // Initialize Configs
-    Properties* myProperties = new Properties();
+    Properties& myProperties = Properties::getProperties();
 
     // Initialize World
 
     // Create worker threads
 
     // Begin Connection handler
-    std::vector<Connection> connections;
-    connections.reserve(myProperties->max_players);
+    ConnectionList& myList = ConnectionList::getList();
 
 
     return 0;

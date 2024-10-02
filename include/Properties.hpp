@@ -7,11 +7,7 @@ using namespace std;
 
 class Properties {
     public:
-        Properties();
-        // Other methods and member variables
-        ~Properties();
-
-
+        Properties& getProperties();
 
         enum Difficulties {
             Peaceful,
@@ -74,6 +70,8 @@ class Properties {
         bool white_list = false; 
     
     private:
+        Properties();
+        ~Properties();
         string difficulty_to_string(Difficulties d);
         void generateDefault();
         void loadValues(std::ifstream& file);

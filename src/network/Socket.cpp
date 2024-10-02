@@ -7,7 +7,6 @@ Socket::Socket(Type type) : isBlocking(false),
 	status(DISCONNECT),
 	type(type),   
     sockHandle(-1) 
-      
 {
 	
 }
@@ -18,7 +17,7 @@ Socket::~Socket()
 }
 void Socket::SetBlocking(bool block)
 {
-	UInt64 mode = block ? 0 : 1;
+	//UInt64 mode = block ? 0 : 1; // Unused
 	Int32 opts = fcntl(sockHandle, F_GETFL);
 	if (opts < 0)return;
 	if(block)

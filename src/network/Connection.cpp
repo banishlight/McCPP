@@ -1,5 +1,6 @@
 #include <network/Connection.hpp>
 #include <network/IPAddress.hpp>
+#include <Properties.hpp>
 
 Connection::Connection() { 
     this->myState = Connection_State::Handshake;
@@ -35,5 +36,18 @@ ConnectionList::~ConnectionList() {
 
 ConnectionList& ConnectionList::getList() {
     static ConnectionList singleton;
+    if (ConnectionList::count == -1) {
+        Properties& myProperties = Properties::getProperties();
+        singleton.connections.reserve(myProperties.max_players);
+        singleton.count = 0;
+    }
     return singleton;
+}
+
+void ConnectionList::addConnection(Connection member) {
+    if (this->count == -1) {
+        return;// ERROR HERE, UNREACHABLE
+    }
+    this->connections.push_back(member);  
+    this->count += 1;
 }
