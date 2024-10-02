@@ -1,5 +1,5 @@
 #include <Standards.hpp>
-
+#include <network/VarIntLong.hpp>
 
 // Handshaking state
 void server_Handshake(VarInt protocol_version, string server_address, unsigned short server_port, VarInt next_state);
