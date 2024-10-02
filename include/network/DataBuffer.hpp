@@ -7,7 +7,8 @@
 #include <ios>
 
 #include <Standards.hpp>
-    class VarInt; // cheap hack to get around including header files
+#include <network/VarIntLong.hpp>
+    //class VarInt; // cheap hack to get around including header files
 
 
     class MCString;

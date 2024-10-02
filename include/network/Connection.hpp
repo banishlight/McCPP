@@ -1,5 +1,7 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
+#include <string>
+#include <unordered_map>
 
 class Connection {
     public:
@@ -14,10 +16,16 @@ class Connection {
             Closed
         };
         Connection_State myState;
-        int ipaddress;
+        std::string ipaddress;
         void decode_packet(void* packet);
 };
 
-
+class ConnectionList {
+    public:
+        static ConnectionList& getList();
+    private:
+        ConnectionList();
+        ~ConnectionList();
+};
 
 #endif

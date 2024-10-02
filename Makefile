@@ -9,7 +9,7 @@ INCLUDE_DIR := include
 TARGET := $(BIN_DIR)/MinecraftServer
 
 # Source and object files
-SRC := $(wildcard $(SRC_DIR)/*.cpp)
+SRC := $(shell find $(SRC_DIR) -name '*.cpp')
 OBJ := $(SRC:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 DEPS := $(OBJ:.o=.d)
 
@@ -24,6 +24,7 @@ $(TARGET): $(OBJ)
 
 # Compile each source file into an object file
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
 
 # Create necessary directories

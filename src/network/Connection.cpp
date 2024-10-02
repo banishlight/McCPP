@@ -1,20 +1,39 @@
 #include <network/Connection.hpp>
+#include <network/IPAddress.hpp>
 
-class Connection {
-    public:
-        Connection::Connection() { 
-            this->myState = Connection_State::Handshake;
-        }
+Connection::Connection() { 
+    this->myState = Connection_State::Handshake;
+}
 
-        Connection::~Connection() { 
+Connection::~Connection() = default;
 
-        }
+void Connection::decode_packet(void* packet) {
+    // determine packet ID
+    int packetID;
+    // get connection state
+    switch(myState) {
+        case Handshake:
+            break;
+        case Status:
+            break;
+        case Login:
+            break;
+        case Play:
+            break;
+        case Closed:
+            break;
+    }
+}
 
-    private:
-        void Connection::decode_packet(void* packet) {
-            // determine packet ID
-            int packetID;
-            // get connection state
-            switch(myState)
-        }
-};
+ConnectionList::ConnectionList() {
+
+}
+
+ConnectionList::~ConnectionList() {
+    
+}
+
+ConnectionList& ConnectionList::getList() {
+    static ConnectionList singleton;
+    return singleton;
+}
