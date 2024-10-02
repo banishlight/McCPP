@@ -36,11 +36,9 @@ public:
 	virtual void SetBlocking(bool block)=0;
 	//Attributes
 	bool isBlocking;
-	Type type;
-	
 	Status status;
+	Type type;
 	Int32 sockHandle;
-
 	//typedef smart pointer
 	typedef std::shared_ptr<Socket> SocketPtr;
 

@@ -3,7 +3,11 @@
 #include <network/IPAddress.hpp>
 #include <fcntl.h>
 
-Socket::Socket(Type type) : sockHandle(-1), type(type),isBlocking(false),status(DISCONNECT)
+Socket::Socket(Type type) : isBlocking(false),
+	status(DISCONNECT),
+	type(type),   
+    sockHandle(-1) 
+      
 {
 	
 }
