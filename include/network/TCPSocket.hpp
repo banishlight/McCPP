@@ -15,4 +15,5 @@ public:
 	size Receive(DataBuffer& buffer, size amount) override;
 	DataBuffer Receive(size amount) override;
 	void Disconnect();
+	void Listen(int sockfd, int backlog);
 };

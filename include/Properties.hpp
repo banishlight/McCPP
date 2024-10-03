@@ -7,7 +7,7 @@ using namespace std;
 
 class Properties {
     public:
-        Properties& getProperties();
+        static Properties& getProperties();
 
         enum Difficulties {
             Peaceful,
