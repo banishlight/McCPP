@@ -2,8 +2,7 @@
 #include <network/DataBuffer.hpp>
 #include <network/Socket.hpp>
 #include <Standards.hpp>
-class TCPSocket : public Socket
-{
+class TCPSocket : public Socket {
 	
 private:
 	IPAddress remoteIp;
@@ -15,4 +14,5 @@ public:
 	size Send(const Byte* data, size size) override;
 	size Receive(DataBuffer& buffer, size amount) override;
 	DataBuffer Receive(size amount) override;
+	void Disconnect();
 };

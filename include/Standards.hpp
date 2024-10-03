@@ -38,41 +38,7 @@ typedef string TextComponent;
   ((byte) & 0x01 ? '1' : '0')
 
 
-
 void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z);
 
 
 #endif
-
-// Data types DONE
-// Boolean
-// Short
-// Unsigned Short
-// Int
-// Long
-// String
-// Varint ?
-// VarLong ?
-// Byte array ?
-// JSON Text Component ?
-
-// Data types TODO
-// Byte
-// Unsigned Byte
-// Float
-// Double
-// Text Component
-
-// Identifier
-// Entity Metadata
-// Slot
-// NBT
-// Position
-// Angle
-// UUID (See Boost library for 128bit number arithmatic)
-// Bitset
-// Fixed Bitset
-// Optional X
-// Array of X
-// X Enum
-// 

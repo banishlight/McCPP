@@ -14,14 +14,16 @@ int main()
     // Initialize Configs
     Properties& myProperties = Properties::getProperties();
 
-    // Initialize World
-
-    // Create worker threads
-
     // Begin Connection handler
     ConnectionList& myList = ConnectionList::getList();
 
+    // Initialize World
 
+    // Create listening thread
+
+    // Create worker threads
+
+    
     return 0;
 }
 

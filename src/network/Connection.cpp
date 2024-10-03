@@ -36,7 +36,7 @@ ConnectionList::~ConnectionList() {
 
 ConnectionList& ConnectionList::getList() {
     static ConnectionList singleton;
-    if (ConnectionList::count == -1) {
+    if (singleton.count == -1) {
         Properties& myProperties = Properties::getProperties();
         singleton.connections.reserve(myProperties.max_players);
         singleton.count = 0;

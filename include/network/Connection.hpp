@@ -24,7 +24,7 @@ class Connection {
 class ConnectionList {
     public:
         static ConnectionList& getList();
-        void addConnection(Connection member)
+        void addConnection(Connection member);
     private:
         int count = -1; // -1 if uninitialized
         std::vector<Connection> connections;
