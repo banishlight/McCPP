@@ -1,26 +1,28 @@
 #include <iostream>
-
-#include <pthread.h>
+#include <thread>
 #include <Standards.hpp>
 #include <Properties.hpp>
 #include <network/Connection.hpp>
+#include <network/ListenChild.hpp>
 
 int main()
 {
     std::cout << "A C++ Minecraft Server" << std::endl;
-    //const char* ip = "15.235.13.44";
-    // ProcessHandshake(764,25565,ip);
 
     // Initialize Configs
     Properties& myProperties = Properties::getProperties();
 
-    // Begin Connection handler
+    // Init Connection handler
     ConnectionList& myList = ConnectionList::getList();
 
     // Initialize World
 
-    // Create listening thread
-
+    // Create RecievingThread
+    // Init listen() here, accept connections in child thread
+    TCPSocket::Bind();
+    AcceptChild myAccept = new AcceptChild();
+    std::thread childThread(myAccept.begin());
+    
     // Create worker threads
 
     

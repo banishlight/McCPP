@@ -4,7 +4,8 @@
 #include <string>
 #include <sstream>
 #include <iostream>
-using namespace std;
+#include <stdexcept>
+// using namespace std;
 
 
 Properties::Properties() {
@@ -320,5 +321,12 @@ void Properties::splitLine(string line, string identifier, string value) {
     std::istringstream iss(line);
     getline(iss, identifier, '=');
     getline(iss, value);
+}
+
+string Properties::getIP() {
+    if (server_ip.compare("")) {
+        // ERROR no ip set, throw exception
+    }
+    return server_ip;
 }
 
