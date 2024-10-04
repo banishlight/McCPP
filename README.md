@@ -16,3 +16,17 @@ The goal of this project is to write a minecraft server client focused around be
 4. Create Java wrapper functions to allow for plugins to be written in Java just as traditional Java edition server clients do (i.e. [Bukkit](https://dev.bukkit.org) and [Spigot](https://www.spigotmc.org)).
 5. Create Java wrapper functions for mods to be written with an API similar enough to [Fabric](https://github.com/FabricMC/fabric) that it would allow existing mods to be easily or seamlessly ported to our server.
 6. Offload work to a GPU array (see [CUDA Programming](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)).
+
+## Build Guide
+To build this project you just have to run:
+```
+make
+```
+and it will create the ```bin``` folder containing the binary.
+
+To remove the build files and executable run:
+```
+make clean
+```
+
+Note: This is being designed for the x64 Linux platform
