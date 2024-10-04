@@ -39,7 +39,7 @@ string Properties::difficulty_to_string(Difficulties d) {
 void Properties::generateDefault() {
     // TODO write all default variables to file server.properties
     std::cout << "generate default properties file";
-    ofstream MyFile("server.properties");
+    std::ofstream MyFile("server.properties");
     MyFile << "allow-flight=" + std::to_string(allow_flight) + "\n";
     MyFile << "allow-nether=" + std::to_string(allow_nether) + "\n";
     MyFile << "broadcast-console-to-ops=" + std::to_string(broadcast_console_to_ops) + "\n";

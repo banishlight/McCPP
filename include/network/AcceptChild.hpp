@@ -6,6 +6,6 @@ class AcceptChild {
         ~AcceptChild();
         void begin();
     private:
-        ConnectionList& listRef;
+        ConnectionList& listRef = ConnectionList::getList();
         bool running = true;
 };

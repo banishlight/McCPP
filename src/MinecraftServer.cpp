@@ -3,7 +3,7 @@
 #include <Standards.hpp>
 #include <Properties.hpp>
 #include <network/Connection.hpp>
-#include <network/ListenChild.hpp>
+#include <network/AcceptChild.hpp>
 
 int main()
 {
@@ -17,11 +17,11 @@ int main()
 
     // Initialize World
 
-    // Create RecievingThread
     // Init listen() here, accept connections in child thread
-    TCPSocket::Bind();
-    AcceptChild myAccept = new AcceptChild();
-    std::thread childThread(myAccept.begin());
+
+    // Create RecievingThread
+    AcceptChild myAccept = AcceptChild();
+    //std::thread childThread(myAccept.begin);
     
     // Create worker threads
 

@@ -5,10 +5,10 @@ class CubSock {
     public:
         CubSock();
         ~CubSock();
-        void Bind();
-        void Accept();
-        void Listen();
-        void Connect();
+        int Bind(string ip, string port);
+        int Accept(string ip, string port);
+        int Listen(string ip, string port);
+        int Connect(string ip, string port);
     private:
 
 };

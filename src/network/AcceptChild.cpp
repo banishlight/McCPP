@@ -14,16 +14,8 @@ AcceptChild::~AcceptChild() {
 }
 
 void AcceptChild::begin() {
-    string myIP = Properties::getProperties().server_ip;
+    string myIP = Properties::getProperties().getIP();
     while(this->running) {
 
     }
-}
-
-string AcceptChild::getIP() {
-    if (server_ip.compare("")) {
-        // ERROR no ip set, throw exception
-        throw std::runtime_error();
-    }
-    return server_ip;
 }
