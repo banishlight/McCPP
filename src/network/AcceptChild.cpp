@@ -1,6 +1,5 @@
 #include <network/AcceptChild.hpp>
 #include <network/Connection.hpp>
-#include <network/TCPSocket.hpp>
 #include <Properties.hpp>
 #include <string>
 #include <Standards.hpp>
