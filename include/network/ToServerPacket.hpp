@@ -25,5 +25,4 @@ void server_Pong(Int32 id);
 void server_Resource_Pack_Response(UUID uuid, VarInt result);
 void server_Known_Packs(VarInt pack_count, string* name_space, string* id, string* version);
 
-typedef void (*LoginPacket)(void* paramA, void* paramB, void* paramC, void* paramD);
-typedef void (*ConfigPacket)(void* paramA, void* paramB, void* paramC, void* paramD, void* paramE, void* paramF, void* paramG, void* paramH);
+// Typedef function pointer array for play state here
