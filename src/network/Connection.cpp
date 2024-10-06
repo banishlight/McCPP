@@ -2,7 +2,7 @@
 #include <network/IPAddress.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
-#include <ToServerPacket.hpp>
+#include <network/ToServerPacket.hpp>
 
 Connection::Connection() { 
     this->myState = Connection_State::Handshake;
@@ -16,16 +16,31 @@ void Connection::decode_packet(void* packet) {
     // get connection state
     switch(myState) {
         case Handshake:
-            // call server_Handshake();
+            if (packetID == 0x00) {
+                // call server_Handshake();
+            }
+            else {
+                Console::GetConsole().Error("Bad Packet ID in Handshake");
+            }
             break;
         case Status:
-            // call server_Status_Request(); or
-            // call server_Ping_Request();
+            if () {
+                // call server_Status_Request();
+            }
+            else if () {
+                // call server_Ping_Request();
+            }
+            else {
+                Console::GetConsole().Error("Bad Packet ID in Status");
+            }
             break;
         case Login:
             // Decode one of four Login State packets
             break;
+        case Config:
+            break;
         case Play:
+            // Function pointer array only used in play state for O(1) speed
             break;
         case Closed:
             break;
