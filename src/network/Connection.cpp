@@ -2,6 +2,7 @@
 #include <network/IPAddress.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
+#include <ToServerPacket.hpp>
 
 Connection::Connection() { 
     this->myState = Connection_State::Handshake;
@@ -15,10 +16,14 @@ void Connection::decode_packet(void* packet) {
     // get connection state
     switch(myState) {
         case Handshake:
+            // call server_Handshake();
             break;
         case Status:
+            // call server_Status_Request(); or
+            // call server_Ping_Request();
             break;
         case Login:
+            // Decode one of four Login State packets
             break;
         case Play:
             break;
@@ -52,8 +57,4 @@ void ConnectionList::addConnection(Connection member) {
     }
     this->connections.push_back(member);  
     this->count += 1;
-}
-
-int ConnectionList::setListenFD(int fd) {
-    return 0;
 }

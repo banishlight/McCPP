@@ -13,11 +13,13 @@ class Connection {
             Handshake,
             Status,
             Login,
+            Config,
             Play,
             Closed
         };
         Connection_State myState;
         std::string ipaddress;
+        int fd = -1;
         void decode_packet(void* packet);
 };
 
@@ -30,7 +32,6 @@ class ConnectionList {
         std::vector<Connection> connections;
         ConnectionList();
         ~ConnectionList();
-        int setListenFD(int fd);
 };
 
 #endif
