@@ -9,7 +9,7 @@
 
 int main()
 {
-    Console& myConsole = Console::GetConsole();
+    Console& myConsole = Console::getConsole();
     myConsole.Entry("A C++ Minecraft Server");
     Properties& myProperties = Properties::getProperties();
     ConnectionList& myList = ConnectionList::getList();

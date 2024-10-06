@@ -4,7 +4,7 @@
 
 class Console {
     public:
-        static Console& GetConsole();
+        static Console& getConsole();
         int Entry(string text);
         int Post();
     private:

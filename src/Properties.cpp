@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iostream>
 #include <stdexcept>
-// using namespace std;
+#include <Console.hpp>
 
 
 Properties::Properties() {
@@ -38,7 +38,9 @@ string Properties::difficulty_to_string(Difficulties d) {
 
 void Properties::generateDefault() {
     // TODO write all default variables to file server.properties
-    std::cout << "generate default properties file";
+    // Console& myConsole = Console::getConsole();
+    // myConsole.Entry("generating default properties file");
+    Console::getConsole().Entry("generating default properties file");
     std::ofstream MyFile("server.properties");
     MyFile << "allow-flight=" + std::to_string(allow_flight) + "\n";
     MyFile << "allow-nether=" + std::to_string(allow_nether) + "\n";
