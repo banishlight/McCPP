@@ -37,9 +37,6 @@ string Properties::difficulty_to_string(Difficulties d) {
 }
 
 void Properties::generateDefault() {
-    // TODO write all default variables to file server.properties
-    // Console& myConsole = Console::getConsole();
-    // myConsole.Entry("generating default properties file");
     Console::getConsole().Entry("generating default properties file");
     std::ofstream MyFile("server.properties");
     MyFile << "allow-flight=" + std::to_string(allow_flight) + "\n";
@@ -328,6 +325,7 @@ void Properties::splitLine(string line, string identifier, string value) {
 string Properties::getIP() {
     if (server_ip.compare("")) {
         // ERROR no ip set, throw exception
+        Console::getConsole().Error("No IP set.");
     }
     return server_ip;
 }

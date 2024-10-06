@@ -37,9 +37,9 @@ Console& Console::getConsole() {
 }
 
 int Console::Entry(string text) {
-    std::cout << text << "\n";
+    text = text + "\n";
+    std::cout << text;
     myLog << text;
-    myLog << "\n";
     return 0;
 }
 
@@ -51,3 +51,9 @@ int Console::Post() {
     return 0;
 }
 
+int Console::Error(string text) {
+    text = "Error: " + text + "\n";
+    std::cerr << text;
+    myLog << text;
+    return 0;
+}

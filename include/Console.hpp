@@ -7,6 +7,7 @@ class Console {
         static Console& getConsole();
         int Entry(string text);
         int Post();
+        int Error(string text);
     private:
         Console();
         ~Console();

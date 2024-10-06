@@ -1,6 +1,7 @@
 #include <network/Connection.hpp>
 #include <network/IPAddress.hpp>
 #include <Properties.hpp>
+#include <Console.hpp>
 
 Connection::Connection() { 
     this->myState = Connection_State::Handshake;
@@ -46,6 +47,7 @@ ConnectionList& ConnectionList::getList() {
 
 void ConnectionList::addConnection(Connection member) {
     if (this->count == -1) {
+        Console::getConsole().Error("No IP set.");
         return;// ERROR HERE, UNREACHABLE
     }
     this->connections.push_back(member);  
