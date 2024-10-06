@@ -51,3 +51,7 @@ void ConnectionList::addConnection(Connection member) {
     this->connections.push_back(member);  
     this->count += 1;
 }
+
+int ConnectionList::setListenFD(int fd) {
+    return 0;
+}

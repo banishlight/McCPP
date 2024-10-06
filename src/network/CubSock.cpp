@@ -36,14 +36,20 @@ int CubSock::Listen(string ip, string port) {
 // bind();
 // listen();
     struct addrinfo hints, *res;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_UNSPEC;
     int addr_result = getaddrinfo(ip.c_str(), port.c_str(), &hints, &res);
     if (addr_result != 0) { return -1; } // Error with IP
-    int sock_result = socket(res->ai_family, ai->ai_socktype, res->ai_protocol);
+    int sock_result = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sock_result != 0) { return -1; }
     if (bind(sock_result, res->ai_addr, res->ai_addrlen) < 0) {
-        return -1; // Bind failed
+        // Bind failed
+        return -1; 
     }
-
+    if (listen(sock_result, 10) < 0) {
+        // Listen failed
+        return -1;
+    }
     return 0;
 }
 

@@ -30,6 +30,7 @@ class ConnectionList {
         std::vector<Connection> connections;
         ConnectionList();
         ~ConnectionList();
+        int setListenFD(int fd);
 };
 
 #endif
