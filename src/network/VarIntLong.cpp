@@ -36,7 +36,7 @@ void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
 	}
 	this->varIntBuf[pos++] = (Byte)value;
 	this->varIntSize++;
-	for(int i=0;i<varIntSize;i++) {
+	for(UInt32 i=0;i<varIntSize;i++) {
 
 	}
  }

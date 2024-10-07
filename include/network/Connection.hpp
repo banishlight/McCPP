@@ -2,6 +2,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <network/VarIntLong.hpp>
 
 class Connection {
     public:
