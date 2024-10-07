@@ -1,5 +1,4 @@
-#ifndef STANDARDS_HPP
-#define STANDARDS_HPP
+#pragma once
 #include <string>
 #include <memory>
 #include <netinet/in.h>
@@ -39,6 +38,3 @@ typedef string TextComponent;
 
 
 void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z);
-
-
-#endif

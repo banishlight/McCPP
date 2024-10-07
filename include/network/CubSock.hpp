@@ -1,3 +1,4 @@
+#pragma once
 #include <Standards.hpp>
 
 // Will be using SOCK_STREAM sockets

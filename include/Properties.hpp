@@ -1,6 +1,4 @@
-#ifndef PROPERTIES_H
-#define PROPERTIES_H
-
+#pragma once
 #include <fstream>
 #include <Standards.hpp>
 //using namespace std;
@@ -81,5 +79,3 @@ class Properties {
 
         string server_ip = "";
 };
-
-#endif // PROPERTIES_H

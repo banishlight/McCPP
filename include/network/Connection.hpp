@@ -1,5 +1,4 @@
-#ifndef CONNECTION_H
-#define CONNECTION_H
+#pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -19,10 +18,10 @@ class Connection {
         };
         Connection_State myState;
         std::string ipaddress;
-        int fd = -1;
+        int file_d = -1;
         void decode_packet(void* packet);
         void* extractValue(void** packet, size_t size);
-        int getPacketID(void** packet);
+        int extractPacketID(void** packet);
 };
 
 class ConnectionList {
@@ -35,5 +34,3 @@ class ConnectionList {
         ConnectionList();
         ~ConnectionList();
 };
-
-#endif

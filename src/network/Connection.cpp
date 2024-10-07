@@ -13,7 +13,7 @@ Connection::~Connection() = default;
 
 void Connection::decode_packet(void* packet) {
     void* originalPacket = packet;
-    int packetID; // determine packet ID
+    int packetID = this->extractPacketID(packet&);
     switch(myState) {
         case Handshake:
             if (packetID == 0x00) {
@@ -102,7 +102,7 @@ void* Connection::extractValue(void** packet, size_t size) {
     return value;
 }
 
-int Connection::getPacketID(void** packet) {
+int Connection::extractPacketID(void** packet) {
     char** bytePtr = reinterpret_cast<char**>(packet);
     int value = static_cast<int>(**bytePtr);
     *bytePtr += 1;
