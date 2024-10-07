@@ -3,7 +3,8 @@
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>
-#include <VarIntLong.hpp>
+#include <network/VarIntLong.hpp>
+#include <cstring>
 
 Connection::Connection() { 
     this->myState = Connection_State::Handshake;
@@ -13,7 +14,7 @@ Connection::~Connection() = default;
 
 void Connection::decode_packet(void* packet) {
     void* originalPacket = packet;
-    int packetID = this->extractPacketID(packet&);
+    int packetID = extractPacketID(&packet);
     switch(myState) {
         case Handshake:
             if (packetID == 0x00) {

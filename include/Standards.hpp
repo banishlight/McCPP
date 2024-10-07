@@ -8,14 +8,14 @@ typedef std::size_t size;
 typedef signed long long Int64;
 typedef signed int Int32;
 typedef signed short Int16;
-typedef signed char Byte;
+typedef signed char Int8;
 
 typedef unsigned long long UInt64;
 typedef unsigned int UInt32;
 typedef unsigned short UInt16;
 typedef unsigned char UInt8;
 
-typedef unsigned char UByte;
+typedef unsigned char Byte;
 typedef Byte ColourID;
 typedef unsigned char ByteArray[256];
 typedef string JsonTextComponent;
