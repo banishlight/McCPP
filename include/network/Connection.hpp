@@ -16,12 +16,14 @@ class Connection {
             Play,
             Closed
         };
-        Connection_State myState;
+        Connection_State myState = Connection_State::Handshake;
         std::string ipaddress;
         int file_d = -1;
         void decode_packet(void* packet);
         void* extractValue(void** packet, size_t size);
         int extractPacketID(void** packet);
+        VarInt extractVarInt(void** packet);
+        VarLong extractVarLong(void** packet);
 };
 
 class ConnectionList {

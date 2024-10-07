@@ -7,13 +7,13 @@
 #include <cstring>
 
 Connection::Connection() { 
-    this->myState = Connection_State::Handshake;
+
 }
 
 Connection::~Connection() = default;
 
 void Connection::decode_packet(void* packet) {
-    void* originalPacket = packet;
+    void* originalPacket = packet; // free later?
     int packetID = extractPacketID(&packet);
     switch(myState) {
         case Handshake:
@@ -108,6 +108,14 @@ int Connection::extractPacketID(void** packet) {
     int value = static_cast<int>(**bytePtr);
     *bytePtr += 1;
     return value;
+}
+
+VarInt Connection::extractVarInt(void** packet) {
+
+}
+
+VarLong Connection::extractVarLong(void** packet) {
+    
 }
 
 ConnectionList::ConnectionList() {
