@@ -18,7 +18,7 @@ void Connection::decode_packet(void* packet) {
                 // call server_Handshake();
             }
             else {
-                Console::GetConsole().Error("Bad Packet ID in Handshake");
+                Console::getConsole().Error("Bad Packet ID in Handshake");
             }
             break;
         case Status:
@@ -29,7 +29,7 @@ void Connection::decode_packet(void* packet) {
                 // call server_Ping_Request();
             }
             else {
-                Console::GetConsole().Error("Bad Packet ID in Status");
+                Console::getConsole().Error("Bad Packet ID in Status");
             }
             break;
         case Login:
@@ -50,7 +50,7 @@ void Connection::decode_packet(void* packet) {
                     // call server_Cookie_Reponse_login();
                     break;
                 default:
-                    Console::GetConsole().Error("Bad Packet ID in Login");
+                    Console::getConsole().Error("Bad Packet ID in Login");
             }
             break;
         case Config:
@@ -80,7 +80,7 @@ void Connection::decode_packet(void* packet) {
                     // call server_Known_Packs();
                     break;
                 default:
-                    Console::GetConsole().Error("Bad Packet ID in Config");
+                    Console::getConsole().Error("Bad Packet ID in Config");
             }
             break;
         case Play:
