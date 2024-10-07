@@ -3,6 +3,7 @@
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>
+#include <VarIntLong.hpp>
 
 Connection::Connection() { 
     this->myState = Connection_State::Handshake;
@@ -11,6 +12,7 @@ Connection::Connection() {
 Connection::~Connection() = default;
 
 void Connection::decode_packet(void* packet) {
+    void* originalPacket = packet;
     int packetID; // determine packet ID
     switch(myState) {
         case Handshake:
@@ -89,6 +91,22 @@ void Connection::decode_packet(void* packet) {
         case Closed:
             break;
     }
+}
+
+// return value will need to be cast to the appropriate type and then freed
+void* Connection::extractValue(void** packet, size_t size) {
+    char** bytePtr = reinterpret_cast<char**>(packet);
+    void* value = malloc(size);
+    std::memcpy(value, *bytePtr, size);
+    *bytePtr += size;
+    return value;
+}
+
+int Connection::getPacketID(void** packet) {
+    char** bytePtr = reinterpret_cast<char**>(packet);
+    int value = static_cast<int>(**bytePtr);
+    *bytePtr += 1;
+    return value;
 }
 
 ConnectionList::ConnectionList() {

@@ -21,6 +21,8 @@ class Connection {
         std::string ipaddress;
         int fd = -1;
         void decode_packet(void* packet);
+        void* extractValue(void** packet, size_t size);
+        int getPacketID(void** packet);
 };
 
 class ConnectionList {
