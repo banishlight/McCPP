@@ -14,7 +14,8 @@ Connection::~Connection() = default;
 
 void Connection::decode_packet(void* packet) {
     void* originalPacket = packet; // free later?
-    int packetID = extractPacketID(&packet);
+    VarInt packetLength = extractVarInt(&packet);
+    Int32 packetID = VarInt::ReadVarInt(extractVarInt(&packet)); // Fix ReadVarInt() to take bytes and read them in
     switch(myState) {
         case Handshake:
             if (packetID == 0x00) {
@@ -94,6 +95,7 @@ void Connection::decode_packet(void* packet) {
     }
 }
 
+// Will need to be modified or other functions declared for variable sized types
 // return value will need to be cast to the appropriate type and then freed
 void* Connection::extractValue(void** packet, size_t size) {
     char** bytePtr = reinterpret_cast<char**>(packet);
@@ -103,6 +105,7 @@ void* Connection::extractValue(void** packet, size_t size) {
     return value;
 }
 
+// Wrong, PacketID's are stored as VarInt
 int Connection::extractPacketID(void** packet) {
     char** bytePtr = reinterpret_cast<char**>(packet);
     int value = static_cast<int>(**bytePtr);
@@ -115,7 +118,7 @@ VarInt Connection::extractVarInt(void** packet) {
 }
 
 VarLong Connection::extractVarLong(void** packet) {
-    
+
 }
 
 ConnectionList::ConnectionList() {

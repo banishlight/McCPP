@@ -41,6 +41,17 @@ void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
 	}
  }
 
+
+Int32 VarInt::raw_ReadVarInt(VarInt value) { 
+	Int32 result = 0;
+	return result;
+}
+
+VarInt VarInt::raw_WriteVarInt(Int32 value) {
+	VarInt result;
+	return result;
+}
+
 Int64 VarLong::ReadVarLong() {
 	//Takes a VarLongBuffer that is already loaded and return a signed long
 	int64_t result = 0;
