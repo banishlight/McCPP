@@ -11,14 +11,13 @@ int main()
 {
     Console::getConsole().Entry("A C++ Minecraft Server");
     Properties::getProperties(); // init properties first
-    ConnectionList& myList = ConnectionList::getList();
+    // ConnectionList& myList = ConnectionList::getList();
 
-    // Init listen() here, accept connections in child thread
     CubSock serverSock;
     serverSock.Listen(Properties::getProperties().getIP(), Properties::getProperties().query_port);
     // Create RecievingThread
     AcceptChild myAccept = AcceptChild();
-    //std::thread childThread(myAccept.begin);
+
     
     // Create worker threads
 

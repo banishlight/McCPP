@@ -114,7 +114,9 @@ int Connection::extractPacketID(void** packet) {
 }
 
 VarInt Connection::extractVarInt(void** packet) {
-
+    int value = 0;
+    int position = 0;
+    
 }
 
 VarLong Connection::extractVarLong(void** packet) {
