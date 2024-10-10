@@ -42,7 +42,7 @@ void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
  }
 
 
-Int32 VarInt::raw_ReadVarInt(VarInt value) { 
+Int32 VarInt::raw_ReadVarInt() { 
 	Int32 result = 0;
 	return result;
 }

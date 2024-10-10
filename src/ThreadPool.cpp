@@ -1,4 +1,4 @@
-#include <ThreadPool>
+#include <ThreadPool.hpp>
 #include <thread>
 
 ThreadPool::ThreadPool(int num_threads) {
@@ -14,7 +14,7 @@ ThreadPool::~ThreadPool() {
     }
     cv.notify_all();
     for(std::thread& worker : workers) {
-        worker.join()
+        worker.join();
     }
 }
 

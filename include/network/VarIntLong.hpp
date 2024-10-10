@@ -11,7 +11,7 @@ class VarInt {
         Int32 ReadVarInt(Int32* sock, Int32* readVal);
         void WriteVarInt(Int32 value, Int32* sock, Int32* writeVal);
         UInt32 EncodedLength(UInt32 index);
-        Int32 raw_ReadVarInt(VarInt value);
+        Int32 raw_ReadVarInt();
         VarInt raw_WriteVarInt(Int32 value);
 
     private:

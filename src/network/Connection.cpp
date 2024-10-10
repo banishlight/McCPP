@@ -15,7 +15,7 @@ Connection::~Connection() = default;
 void Connection::decode_packet(void* packet) {
     void* originalPacket = packet; // free later?
     VarInt packetLength = extractVarInt(&packet);
-    Int32 packetID = VarInt::ReadVarInt(extractVarInt(&packet)); // Fix ReadVarInt() to take bytes and read them in
+    Int32 packetID = extractVarInt(&packet).raw_ReadVarInt(); 
     switch(myState) {
         case Handshake:
             if (packetID == 0x00) {

@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 AcceptChild::AcceptChild() {
-    this->listRef = ConnectionList::getList();
+
 }
 
 AcceptChild::~AcceptChild() {
