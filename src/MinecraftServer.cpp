@@ -7,8 +7,7 @@
 #include <network/CubSock.hpp>
 #include <Console.hpp>
 
-int main()
-{
+int main() {
     Console::getConsole().Entry("A C++ Minecraft Server");
     Properties::getProperties(); // init properties first
     // ConnectionList& myList = ConnectionList::getList();

@@ -97,6 +97,7 @@ void Connection::decode_packet(void* packet) {
 
 // Will need to be modified or other functions declared for variable sized types
 // return value will need to be cast to the appropriate type and then freed
+// WARNING, return value must be freed!
 void* Connection::extractValue(void** packet, size_t size) {
     char** bytePtr = reinterpret_cast<char**>(packet);
     void* value = malloc(size);

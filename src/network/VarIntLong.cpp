@@ -26,6 +26,7 @@ Int32 VarInt::ReadVarInt(Int32* sock, Int32* readVal) {
 		}
 		return unpackedVarint;
 }
+
 void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
 	//writes a 32 bit integer to the datastream
 	int pos = 0;
@@ -39,7 +40,7 @@ void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
 	for(UInt32 i=0;i<varIntSize;i++) {
 
 	}
- }
+}
 
 
 Int32 VarInt::raw_ReadVarInt() { 

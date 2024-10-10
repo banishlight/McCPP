@@ -1,6 +1,6 @@
 # Variables
 CXX := g++
-CXXFLAGS := -Wall -Wextra -std=c++17 -g -MMD
+CXXFLAGS := -Wall -Wextra -std=c++17 -g -MMD # -Wno-unused-parameter
 LDFLAGS := 
 SRC_DIR := src
 BUILD_DIR := build
