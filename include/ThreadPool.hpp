@@ -19,4 +19,4 @@ class ThreadPool {
         bool stop;
         
         void workerThread();
-};
+}; 

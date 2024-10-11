@@ -1,7 +1,7 @@
 #include <ThreadPool.hpp>
 #include <thread>
 
-ThreadPool::ThreadPool(int num_threads) {
+ThreadPool::ThreadPool(int num_threads) : stop(false) {
     for(int i = 0; i < num_threads; i++) {
         workers.emplace_back([this]() { workerThread(); });
     }
@@ -19,10 +19,26 @@ ThreadPool::~ThreadPool() {
 }
 
 void enqueue(std::function<void()> task) {
-
+    {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        tasks.push(std::move(task));
+    }
+    cv.notify_one();
 }
 
 void ThreadPool::workerThread() {
-
+    while (true) {
+        std::function<void()> task;
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            cv.wait(lock, [this]() {return stop || !tasks.empty(); });
+            if (stop && tasks.empty()) {
+                return;
+            }
+            task = std::move(tasks.front());
+            tasks.pop();
+        }
+        task();
+    }
 }
 
