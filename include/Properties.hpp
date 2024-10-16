@@ -7,6 +7,7 @@ class Properties {
     public:
         static Properties& getProperties();
         string getIP();
+        string getPort()
 
         enum Difficulties {
             Peaceful,
@@ -56,7 +57,7 @@ class Properties {
         string resource_pack_prompt = ""; 
         string resource_pack_sha1 = ""; 
          
-        string server_port = "25565"; 
+         
         int simulation_distance = 10; 
         bool spawn_animals = true; 
         bool spawn_monsters = true; 
@@ -78,4 +79,5 @@ class Properties {
         void splitLine(string line, string identifier, string value);
 
         string server_ip = "";
+        string server_port = "25565";
 };

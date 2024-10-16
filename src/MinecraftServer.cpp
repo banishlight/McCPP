@@ -9,18 +9,14 @@
 
 int main() {
     Console::getConsole().Entry("A C++ Minecraft Server");
-    Properties::getProperties(); // init properties first
-    // ConnectionList& myList = ConnectionList::getList();
-
+    &Properties myProperties = Properties::getProperties(); // init properties first
     CubSock serverSock;
-    serverSock.Listen(Properties::getProperties().getIP(), Properties::getProperties().query_port);
-    // Create RecievingThread
-    AcceptChild myAccept = AcceptChild();
 
+    if (serverSock.Listen(myProperties.getIP(), myProperties.getPort())) {
+        Console::getConsole().Error("Failed to bind port on: " + myProperties.getIP() + ":" + myProperties.getPort());
+        return -1;
+    }
     
-    // Create worker threads
-
-    // Initialize World
     
     return 0;
 }

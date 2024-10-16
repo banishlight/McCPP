@@ -330,3 +330,7 @@ string Properties::getIP() {
     return server_ip;
 }
 
+string Properties::getPort() {
+    return server_port;
+}
+

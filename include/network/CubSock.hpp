@@ -7,7 +7,7 @@ class CubSock {
         CubSock();
         ~CubSock();
         int Bind(string ip, string port);
-        int Accept(string ip, string port);
+        int Accept(int listen_fd);
         int Listen(string ip, string port);
         int Connect(string ip, string port);
     private:

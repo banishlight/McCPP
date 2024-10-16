@@ -19,7 +19,7 @@ typedef unsigned char Byte;
 typedef Byte ColourID;
 typedef unsigned char ByteArray[256];
 typedef string JsonTextComponent;
-typedef Int64 UUID; // needs to be 128bit int
+typedef Int64[2] UUID; // needs to be 128bit int
 typedef string Identifier;
 typedef string TextComponent;
 
