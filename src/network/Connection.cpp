@@ -1,5 +1,5 @@
 #include <network/Connection.hpp>
-#include <network/IPAddress.hpp>
+// #include <network/IPAddress.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>

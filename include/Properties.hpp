@@ -7,7 +7,7 @@ class Properties {
     public:
         static Properties& getProperties();
         string getIP();
-        string getPort()
+        string getPort();
 
         enum Difficulties {
             Peaceful,

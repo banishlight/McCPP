@@ -20,7 +20,7 @@ class Connection {
         Connection_State myState = Connection_State::Handshake;
         std::string ipaddress;
         int file_d = -1;
-        void decode_packet(void* packet);
+        void decode_packet(void* packet, int packetID);
         void* extractValue(void** packet, size_t size);
         int extractPacketID(void** packet);
         VarInt extractVarInt(void** packet);

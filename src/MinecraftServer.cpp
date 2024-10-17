@@ -3,13 +3,12 @@
 #include <Standards.hpp>
 #include <Properties.hpp>
 #include <network/Connection.hpp>
-#include <network/AcceptChild.hpp>
 #include <network/CubSock.hpp>
 #include <Console.hpp>
 
 int main() {
     Console::getConsole().Entry("A C++ Minecraft Server");
-    &Properties myProperties = Properties::getProperties(); // init properties first
+    Properties& myProperties = Properties::getProperties(); // init properties first
     CubSock serverSock;
 
     if (serverSock.Listen(myProperties.getIP(), myProperties.getPort())) {
