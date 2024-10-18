@@ -20,10 +20,10 @@ ThreadPool::~ThreadPool() {
 
 void ThreadPool::enqueue(std::function<void()> task) {
     {
-        std::unique_lock<std::mutex> lock(this->queueMutex);
-        this->tasks.push(std::move(task));
+        std::unique_lock<std::mutex> lock(queueMutex);
+        tasks.push(std::move(task));
     }
-    this->cv.notify_one();
+    cv.notify_one();
 }
 
 void ThreadPool::workerThread() {
