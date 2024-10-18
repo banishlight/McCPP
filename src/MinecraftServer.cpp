@@ -9,12 +9,13 @@
 int main() {
     Console::getConsole().Entry("A C++ Minecraft Server");
     Properties& myProperties = Properties::getProperties(); // init properties first
-    CubSock serverSock;
 
-    if (serverSock.Listen(myProperties.getIP(), myProperties.getPort())) {
+    int listen_fd = Listen(myProperties.getIP(), myProperties.getPort());
+    if (listen_fd) {
         Console::getConsole().Error("Failed to bind port on: " + myProperties.getIP() + ":" + myProperties.getPort());
         return -1;
     }
+    Connection myConnection = Connection(listen_fd);
     
     
     return 0;

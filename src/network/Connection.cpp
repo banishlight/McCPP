@@ -6,8 +6,8 @@
 #include <network/VarIntLong.hpp>
 #include <cstring>
 
-Connection::Connection() { 
-
+Connection::Connection(int fd) { 
+    this->file_d = fd;
 }
 
 Connection::~Connection() = default;

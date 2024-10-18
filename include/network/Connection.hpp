@@ -6,7 +6,7 @@
 
 class Connection {
     public:
-        Connection();
+        Connection(int fd);
         ~Connection();
     private:
         enum Connection_State {

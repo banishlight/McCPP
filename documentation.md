@@ -3,7 +3,6 @@
 ## TODO
 - Packet Function stubs now take the raw void*, data splitting done within method
 - Test CubSock
-    - no longer needs to be a class??
 - Finish function stubs in VarIntLong.cpp
     - Maybe rewrite VarIntLong.cpp?
 
