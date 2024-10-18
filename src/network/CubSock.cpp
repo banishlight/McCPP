@@ -11,7 +11,7 @@
 int Bind(string ip, string port) {
     struct addrinfo hints, *res;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = SOCK_STREAM;
+    hints.ai_socktype = SOCK_STREAM;
     hints.ai_family = AF_UNSPEC;
     int addr_result = getaddrinfo(ip.c_str(), port.c_str(), &hints, &res);
     if (addr_result != 0) { 
