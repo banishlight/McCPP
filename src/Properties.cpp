@@ -114,205 +114,205 @@ void Properties::checkString(string input) {
     if (input[0] == '#') {
         return; // Ignore comment line in file
     }
-    else if (identifier.compare("allow-flight")) {
+    else if (identifier.compare("allow-flight") == 0) {
         if (value.compare("true")) {
             this->allow_flight = true;
         }
     }
-    else if (identifier.compare("allow-nether")) {
+    else if (identifier.compare("allow-nether") == 0) {
         if (value.compare("false")) {
             this->allow_nether = false;
         }
     }
-    else if (identifier.compare("broadcast-console-to-ops")) {
+    else if (identifier.compare("broadcast-console-to-ops") == 0) {
         if (value.compare("false")) {
             this->broadcast_console_to_ops = false;
         }
     }
-    else if (identifier.compare("broadcast-rcon-to-ops")) {
+    else if (identifier.compare("broadcast-rcon-to-ops") == 0) {
         if (value.compare("false")) {
             this->broadcast_rcon_to_ops = false;
         }
     }
-    else if (identifier.compare("difficulty")) {
-        if (value.compare("peaceful")) {
+    else if (identifier.compare("difficulty") == 0) {
+        if (value.compare("peaceful") == 0) {
             this->difficulty = Peaceful;
         }
-        else if (value.compare("normal")) {
+        else if (value.compare("normal") == 0) {
             this->difficulty = Normal;
         }
-        else if (value.compare("hard")) {
+        else if (value.compare("hard") == 0) {
             this->difficulty = Hard;
         }
     }
-    else if (identifier.compare("enable-command-block")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("enable-command-block") == 0) {
+        if (value.compare("true") == 0) {
             this->enable_command_block = true;
         }
     }
-    else if (identifier.compare("enable-query")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("enable-query") == 0) {
+        if (value.compare("true") == 0) {
             this->enable_query = true;
         }
     }
-    else if (identifier.compare("enable-status")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("enable-status") == 0) {
+        if (value.compare("false") == 0) {
             this->enable_status = true;
         }
     }
-    else if (identifier.compare("enforce-whitelist")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("enforce-whitelist") == 0) {
+        if (value.compare("true") == 0) {
             this->enforce_whitelist = true;
         }
     }
-    else if (identifier.compare("force-gamemode")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("force-gamemode") == 0) {
+        if (value.compare("true") == 0) {
             this->force_gamemode = true;
         }
     }
-    else if (identifier.compare("function-permission-level")) {
+    else if (identifier.compare("function-permission-level") == 0) {
         this->function_permission_level = std::stoi(value);
     }
-    else if (identifier.compare("gamemode")) {
-        if (value.compare("creative") || value.compare("adventure") || 
-        value.compare("spectator")) {
+    else if (identifier.compare("gamemode") == 0) {
+        if (value.compare("creative") == 0 || value.compare("adventure") == 0 || 
+        value.compare("spectator") == 0) {
             this->gamemode = value;
         }
     }
-    else if (identifier.compare("generate-structures")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("generate-structures") == 0) {
+        if (value.compare("false") == 0) {
             this->generate_structures = false;
         }
     }
-    else if (identifier.compare("generator-settings")) {
+    else if (identifier.compare("generator-settings") == 0) {
         // TODO: This takes a JSON string
     }
-    else if (identifier.compare("hardcore")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("hardcore") == 0) {
+        if (value.compare("true") == 0) {
             this->hardcore = true;
         }
     }
-    else if (identifier.compare("hide-online-players")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("hide-online-players") == 0) {
+        if (value.compare("true") == 0) {
             this->hide_online_players = true;
         }
     }
-    else if (identifier.compare("level-name")) {
+    else if (identifier.compare("level-name") == 0) {
         this->level_name = value;
     }
-    else if (identifier.compare("level-seed")) {
+    else if (identifier.compare("level-seed") == 0) {
         this->level_seed = value;
     }
-    else if (identifier.compare("level-type")) {
+    else if (identifier.compare("level-type") == 0) {
         this->level_type = value;
     }
-    else if (identifier.compare("max-players")) {
+    else if (identifier.compare("max-players") == 0) {
         this->max_players = std::stoi(value);
     }
-    else if (identifier.compare("max-tick-time")) {
+    else if (identifier.compare("max-tick-time") == 0) {
         this->max_tick_time = std::stoi(value);
     }
-    else if (identifier.compare("max-world-size")) {
+    else if (identifier.compare("max-world-size") == 0) {
         this->max_world_size = std::stoi(value);
     }
-    else if (identifier.compare("motd")) {
+    else if (identifier.compare("motd") == 0) {
         this->motd = value;
     }
-    else if (identifier.compare("network-compression-threshold")) {
+    else if (identifier.compare("network-compression-threshold") == 0) {
         this->network_compression_threshold = std::stoi(value);
     }
-    else if (identifier.compare("online-mode")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("online-mode") == 0) {
+        if (value.compare("false") == 0) {
             this->online_mode = false;
         }
     }
-    else if (identifier.compare("op-permission-level")) {
+    else if (identifier.compare("op-permission-level") == 0) {
         this->op_permission_level = std::stoi(value);
     }
-    else if (identifier.compare("player-idle-timeout")) {
+    else if (identifier.compare("player-idle-timeout") == 0) {
         this->player_idle_timeout = std::stoi(value);
     }
-    else if (identifier.compare("prevent-proxy-connections")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("prevent-proxy-connections") == 0) {
+        if (value.compare("true") == 0) {
             this->prevent_proxy_connections = std::stoi(value);
         }
     }
-    else if (identifier.compare("pvp")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("pvp") == 0) {
+        if (value.compare("false") == 0) {
             this->pvp = false;
         }
     }
-    else if (identifier.compare("query.port")) {
+    else if (identifier.compare("query.port") == 0) {
         this->query_port = value;
     }
-    else if (identifier.compare("rate-limit")) {
+    else if (identifier.compare("rate-limit") == 0) {
         this->rate_limit = std::stoi(value);
     }
-    else if (identifier.compare("rcon.password")) {
+    else if (identifier.compare("rcon.password") == 0) {
         this->rcon_password = value;
     }
-    else if (identifier.compare("rcon.port")) {
+    else if (identifier.compare("rcon.port") == 0) {
         this->rcon_port = value;
     }
-    else if (identifier.compare("require-resource-pack")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("require-resource-pack") == 0) {
+        if (value.compare("true") == 0) {
             this->require_resource_pack = true;
         }
     }
-    else if (identifier.compare("resource-pack")) {
+    else if (identifier.compare("resource-pack") == 0) {
         this->resource_pack = value;
     }
-    else if (identifier.compare("resource-pack-prompt")) {
+    else if (identifier.compare("resource-pack-prompt") == 0) {
         this->resource_pack_prompt = value;
     }
-    else if (identifier.compare("resource-pack-sha1")) {
+    else if (identifier.compare("resource-pack-sha1") == 0) {
         this->resource_pack_sha1 = value;
     }
-    else if (identifier.compare("server-ip")) {
+    else if (identifier.compare("server-ip") == 0) {
         this->server_ip = value;
     }
-    else if (identifier.compare("server-port")) {
+    else if (identifier.compare("server-port") == 0) {
         this->server_port = value;
     }
-    else if (identifier.compare("simulation-distance")) {
+    else if (identifier.compare("simulation-distance") == 0) {
         this->simulation_distance = std::stoi(value);
     }
-    else if (identifier.compare("spawn-animals")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("spawn-animals") == 0) {
+        if (value.compare("false") == 0) {
             this->spawn_animals = false;
         }
     }
-    else if (identifier.compare("spawn-monsters")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("spawn-monsters") == 0) {
+        if (value.compare("false") == 0) {
             this->spawn_monsters = false;
         }
     }
-    else if (identifier.compare("spawn-npcs")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("spawn-npcs") == 0) {
+        if (value.compare("false") == 0) {
             this->spawn_npcs = false;
         }
     }
-    else if (identifier.compare("spawn-protection")) {
+    else if (identifier.compare("spawn-protection") == 0) {
         this->spawn_protection = std::stoi(value);
     }
-    else if (identifier.compare("sync-chunk-writes")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("sync-chunk-writes") == 0) {
+        if (value.compare("false") == 0) {
             this->sync_chunk_writes = false;
         }
     }
-    else if (identifier.compare("text-filtering-config")) {
+    else if (identifier.compare("text-filtering-config") == 0) {
         this->text_filtering_config = value;
     }
-    else if (identifier.compare("use-native-transport")) {
-        if (value.compare("false")) {
+    else if (identifier.compare("use-native-transport") == 0) {
+        if (value.compare("false") == 0) {
             this->use_native_transport = false;
         }
     }
-    else if (identifier.compare("view-distance")) {
+    else if (identifier.compare("view-distance") == 0) {
         this->view_distance = std::stoi(value);
     }
-    else if (identifier.compare("white-list")) {
-        if (value.compare("true")) {
+    else if (identifier.compare("white-list") == 0) {
+        if (value.compare("true") == 0) {
             this->white_list = true;
         }
     }
@@ -322,7 +322,7 @@ void Properties::checkString(string input) {
 }
 
 string Properties::getIP() {
-    if (this->server_ip.compare("")) {
+    if (this->server_ip.compare("") == 0) {
         // ERROR no ip set, throw exception
         Console::getConsole().Error("No IP set.");
     }
