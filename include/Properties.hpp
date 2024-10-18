@@ -76,7 +76,6 @@ class Properties {
         void generateDefault();
         void loadValues(std::ifstream& file);
         void checkString(string input);
-        void splitLine(string line, string identifier, string value);
 
         string server_ip = "";
         string server_port = "25565";

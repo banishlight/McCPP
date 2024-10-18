@@ -102,10 +102,15 @@ void Properties::loadValues(std::ifstream& file) {
 
 void Properties::checkString(string input) {
     // Split identifier and data here
-    string identifier;
-    string value;
-    splitLine(input, identifier, value);
+    string identifier, value;
+    std::istringstream iss(input);
+    getline(iss, identifier, '=');
+    getline(iss, value);
     // This could get gross, hopefully there is a better way.
+    #ifdef DEBUG
+        Console::getConsole().Entry("Identifier found: [" + identifier + "]");
+        Console::getConsole().Entry("Value found: [" + value + "]");
+    #endif
     if (input[0] == '#') {
         return; // Ignore comment line in file
     }
@@ -316,21 +321,15 @@ void Properties::checkString(string input) {
     }
 }
 
-void Properties::splitLine(string line, string identifier, string value) {
-    std::istringstream iss(line);
-    getline(iss, identifier, '=');
-    getline(iss, value);
-}
-
 string Properties::getIP() {
-    if (server_ip.compare("")) {
+    if (this->server_ip.compare("")) {
         // ERROR no ip set, throw exception
         Console::getConsole().Error("No IP set.");
     }
-    return server_ip;
+    return this->server_ip;
 }
 
 string Properties::getPort() {
-    return server_port;
+    return this->server_port;
 }
 

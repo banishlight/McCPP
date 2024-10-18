@@ -5,6 +5,7 @@
 - Test CubSock
 - Finish function stubs in VarIntLong.cpp
     - Maybe rewrite VarIntLong.cpp?
+- Move Standards.hpp to Fixed integer lengths: [here](https://en.cppreference.com/w/cpp/types/integer)
 
 
 
