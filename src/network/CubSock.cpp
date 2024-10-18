@@ -7,15 +7,8 @@
 #include <cstring>
 #include <Console.hpp>
 
-CubSock::CubSock() {
 
-}
-
-CubSock::~CubSock() {
-
-}
-
-int CubSock::Bind(string ip, string port) {
+int Bind(string ip, string port) {
     struct addrinfo hints, *res;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = SOCK_STREAM;
@@ -39,7 +32,7 @@ int CubSock::Bind(string ip, string port) {
     return sock_result;
 }
 
-int CubSock::Accept(int listen_fd) {  // Sus implementation
+int Accept(int listen_fd) {  // Sus implementation
     struct sockaddr_storage client_addr;
     socklen_t addr_size = sizeof(client_addr);
     int new_sock = accept(listen_fd, (struct sockaddr*)&client_addr, &addr_size);
@@ -50,7 +43,7 @@ int CubSock::Accept(int listen_fd) {  // Sus implementation
     return 0;
 }
 
-int CubSock::Listen(string ip, string port) {
+int Listen(string ip, string port) {
     const int BACKLOG = 10;
     int sock_result = Bind(ip, port);
     if (sock_result < 0) {
@@ -64,6 +57,6 @@ int CubSock::Listen(string ip, string port) {
     return 0;
 }
 
-int CubSock::Connect(string ip, string port) {
+int Connect(string ip, string port) {
     return 0;
 }
