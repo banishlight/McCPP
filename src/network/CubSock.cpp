@@ -19,7 +19,7 @@ int Bind(string ip, string port) {
         return -1; 
     } 
     int sock_result = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sock_result != 0) { 
+    if (sock_result == -1) { 
         Console::getConsole().Error("socket creation failed");
         freeaddrinfo(res);
         return -1; 
