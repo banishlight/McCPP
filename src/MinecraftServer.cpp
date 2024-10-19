@@ -18,9 +18,9 @@ int main() {
     Connection myConnection = Connection(listen_fd);
     
     while(true) {
-        if (Console::getConsole().Command() == 1) { return 0; }
+        if (Console::getConsole().Command() == 1) { break; }
     }
-    
+    // Clean up memory and threads here
     return 0;
 }
 
