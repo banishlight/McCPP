@@ -57,3 +57,25 @@ int Console::Error(string text) {
     myLog << text;
     return 0;
 }
+
+int Console::Command() {
+    string command;
+    std::cin >> command;
+    myLog << command;
+    myLog << "\n";
+    return CommandDecode(command);
+}
+
+int Console::CommandDecode(string command) {
+    if (command.compare("help") == 0) {
+        Entry("List of available commands:");
+    }
+    else if (command.compare("stop") == 0) {
+        Entry("Exiting server.");
+        return 1;
+    }
+    else {
+        Entry("Unkown command");
+    }
+    return 0;
+}
