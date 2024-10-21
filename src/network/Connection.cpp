@@ -121,7 +121,9 @@ VarLong Connection::extractVarLong(void** packet) {
 }
 
 ConnectionList::ConnectionList() {
-
+    Properties& myProperties = Properties::getProperties();
+    this->connections.reserve(myProperties.max_players);
+    this->count = 0;
 }
 
 ConnectionList::~ConnectionList() {
@@ -130,11 +132,6 @@ ConnectionList::~ConnectionList() {
 
 ConnectionList& ConnectionList::getList() {
     static ConnectionList singleton;
-    if (singleton.count == -1) {
-        Properties& myProperties = Properties::getProperties();
-        singleton.connections.reserve(myProperties.max_players);
-        singleton.count = 0;
-    }
     return singleton;
 }
 
