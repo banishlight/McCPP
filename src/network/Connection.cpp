@@ -1,5 +1,4 @@
 #include <network/Connection.hpp>
-// #include <network/IPAddress.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>
@@ -147,4 +146,12 @@ void ConnectionList::addConnection(Connection member) {
     this->connections.push_back(member);  
     this->count += 1;
     // Perform sorted insert here instead
+}
+
+void ConnectionList::setListenfd(int fd) {
+    listen_fd = fd;
+}
+
+int ConnectionList::getListenfd() {
+    return listen_fd;
 }

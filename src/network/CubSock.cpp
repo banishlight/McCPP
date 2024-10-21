@@ -13,6 +13,7 @@ int Bind(string ip, string port) {
     memset(&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = AI_PASSIVE;
     int addr_result = getaddrinfo(ip.c_str(), port.c_str(), &hints, &res);
     if (addr_result != 0) { 
         Console::getConsole().Error("getaddrinfo failure");
@@ -29,6 +30,7 @@ int Bind(string ip, string port) {
         freeaddrinfo(res);
         return -1;
     }
+    freeaddrinfo(res);
     return sock_result;
 }
 
@@ -40,7 +42,7 @@ int Accept(int listen_fd) {  // Sus implementation
         Console::getConsole().Error("Accept failed");
         return -1;
     }
-    return 0;
+    return new_sock;
 }
 
 int Listen(string ip, string port) {
@@ -51,10 +53,11 @@ int Listen(string ip, string port) {
     }
     if (listen(sock_result, BACKLOG) < 0) {
         Console::getConsole().Error("Listen failed");
+        // close(sock_result);
         return -1;
     }
     Console::getConsole().Entry("Listen successful on " + ip + ":" + port);
-    return 0;
+    return sock_result;
 }
 
 int Connect(string ip, string port) {

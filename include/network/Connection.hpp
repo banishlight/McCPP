@@ -1,5 +1,5 @@
 #pragma once
-#include <string>
+#include <Standards.hpp>
 #include <unordered_map>
 #include <vector>
 #include <network/VarIntLong.hpp>
@@ -18,7 +18,7 @@ class Connection {
             Closed
         };
         Connection_State myState = Connection_State::Handshake;
-        std::string ipaddress;
+        string ipaddress;
         int file_d = -1;
         void decode_packet(void* packet, int packetID);
         void* extractValue(void** packet, size_t size);
@@ -31,8 +31,11 @@ class ConnectionList {
     public:
         static ConnectionList& getList();
         void addConnection(Connection member);
+        void setListenfd(int fd);
+        int getListenfd();
     private:
-        int count = -1; // -1 if uninitialized
+        int listen_fd = -1;
+        int count = -1;
         std::vector<Connection> connections;
         ConnectionList();
         ~ConnectionList();
