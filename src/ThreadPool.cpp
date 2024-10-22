@@ -1,5 +1,6 @@
 #include <ThreadPool.hpp>
 #include <thread>
+#include <Console.hpp>
 
 ThreadPool::ThreadPool(int num_threads) : stop(false) {
     for(int i = 0; i < num_threads; i++) {
@@ -8,6 +9,7 @@ ThreadPool::ThreadPool(int num_threads) : stop(false) {
 }
 
 ThreadPool::~ThreadPool() {
+    Console::getConsole().Entry("Closing ThreadPool");
     {
         std::unique_lock<std::mutex> lock(queueMutex);
         stop = true;

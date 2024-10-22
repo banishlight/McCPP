@@ -16,13 +16,13 @@ NetworkHandler::NetworkHandler() {
     ConnectionList::getList().setListenfd(listen_fd);
 
     // Create Thread pool
-    ThreadPool netThreads(4);
+    netThreads = new ThreadPool(4);
     Console::getConsole().Entry("Thread Pool Created");
     // Create Thread to manage pool
 }
 
 NetworkHandler::~NetworkHandler() {
-
+    
 }
 
 NetworkHandler& NetworkHandler::getHandler() {
@@ -31,5 +31,5 @@ NetworkHandler& NetworkHandler::getHandler() {
 }
 
 void NetworkHandler::close() {
-
+    delete netThreads;
 }

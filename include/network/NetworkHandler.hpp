@@ -1,4 +1,5 @@
 #pragma once
+#include <ThreadPool.hpp>
 
 class NetworkHandler {
     public:
@@ -7,4 +8,5 @@ class NetworkHandler {
     private:
         NetworkHandler();
         ~NetworkHandler();
+        ThreadPool* netThreads;
 };
