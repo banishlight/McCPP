@@ -4,6 +4,7 @@
 #include <network/ToServerPacket.hpp>
 #include <network/VarIntLong.hpp>
 #include <cstring>
+#include <network/CubSock.hpp>
 
 Connection::Connection(int fd) { 
     this->file_d = fd;
@@ -120,6 +121,11 @@ VarLong Connection::extractVarLong(void** packet) {
 
 }
 
+int Connection::getFD() {
+    return file_d;
+}
+
+
 ConnectionList::ConnectionList() {
     Properties& myProperties = Properties::getProperties();
     this->connections.reserve(myProperties.max_players);
@@ -151,4 +157,16 @@ void ConnectionList::setListenfd(int fd) {
 
 int ConnectionList::getListenfd() {
     return listen_fd;
+}
+
+int ConnectionList::close() {
+    int result = 0;
+    for (auto it = connections.begin(); it != connections.end(); it++) {
+        result = Closefd(it->getFD());
+        if (result != 0) {
+            Console::getConsole().Error("Failed to close connection on fd: " + it->getFD());
+            return -1;
+        }
+    }
+    return 0;
 }

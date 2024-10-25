@@ -1,12 +1,14 @@
-#include <network/CubSock.hpp>
-#include <Standards.hpp>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <cstring>
-#include <Console.hpp>
 
+#include <Console.hpp>
+#include <network/CubSock.hpp>
+#include <network/Connection.hpp>
+#include <Standards.hpp>
 
 int Bind(string ip, string port) {
     struct addrinfo hints, *res;
@@ -62,4 +64,13 @@ int Listen(string ip, string port) {
 
 int Connect(string ip, string port) {
     return 0;
+}
+
+// Will fetch fds from ConnectionList to poll
+int Poll() {
+
+}
+
+int Closefd(int fd) {
+    return close(fd);
 }

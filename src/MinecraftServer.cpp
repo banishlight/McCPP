@@ -16,5 +16,6 @@ int main() {
     }
     // Clean up memory and threads here
     NetworkHandler::getHandler().close();
+    ConnectionList::getList().close();
     return 0;
 }

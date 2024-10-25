@@ -8,6 +8,7 @@ class Connection {
     public:
         Connection(int fd);
         ~Connection();
+        int getFD();
     private:
         enum Connection_State {
             Handshake,
@@ -33,6 +34,7 @@ class ConnectionList {
         void addConnection(Connection member);
         void setListenfd(int fd);
         int getListenfd();
+        int close();
     private:
         int listen_fd = -1;
         int count = -1;
