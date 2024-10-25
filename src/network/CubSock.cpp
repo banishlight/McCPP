@@ -4,7 +4,6 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <cstring>
-
 #include <Console.hpp>
 #include <network/CubSock.hpp>
 #include <network/Connection.hpp>

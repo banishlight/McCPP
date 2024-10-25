@@ -3,7 +3,6 @@
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>
 #include <network/VarIntLong.hpp>
-#include <cstring>
 #include <network/CubSock.hpp>
 
 Connection::Connection(int fd) { 
@@ -90,35 +89,6 @@ void Connection::decode_packet(void* packet, int packetID) {
         case Closed:
             break;
     }
-}
-
-// Will need to be modified or other functions declared for variable sized types
-// return value will need to be cast to the appropriate type and then freed
-// WARNING, return value must be freed!
-void* Connection::extractValue(void** packet, size_t size) {
-    char** bytePtr = reinterpret_cast<char**>(packet);
-    void* value = malloc(size);
-    std::memcpy(value, *bytePtr, size);
-    *bytePtr += size;
-    return value;
-}
-
-// Wrong, PacketID's are stored as VarInt
-int Connection::extractPacketID(void** packet) {
-    char** bytePtr = reinterpret_cast<char**>(packet);
-    int value = static_cast<int>(**bytePtr);
-    *bytePtr += 1;
-    return value;
-}
-
-VarInt Connection::extractVarInt(void** packet) {
-    int value = 0;
-    int position = 0;
-    
-}
-
-VarLong Connection::extractVarLong(void** packet) {
-
 }
 
 int Connection::getFD() {

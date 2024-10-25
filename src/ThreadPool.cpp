@@ -1,5 +1,5 @@
-#include <ThreadPool.hpp>
 #include <thread>
+#include <ThreadPool.hpp>
 #include <Console.hpp>
 
 ThreadPool::ThreadPool(int num_threads) : stop(false) {

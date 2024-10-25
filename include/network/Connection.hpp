@@ -1,7 +1,7 @@
 #pragma once
-#include <Standards.hpp>
 #include <unordered_map>
 #include <vector>
+#include <Standards.hpp>
 #include <network/VarIntLong.hpp>
 
 class Connection {
@@ -22,10 +22,6 @@ class Connection {
         string ipaddress;
         int file_d = -1;
         void decode_packet(void* packet, int packetID);
-        void* extractValue(void** packet, size_t size);
-        int extractPacketID(void** packet);
-        VarInt extractVarInt(void** packet);
-        VarLong extractVarLong(void** packet);
 };
 
 class ConnectionList {
