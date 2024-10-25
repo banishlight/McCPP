@@ -2,7 +2,7 @@
 #include <network/Position.hpp>
 #include <vector>
 
-Position::Position(Int32 posX =0 , Int32 posY = 0, Int32 posZ = 0)
+Position::Position(Int32 posX, Int32 posY, Int32 posZ)
 {
 	this->posX = posX;
 	this->posY = posY;
