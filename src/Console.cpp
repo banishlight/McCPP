@@ -25,6 +25,7 @@ Console::Console() {
     if (!this->myLog) {
         std::cerr << "Failed to open log file: " << filename << std::endl;
     }
+    initList();
 }
 
 Console::~Console() {
@@ -38,7 +39,9 @@ Console& Console::getConsole() {
 
 int Console::Entry(string text) {
     text = text + "\n";
+    setColour(32, OUT);
     std::cout << text;
+    resetColour(OUT);
     myLog << text;
     return 0;
 }
@@ -68,7 +71,8 @@ int Console::Command() {
 
 int Console::CommandDecode(string command) {
     if (command.compare("help") == 0) {
-        Entry("List of available commands:");
+        Entry("List of available commands: ");
+        // Entry(commandList);
     }
     else if (command.compare("stop") == 0) {
         Entry("Exiting server.");
@@ -78,4 +82,31 @@ int Console::CommandDecode(string command) {
         Entry("Unkown command");
     }
     return 0;
+}
+
+void Console::resetColour(Stream stream) { 
+    switch (stream) {
+        case OUT:
+            std::cout << "\033[0m";
+        break;
+        case ERR:
+            std::cerr << "\033[0m";
+        break;
+    }
+     
+}
+void Console::setColour(int colour, Stream stream) {
+    switch (stream) {
+        case OUT:
+            std::cout << "\033[" << colour << "m";
+        break;
+        case ERR:
+            std::cerr << "\033[" << colour << "m";
+        break;
+    } 
+    
+}
+
+int Console::initList() {
+
 }
