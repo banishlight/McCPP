@@ -1,6 +1,6 @@
 # Variables
 CXX := g++
-CXXFLAGS := -Wall -Wextra -std=c++17 -g -MMD -Wno-unused-parameter
+CXXFLAGS := -Wall -Wextra -std=c++17 -MMD -Wno-unused-parameter
 LDFLAGS := 
 SRC_DIR := src
 BUILD_DIR := build
@@ -20,7 +20,7 @@ all: directories $(TARGET)
 
 # Debug target
 debug: CXXFLAGS += -D DEBUG
-# debug: LDFLAGS += -g # Might use in the future
+debug: LDFLAGS += -g
 debug: directories $(TARGET)
 
 # Link the final executable
