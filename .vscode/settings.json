@@ -6,5 +6,8 @@
             "binaryPath": "/home/banishlight/programming/McCPP/bin/MinecraftServer",
             "binaryArgs": []
         }
-    ]
+    ],
+    "files.associations": {
+        "iostream": "cpp"
+    }
 }

@@ -48,7 +48,9 @@ int Console::Entry(string text) {
 
 int Console::Post() {
     string text;
+    setColour(36, IN);
     std::cin >> text;
+    resetColour(IN);
     myLog << text;
     myLog << "\n";
     return 0;
@@ -56,7 +58,9 @@ int Console::Post() {
 
 int Console::Error(string text) {
     text = "Error: " + text + "\n";
+    setColour(31, ERR);
     std::cerr << text;
+    resetColour(ERR);
     myLog << text;
     return 0;
 }
@@ -92,9 +96,13 @@ void Console::resetColour(Stream stream) {
         case ERR:
             std::cerr << "\033[0m";
         break;
+        case IN:
+            // a hack since cin can't be given escape characters
+            std::cout << "\033[0m";
+        break;
     }
-     
 }
+
 void Console::setColour(int colour, Stream stream) {
     switch (stream) {
         case OUT:
@@ -103,10 +111,13 @@ void Console::setColour(int colour, Stream stream) {
         case ERR:
             std::cerr << "\033[" << colour << "m";
         break;
+        case IN:
+            // a hack since cin can't be given escape characters
+            std::cout << "\033[" << colour << "m";
+        break;
     } 
-    
 }
 
 int Console::initList() {
-
+    return 0;
 }
