@@ -16,14 +16,13 @@ class Console {
     public:
         static Console& getConsole();
         int Entry(string text);
-        int Post();
+        string Post();
         int Error(string text);
         int Command();
     private:
         Console();
         ~Console();
         int CommandDecode(string command);
-        void resetColour(Stream stream);
         void setColour(int colour, Stream stream);
         int initList();
         bool opened = false;
@@ -39,4 +38,7 @@ class Console {
             cyan=36,
             lightgray=37
         };
+        const int IN_COLOUR = cyan;
+        const int OUT_COLOUR = green;
+        const int ERR_COLOUR = red;
 };

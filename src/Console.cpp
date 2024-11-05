@@ -39,35 +39,37 @@ Console& Console::getConsole() {
 
 int Console::Entry(string text) {
     text = text + "\n";
-    setColour(32, OUT);
+    setColour(OUT_COLOUR, OUT);
     std::cout << text;
-    resetColour(OUT);
+    setColour(0, OUT);
     myLog << text;
     return 0;
 }
 
-int Console::Post() {
+string Console::Post() {
     string text;
-    setColour(36, IN);
+    setColour(IN_COLOUR, IN);
     std::cin >> text;
-    resetColour(IN);
+    setColour(0, IN);
     myLog << text;
     myLog << "\n";
-    return 0;
+    return text;
 }
 
 int Console::Error(string text) {
     text = "Error: " + text + "\n";
-    setColour(31, ERR);
+    setColour(ERR_COLOUR, ERR);
     std::cerr << text;
-    resetColour(ERR);
+    setColour(0, ERR);
     myLog << text;
     return 0;
 }
 
 int Console::Command() {
     string command;
+    setColour(IN_COLOUR, IN);
     std::cin >> command;
+    setColour(0, IN);
     myLog << command;
     myLog << "\n";
     return CommandDecode(command);
@@ -88,32 +90,27 @@ int Console::CommandDecode(string command) {
     return 0;
 }
 
-void Console::resetColour(Stream stream) { 
-    switch (stream) {
-        case OUT:
-            std::cout << "\033[0m";
-        break;
-        case ERR:
-            std::cerr << "\033[0m";
-        break;
-        case IN:
-            // a hack since cin can't be given escape characters
-            std::cout << "\033[0m";
-        break;
-    }
-}
-
 void Console::setColour(int colour, Stream stream) {
     switch (stream) {
         case OUT:
-            std::cout << "\033[" << colour << "m";
+            if(colour == 0) {
+                std::cout << "\033[0m";
+            }
+            else { std::cout << "\033[" << colour << "m"; }
+            
         break;
         case ERR:
-            std::cerr << "\033[" << colour << "m";
+            if(colour == 0) {
+                std::cerr << "\033[0m";
+            }
+            else { std::cerr << "\033[" << colour << "m"; }
         break;
         case IN:
+            if(colour == 0) {
+                std::cout << "\033[0m";
+            }
             // a hack since cin can't be given escape characters
-            std::cout << "\033[" << colour << "m";
+            else { std::cout << "\033[" << colour << "m"; }
         break;
     } 
 }
