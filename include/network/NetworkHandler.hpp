@@ -1,5 +1,6 @@
 #pragma once
 #include <ThreadPool.hpp>
+#include <network/Connection.hpp>
 #include <thread>
 
 class NetworkHandler {
