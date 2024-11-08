@@ -9,6 +9,7 @@ class Connection {
         Connection(int fd);
         ~Connection();
         int getFD();
+        bool isConnected();
     private:
         enum Connection_State {
             Handshake,
@@ -22,6 +23,7 @@ class Connection {
         string ipaddress;
         int file_d = -1;
         void decode_packet(void* packet, int packetID);
+        bool connected = false;
 };
 
 class ConnectionList {

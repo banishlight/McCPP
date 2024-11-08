@@ -7,6 +7,7 @@
 
 Connection::Connection(int fd) { 
     this->file_d = fd;
+    connected = true;
 }
 
 Connection::~Connection() = default;
@@ -95,6 +96,13 @@ int Connection::getFD() {
     return file_d;
 }
 
+bool Connection::isConnected() {
+    return connected;
+}
+
+bool Connection::processPacket() {
+    return false;
+}
 
 ConnectionList::ConnectionList() {
     Properties& myProperties = Properties::getProperties();

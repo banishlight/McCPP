@@ -1,8 +1,8 @@
 # Documentation of McCPP
 
 ## TODO
+- Implement processPacket() in Connection:: 
 - Packet Function stubs now take the raw void*, data splitting done within method
-- Test CubSock
 - Finish function stubs in VarIntLong.cpp
     - Maybe rewrite VarIntLong.cpp?
 - Move Standards.hpp to Fixed integer lengths: [here](https://en.cppreference.com/w/cpp/types/integer)

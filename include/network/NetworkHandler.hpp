@@ -1,5 +1,6 @@
 #pragma once
 #include <ThreadPool.hpp>
+#include <thread>
 
 class NetworkHandler {
     public:
@@ -9,5 +10,9 @@ class NetworkHandler {
     private:
         NetworkHandler();
         ~NetworkHandler();
+        void acceptConnectionsLoop();
+        void processConnection(Connection conn);
         ThreadPool* netThreads;
+        bool acceptConnections;
+        std::thread acceptThread;
 };

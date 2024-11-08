@@ -91,6 +91,7 @@ int Console::CommandDecode(string command) {
 }
 
 void Console::setColour(int colour, Stream stream) {
+    // 0 resets the colour to system default
     switch (stream) {
         case OUT:
             if(colour == 0) {
@@ -106,10 +107,10 @@ void Console::setColour(int colour, Stream stream) {
             else { std::cerr << "\033[" << colour << "m"; }
         break;
         case IN:
+        // use cout, a hack since cin can't be given escape characters
             if(colour == 0) {
                 std::cout << "\033[0m";
             }
-            // a hack since cin can't be given escape characters
             else { std::cout << "\033[" << colour << "m"; }
         break;
     } 

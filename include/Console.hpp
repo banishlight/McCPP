@@ -29,6 +29,7 @@ class Console {
         std::ofstream myLog;
         std::unordered_map<string, string> commandList;
         enum Colours {
+            none=0,
             black=30,
             red=31,
             green=32,
@@ -38,7 +39,7 @@ class Console {
             cyan=36,
             lightgray=37
         };
-        const int IN_COLOUR = cyan;
+        const int IN_COLOUR = none;
         const int OUT_COLOUR = green;
         const int ERR_COLOUR = red;
 };

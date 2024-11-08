@@ -324,7 +324,7 @@ void Properties::checkString(string input) {
 string Properties::getIP() {
     if (this->server_ip.compare("") == 0) {
         // ERROR no ip set, throw exception
-        Console::getConsole().Error("No IP set.");
+        Console::getConsole().Error("Properties::getIP() : No IP set.");
     }
     return this->server_ip;
 }
