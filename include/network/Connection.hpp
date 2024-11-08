@@ -10,6 +10,7 @@ class Connection {
         ~Connection();
         int getFD();
         bool isConnected();
+        bool processPacket();
     private:
         enum Connection_State {
             Handshake,
