@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <Standards.hpp>
 
-UInt32 VarInt::EncodedLength(UInt32 index){
+UInt32 VarInt::EncodedLength(UInt32 index) {
 	UInt32 result = 0;
 	while (this->varIntBuf[index + result] > CONTINUE_BIT) {
 		result++;
@@ -45,11 +45,13 @@ void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
 
 Int32 VarInt::raw_ReadVarInt() { 
 	Int32 result = 0;
+	#warning "implementation unfinished"
 	return result;
 }
 
 VarInt VarInt::raw_WriteVarInt(Int32 value) {
 	VarInt result;
+	#warning "implementation unfinished"
 	return result;
 }
 

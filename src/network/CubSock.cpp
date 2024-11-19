@@ -67,7 +67,8 @@ int Connect(string ip, string port) {
 
 // Will fetch fds from ConnectionList to poll
 int Poll() {
-
+    #warning "implementation unfinished"
+    return 0;
 }
 
 int Closefd(int fd) {

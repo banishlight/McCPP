@@ -12,17 +12,15 @@ NetworkHandler::NetworkHandler() {
 
 NetworkHandler::~NetworkHandler() {
     acceptConnections = false;
-
+    if (acceptThread.joinable()) {
+        acceptThread.join();
+    }
     delete netThreads;
 }
 
 NetworkHandler& NetworkHandler::getHandler() {
     static NetworkHandler singleton;
     return singleton;
-}
-
-void NetworkHandler::close() {
-    delete netThreads;
 }
 
 int NetworkHandler::initNetwork() {
@@ -34,8 +32,6 @@ int NetworkHandler::initNetwork() {
         return -1;
     }
     ConnectionList::getList().setListenfd(listen_fd);
-
-    // Create Thread pool
     netThreads = new ThreadPool(4);
     Console::getConsole().Entry("Thread Pool Created");
     // Create Thread to manage pool

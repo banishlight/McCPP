@@ -15,7 +15,7 @@ int main() {
         if (Console::getConsole().Command() == 1) { break; }
     }
     // Clean up memory and threads here
-    NetworkHandler::getHandler().close();
+    // NetworkHandler::getHandler().close();
     ConnectionList::getList().close();
     return 0;
 }

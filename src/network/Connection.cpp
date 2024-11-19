@@ -100,7 +100,9 @@ bool Connection::isConnected() {
     return connected;
 }
 
+// Public call to grab packet from self fd and decode it
 bool Connection::processPacket() {
+    #warning "implementation unfinished"
     return false;
 }
 
@@ -121,7 +123,7 @@ ConnectionList& ConnectionList::getList() {
 
 void ConnectionList::addConnection(Connection member) {
     if (this->count == -1) {
-        Console::getConsole().Error("No IP set.");
+        Console::getConsole().Error("ConnectionList::addConnection() : No IP set.");
         return;// ERROR HERE, UNREACHABLE
     }
     this->connections.push_back(member);  
