@@ -13,8 +13,8 @@ class ThreadPool {
         void enqueue(std::function<void()> task);
 
     private:
-        std::vector<std::thread> workers;
-        std::queue<std::function<void()>> tasks;
+        std::vector<std::thread> workerList;
+        std::queue<std::function<void()>> taskQ;
         std::mutex queueMutex;
         std::condition_variable cv;
         bool stop;

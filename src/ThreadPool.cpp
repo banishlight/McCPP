@@ -4,7 +4,7 @@
 
 ThreadPool::ThreadPool(int num_threads) : stop(false) {
     for(int i = 0; i < num_threads; i++) {
-        workers.emplace_back([this]() { workerThread(); });
+        workerList.emplace_back([this]() { workerThread(); });
     }
 }
 
@@ -15,7 +15,7 @@ ThreadPool::~ThreadPool() {
         stop = true;
     }
     cv.notify_all();
-    for(std::thread& worker : workers) {
+    for(std::thread& worker : workerList) {
         worker.join();
     }
 }
@@ -23,7 +23,7 @@ ThreadPool::~ThreadPool() {
 void ThreadPool::enqueue(std::function<void()> task) {
     {
         std::unique_lock<std::mutex> lock(queueMutex);
-        tasks.push(std::move(task));
+        taskQ.push(std::move(task));
     }
     cv.notify_one();
 }
@@ -33,12 +33,12 @@ void ThreadPool::workerThread() {
         std::function<void()> task;
         {
             std::unique_lock<std::mutex> lock(queueMutex);
-            cv.wait(lock, [this]() {return stop || !tasks.empty(); });
-            if (stop && tasks.empty()) {
+            cv.wait(lock, [this]() {return stop || !taskQ.empty(); });
+            if (stop && taskQ.empty()) {
                 return;
             }
-            task = std::move(tasks.front());
-            tasks.pop();
+            task = std::move(taskQ.front());
+            taskQ.pop();
         }
         task();
     }
