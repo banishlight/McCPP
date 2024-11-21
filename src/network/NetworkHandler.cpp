@@ -47,11 +47,7 @@ void NetworkHandler::acceptConnectionsLoop() {
         if (clientSock != -1) {
             Console::getConsole().Entry("Accepted new connection.");
             Connection newConn(clientSock);
-
-            // Add connection to the ConnectionList
             ConnectionList::getList().addConnection(newConn);
-
-            // Enqueue a task to process this connection
             netThreads->enqueue([this, newConn]() mutable {
                 processConnection(newConn);
             });
@@ -63,23 +59,17 @@ void NetworkHandler::acceptConnectionsLoop() {
 }
 
 void NetworkHandler::processConnection(Connection conn) {
-    // Check if the connection is still valid
     if (!conn.isConnected()) {
         Console::getConsole().Entry("Connection closed.");
-        return;  // Exit this task
+        // Remove connection from list
+        return;  
     }
-
     // Attempt to decode a single packet
-    if (conn.processPacket()) { 
-        // Successfully processed a packet, requeue for further processing
-        netThreads->enqueue([this,conn]() mutable {
-            processConnection(conn);
-        });
-    } else {
-        // No packet available; requeue after a short delay
+    if (!conn.processPacket()) { 
+        // Avoid busy waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        netThreads->enqueue([this,conn]() mutable {
+    }
+    netThreads->enqueue([this,conn]() mutable {
             processConnection(conn);
         });
-    }
 }
