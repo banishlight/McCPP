@@ -14,7 +14,7 @@ OBJ := $(SRC:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 DEPS := $(OBJ:.o=.d)
 
 # Rules
-.PHONY: all clean directories debug
+.PHONY: all clean directories debug fast
 
 all: directories $(TARGET)
 
@@ -22,6 +22,10 @@ all: directories $(TARGET)
 debug: CXXFLAGS += -D DEBUG
 debug: LDFLAGS += -g
 debug: directories $(TARGET)
+
+# Optimizations included
+fast: CXXFLAGS += -Ofast
+fast: directories $(TARGET)
 
 # Link the final executable
 $(TARGET): $(OBJ)
