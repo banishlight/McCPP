@@ -34,6 +34,7 @@ class ConnectionList {
         void setListenfd(int fd);
         int getListenfd();
         int close();
+        void removeConnection(Connection conn);
     private:
         int listen_fd = -1;
         int count = -1;

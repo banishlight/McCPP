@@ -150,3 +150,16 @@ int ConnectionList::close() {
     }
     return 0;
 }
+
+void ConnectionList::removeConnection(Connection conn) {
+    int fd = conn.getFD();
+    for (auto it = connections.begin(); it != connections.end(); ++it) {
+        if (it->getFD() == fd) { // No const requirement here
+            connections.erase(it); // Remove the connection
+            count -= 1;
+            Console::getConsole().Entry("Connection removed successfully by FD.");
+            return;
+        }
+    }
+    Console::getConsole().Error("Connection not found by FD.");
+}
