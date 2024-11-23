@@ -17,6 +17,7 @@ void Connection::decode_packet(void* packet, int packetID) {
         case Handshake:
             if (packetID == 0x00) {
                 // call server_Handshake();
+                Console::getConsole().Error("In Handshake, 0x00 found.  Unhandled.");
             }
             else {
                 Console::getConsole().Error("Bad Packet ID in Handshake");
@@ -25,9 +26,11 @@ void Connection::decode_packet(void* packet, int packetID) {
         case Status:
             if (packetID == 0x00) {
                 // call server_Status_Request();
+                Console::getConsole().Error("In Status, 0x00 found.  Unhandled.");
             }
             else if (packetID == 0x01) {
                 // call server_Ping_Request();
+                Console::getConsole().Error("In Status, 0x01 found.  Unhandled.");
             }
             else {
                 Console::getConsole().Error("Bad Packet ID in Status");
@@ -37,18 +40,23 @@ void Connection::decode_packet(void* packet, int packetID) {
             switch(packetID) {
                 case 0x00:
                     // call server_Login_Start();
+                    Console::getConsole().Error("In Login, 0x00 found.  Unhandled.");
                     break;
                 case 0x01:
                     // call server_Encryption_Response();
+                    Console::getConsole().Error("In Login, 0x01 found.  Unhandled.");
                     break;
                 case 0x02:
                     // call server_Plugin_Response();
+                    Console::getConsole().Error("In Login, 0x02 found.  Unhandled.");
                     break;
                 case 0x03:
                     // call server_Login_Acknowledged();
+                    Console::getConsole().Error("In Login, 0x03 found.  Unhandled.");
                     break;
                 case 0x04:
                     // call server_Cookie_Reponse_login();
+                    Console::getConsole().Error("In Login, 0x04 found.  Unhandled.");
                     break;
                 default:
                     Console::getConsole().Error("Bad Packet ID in Login");
@@ -58,27 +66,35 @@ void Connection::decode_packet(void* packet, int packetID) {
             switch(packetID) {
                 case 0x00:
                     // call server_Client_Information();
+                    Console::getConsole().Error("In Config, 0x00 found.  Unhandled.");
                     break;
                 case 0x01:
                     // call server_Cookie_Response();
+                    Console::getConsole().Error("In Config, 0x01 found.  Unhandled.");
                     break;
                 case 0x02:
                     // call server_Plugin_Message();
+                    Console::getConsole().Error("In Config, 0x02 found.  Unhandled.");
                     break;
                 case 0x03:
                     // call server_Acknowledge_Finish_Conifg();
+                    Console::getConsole().Error("In Config, 0x03 found.  Unhandled.");
                     break;
                 case 0x04:
                     // call server_Keep_Alive();
+                    Console::getConsole().Error("In Config, 0x04 found.  Unhandled.");
                     break;
                 case 0x05:
                     // call server_Pong();
+                    Console::getConsole().Error("In Config, 0x05 found.  Unhandled.");
                     break;
                 case 0x06:
                     // call server_Resource_Pack_Reponse();
+                    Console::getConsole().Error("In Config, 0x06 found.  Unhandled.");
                     break;
                 case 0x07:
                     // call server_Known_Packs();
+                    Console::getConsole().Error("In Config, 0x07 found.  Unhandled.");
                     break;
                 default:
                     Console::getConsole().Error("Bad Packet ID in Config");
