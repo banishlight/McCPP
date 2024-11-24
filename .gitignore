@@ -3,6 +3,7 @@ obj
 *.swp
 McCPP.vcxproj.user
 .vs
+.vscode
 McCPP.sln
 McCPP.vcxproj
 McCPP.vcxproj.user
