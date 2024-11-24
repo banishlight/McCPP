@@ -12,7 +12,7 @@ Connection::Connection(int fd) {
 
 Connection::~Connection() = default;
 
-void Connection::decode_packet(void* packet, int packetID) {
+void Connection::decode_packet(void* packetData, int packetID) {
     switch(myState) {
         case Handshake:
             if (packetID == 0x00) {
@@ -119,7 +119,10 @@ bool Connection::isConnected() {
 // Public call to grab packet from self fd and decode it
 bool Connection::processPacket() {
     #warning "implementation unfinished"
+    // Get packet off of fd, if none:
     return false;
+    // else:
+    // extract packet (VarInt)Length, (VarInt)ID, (byte array)Data
 }
 
 ConnectionList::ConnectionList() {
