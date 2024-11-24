@@ -68,14 +68,17 @@ void server_Keep_Alive(void* packet) {
 
 }
 
-void server_Pong(Int32 id) {
+// Int32 id
+void server_Pong(void* packet) {
 
 }
 
-void server_Resource_Pack_Response(UUID uuid, VarInt result) {
+// UUID uuid, VarInt result
+void server_Resource_Pack_Response(void* packet) {
 
 }
 
-void server_Known_Packs(VarInt pack_count, string* name_space, string* id, string* version) {
+// VarInt pack_count, string* name_space, string* id, string* version
+void server_Known_Packs(void* packet) {
     
 }
