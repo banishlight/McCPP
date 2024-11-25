@@ -1,89 +1,87 @@
 #include <network/VarIntLong.hpp>
-#include <unistd.h>
 #include <Standards.hpp>
+#include <Console.hpp>
+#include <cstring>   // For memcpy
+#include <vector>
 
-UInt32 VarInt::EncodedLength(UInt32 index) {
-	UInt32 result = 0;
-	while (this->varIntBuf[index + result] > CONTINUE_BIT) {
-		result++;
+// ==VarInt==
+VarInt::VarInt(int num) : value(static_cast<Int32>(num)) {}
+
+VarInt::VarInt(Int32 num) : value(num) {}
+
+VarInt::VarInt(void* packet) {
+	value = decode(packet);
+}
+
+Int32 VarInt::getRawValue() {
+	return value;
+}
+
+int VarInt::getValue() {
+	return static_cast<int>(value);
+}
+
+Int32 VarInt::decode(void*& packet) {
+	Int32 value = 0;
+    int position = 0;
+    Int8 currentByte;
+	while(true) {
+		std::memcpy(&currentByte, packet, 1);
+		bytes.push_back(currentByte);
+		packet = static_cast<uint8_t*>(packet) + 1;
+		value |= (currentByte & SEGMENT_BITS) << position;
+		if ((currentByte & CONTINUE_BIT) == 0) {
+            break;
+        }
+		position += 7;
+		if (position >= 32) {
+            Console::getConsole().Error("VarInt is too big");
+        }
 	}
-	result++;
-	if (index + result > 5) {
-		throw std::exception();
+	return value;
+}
+
+std::vector<Int8> VarInt::getBytes() {
+	return bytes;
+}
+
+// ==VarLong==
+VarLong::VarLong(long long num) : value(static_cast<Int64>(num)) {}
+
+VarLong::VarLong(Int64 num) : value(num) {}
+
+VarLong::VarLong(void* packet) {
+	value = decode(packet);
+}
+
+Int64 VarLong::getRawValue() {
+	return value;
+}
+
+long long VarLong::getValue() {
+	return static_cast<long long>(value);
+}
+
+Int64 VarLong::decode(void*& packet) {
+	Int64 value = 0;
+    int position = 0;
+    Int8 currentByte;
+	while(true) {
+		std::memcpy(&currentByte, packet, 1);
+		bytes.push_back(currentByte);
+		packet = static_cast<uint8_t*>(packet) + 1;
+		value |= (currentByte & SEGMENT_BITS) << position;
+		if ((currentByte & CONTINUE_BIT) == 0) {
+            break;
+        }
+		position += 7;
+		if (position >= 64) {
+            Console::getConsole().Error("VarInt is too big");
+        }
 	}
-	return result;
+	return value;
 }
 
-Int32 VarInt::ReadVarInt(Int32* sock, Int32* readVal) {
-	//Unpacks a varInt from the datastream into a 32bit integer
-		Int32 unpackedVarint = 0;
-		Byte tmp = 0x80;
-		Byte i = 0;
-		while (tmp & 0x80) {
-			*readVal = read(*sock, &tmp, 1);
-			unpackedVarint |= (tmp & 0x7F) << (7 * i);
-			i++;
-		}
-		return unpackedVarint;
+std::vector<Int8> VarInt::getBytes() {
+	return bytes;
 }
-
-void VarInt::WriteVarInt(Int32 value, Int32*sock, Int32* writeVal) {
-	//writes a 32 bit integer to the datastream
-	int pos = 0;
-	while ((value & -128) !=0) {
-		this->varIntBuf[pos++] = ((value & 127) | 128);
-		value = (UInt32)value >>  7; //Why the fuck does this work?
-		this->varIntSize++;
-	}
-	this->varIntBuf[pos++] = (Byte)value;
-	this->varIntSize++;
-	for(UInt32 i=0;i<varIntSize;i++) {
-
-	}
-}
-
-
-Int32 VarInt::raw_ReadVarInt() { 
-	Int32 result = 0;
-	#warning "implementation unfinished"
-	return result;
-}
-
-VarInt VarInt::raw_WriteVarInt(Int32 value) {
-	VarInt result;
-	#warning "implementation unfinished"
-	return result;
-}
-
-Int64 VarLong::ReadVarLong() {
-	//Takes a VarLongBuffer that is already loaded and return a signed long
-	int64_t result = 0;
-	int32_t count = 0;
-	unsigned char byte;
-	do
-	{
-		if (count >= 10) return 0;
-		byte = this->varIntBuf[count];
-		int64_t value = (byte & SEGMENT_BITS);
-		result |= (value << (7 * count));
-		count++;
-	} while ((byte & CONTINUE_BIT) != 0);
-	return result;
-}
-
-void VarLong::WriteVarLong(Int64 value)
-{
-	Int32 count = 0;
-	Int64 i = value;
-	do
-	{
-		Byte temp = (i & SEGMENT_BITS);
-		i = (UInt64)i  >> 7;
-		if (i != 0) temp |= CONTINUE_BIT;
-		this->varIntBuf[count] = temp;
-		count++;
-		this->varIntSize++;
-	} while (i != 0);
-}
-
-
