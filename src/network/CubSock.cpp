@@ -8,6 +8,15 @@
 #include <network/CubSock.hpp>
 #include <network/Connection.hpp>
 #include <Standards.hpp> 
+#include <fcntl.h> // for non-blocking fd
+
+bool setSocketBlocking(int fd, bool blocking) {
+    if (fd < 0) return false;
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) return false;
+    flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+    return (fcntl(fd, F_SETFL, flags) == 0);
+}
 
 int Bind(string ip, string port) {
     struct addrinfo hints, *res;
@@ -40,7 +49,9 @@ int Accept(int listen_fd) {  // Sus implementation
     socklen_t addr_size = sizeof(client_addr);
     int new_sock = accept(listen_fd, (struct sockaddr*)&client_addr, &addr_size);
     if (new_sock < 0) {
-        Console::getConsole().Error("Accept failed");
+        #ifdef DEBUG
+            Console::getConsole().Error("Accept failed");
+        #endif
         return -1;
     }
     return new_sock;
@@ -49,6 +60,11 @@ int Accept(int listen_fd) {  // Sus implementation
 int Listen(string ip, string port) {
     const int BACKLOG = 10;
     int sock_result = Bind(ip, port);
+    // set to non blocking fd
+    if (!setSocketBlocking(sock_result, false)) {
+        Console::getConsole().Error("set non-blocking fd failed");
+        return -1;
+    }
     if (sock_result < 0) {
         return -1; 
     }

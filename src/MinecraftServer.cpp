@@ -12,9 +12,13 @@ int main() {
 
     Console::getConsole().Entry("Ready!");
     while(true) {
+        #ifdef DEBUG
+            Console::getConsole().Entry("Waiting on Command!");
+        #endif
         if (Console::getConsole().Command() == 1) { break; }
     }
     // Clean up memory and threads here
     ConnectionList::getList().close();
+    NetworkHandler::getHandler().close();
     return 0;
 }

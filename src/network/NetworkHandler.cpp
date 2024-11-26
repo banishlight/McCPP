@@ -7,15 +7,10 @@
 
 NetworkHandler::NetworkHandler() {
     this->initNetwork();
-    acceptConnections = true;
 }
 
 NetworkHandler::~NetworkHandler() {
-    acceptConnections = false;
-    if (acceptThread.joinable()) {
-        acceptThread.join();
-    }
-    delete netThreads;
+    
 }
 
 NetworkHandler& NetworkHandler::getHandler() {
@@ -23,7 +18,30 @@ NetworkHandler& NetworkHandler::getHandler() {
     return singleton;
 }
 
+void NetworkHandler::close() {
+    if (needInit) return;
+    #ifdef DEBUG
+        Console::getConsole().Entry("Network Handler closing");
+    #endif
+    acceptConnections = false;
+    while (!acceptThread.joinable()) {
+        #ifdef DEBUG
+            Console::getConsole().Entry("Spin waiting for Accept thread");
+        #endif
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    acceptThread.join();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Accept Thread joined");
+    #endif
+    delete netThreads;
+}
+
 int NetworkHandler::initNetwork() {
+    if(!needInit) {
+        Console::getConsole().Entry("Network Already Initialized!");
+        return 0;
+    }
     Properties& myProperties = Properties::getProperties();
     int listen_fd = Listen(myProperties.getIP(), myProperties.getPort());
     if (listen_fd < 0) {
@@ -34,8 +52,9 @@ int NetworkHandler::initNetwork() {
     netThreads = new ThreadPool(4);
     Console::getConsole().Entry("Network Thread Pool Created");
     // could potentially move this loop onto the Network Thread pool (for smaller servers?)
-    std::thread acceptThread(&NetworkHandler::acceptConnectionsLoop, this);
-    Console::getConsole().Entry("Accept Thread Created");
+    acceptConnections = true;
+    acceptThread = std::thread([this]() { acceptConnectionsLoop(); });
+    needInit = false;
     return 0;
 }
 

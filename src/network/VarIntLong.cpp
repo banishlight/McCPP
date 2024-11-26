@@ -4,9 +4,12 @@
 #include <cstring>   // For memcpy
 #include <vector>
 
-// ==VarInt==
-VarInt::VarInt(int num) : value(static_cast<Int32>(num)) {}
+// When Standards moves to fixed int sizes, uncomment constructors
 
+// ==VarInt==
+/*
+VarInt::VarInt(int num) : value(static_cast<Int32>(num)) {}
+*/
 VarInt::VarInt(Int32 num) : value(num) {}
 
 VarInt::VarInt(void* packet) {
@@ -16,6 +19,7 @@ VarInt::VarInt(void* packet) {
 Int32 VarInt::getRawValue() {
 	return value;
 }
+
 
 int VarInt::getValue() {
 	return static_cast<int>(value);
@@ -46,8 +50,9 @@ std::vector<Int8> VarInt::getBytes() {
 }
 
 // ==VarLong==
+/*
 VarLong::VarLong(long long num) : value(static_cast<Int64>(num)) {}
-
+*/
 VarLong::VarLong(Int64 num) : value(num) {}
 
 VarLong::VarLong(void* packet) {
@@ -82,6 +87,6 @@ Int64 VarLong::decode(void*& packet) {
 	return value;
 }
 
-std::vector<Int8> VarInt::getBytes() {
+std::vector<Int8> VarLong::getBytes() {
 	return bytes;
 }
