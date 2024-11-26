@@ -24,7 +24,6 @@ NetworkHandler& NetworkHandler::getHandler() {
 }
 
 int NetworkHandler::initNetwork() {
-    // Begin listening on IP
     Properties& myProperties = Properties::getProperties();
     int listen_fd = Listen(myProperties.getIP(), myProperties.getPort());
     if (listen_fd < 0) {
@@ -34,7 +33,9 @@ int NetworkHandler::initNetwork() {
     ConnectionList::getList().setListenfd(listen_fd);
     netThreads = new ThreadPool(4);
     Console::getConsole().Entry("Thread Pool Created");
-    // Create Thread to manage pool
+    // could potentially move this loop onto the Network Thread pool (for smaller servers?)
+    std::thread acceptThread(&NetworkHandler::acceptConnectionsLoop, this);
+    Console::getConsole().Entry("Accept Thread Created");
     return 0;
 }
 
@@ -52,7 +53,8 @@ void NetworkHandler::acceptConnectionsLoop() {
                 processConnection(newConn);
             });
         } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Avoid busy waiting
+            // Avoid busy waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(50)); 
         }
     }
     Console::getConsole().Entry("Stopped accepting connections.");
