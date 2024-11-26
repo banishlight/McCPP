@@ -82,7 +82,7 @@ void NetworkHandler::acceptConnectionsLoop() {
 void NetworkHandler::processConnection(Connection conn) {
     if (!conn.isConnected()) {
         Console::getConsole().Entry("Connection closed.");
-        // Remove connection from list
+        ConnectionList::getList().removeConnection(conn);
         return;  
     }
     // Attempt to decode a single packet
