@@ -10,7 +10,7 @@ int main() {
     
     NetworkHandler::getHandler(); // Init Network
 
-    Console::getConsole().Entry("Done!");
+    Console::getConsole().Entry("Ready!");
     while(true) {
         if (Console::getConsole().Command() == 1) { break; }
     }

@@ -27,12 +27,12 @@ int NetworkHandler::initNetwork() {
     Properties& myProperties = Properties::getProperties();
     int listen_fd = Listen(myProperties.getIP(), myProperties.getPort());
     if (listen_fd < 0) {
-        Console::getConsole().Error("Failed to bind port on: " + myProperties.getIP() + ":" + myProperties.getPort());
+        Console::getConsole().Error("Failed to get Listen FD while initializing network.");
         return -1;
     }
     ConnectionList::getList().setListenfd(listen_fd);
     netThreads = new ThreadPool(4);
-    Console::getConsole().Entry("Thread Pool Created");
+    Console::getConsole().Entry("Network Thread Pool Created");
     // could potentially move this loop onto the Network Thread pool (for smaller servers?)
     std::thread acceptThread(&NetworkHandler::acceptConnectionsLoop, this);
     Console::getConsole().Entry("Accept Thread Created");
@@ -57,7 +57,7 @@ void NetworkHandler::acceptConnectionsLoop() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50)); 
         }
     }
-    Console::getConsole().Entry("Stopped accepting connections.");
+    Console::getConsole().Entry("Stopped accepting connections.  Accept thread closing.");
 }
 
 void NetworkHandler::processConnection(Connection conn) {

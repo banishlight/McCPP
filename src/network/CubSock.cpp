@@ -27,7 +27,7 @@ int Bind(string ip, string port) {
         return -1; 
     }
     if (bind(sock_result, res->ai_addr, res->ai_addrlen) < 0) {
-        Console::getConsole().Error("Bind failed");
+        Console::getConsole().Error("Bind failed on ip: " + ip + ":" + port);
         freeaddrinfo(res);
         return -1;
     }
