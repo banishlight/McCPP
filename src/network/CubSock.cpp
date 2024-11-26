@@ -80,3 +80,38 @@ int Listen(string ip, string port) {
 int Closefd(int fd) {
     return close(fd);
 }
+
+int Recieve(int fd, void* buff, int size) {
+    return recv(fd, buff, size, 0);
+}
+
+int readVarIntFromSocket(int fd) {
+	Int32 value = 0;
+    int position = 0;
+    uint8_t currentByte;
+
+    while (true) {
+        ssize_t bytesRead = recv(fd, &currentByte, 1, 0);
+
+        if (bytesRead == 0) {
+            throw std::runtime_error("Connection closed while reading VarInt");
+        } 
+        else if (bytesRead < 0) {
+            throw std::runtime_error("Error reading from socket");
+        }
+
+        // Accumulate the VarInt value
+        value |= (currentByte & 0x7F) << position;
+
+        // Check if this byte is the last in the VarInt
+        if ((currentByte & 0x80) == 0) {
+            break;
+        }
+
+        position += 7;
+        if (position >= 32) {
+            throw std::runtime_error("VarInt is too big");
+        }
+    }
+    return value;
+}
