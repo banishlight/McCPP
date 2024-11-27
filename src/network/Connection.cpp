@@ -118,11 +118,13 @@ bool Connection::isConnected() {
 
 // Public call to grab packet from self fd and decode it
 bool Connection::processPacket() {
-    #warning "implementation unfinished"
-    // Get packet off of fd, if none:
-    return false;
-    // else:
-    // extract packet (VarInt)Length, (VarInt)ID, (byte array)Data
+    #warning "Needs error catching" // TODO Error catching needs to be done
+    int length = readVarIntFromSocket(this->getFD());
+    int id = readVarIntFromSocket(this->getFD());
+    void* buff = malloc(sizeof(char) * length);
+    int error = Recieve(this->getFD(), buff, length);
+    decode_packet(buff, id);
+    return true;
 }
 
 ConnectionList::ConnectionList() {
