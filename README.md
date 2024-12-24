@@ -30,3 +30,9 @@ make clean
 ```
 
 Note: This is being designed for the x64 Linux platform
+
+To run:
+```
+cd bin/
+./MinecraftServer
+```
