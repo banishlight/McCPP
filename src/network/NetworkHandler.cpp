@@ -86,10 +86,18 @@ void NetworkHandler::processConnection(Connection conn) {
         return;  
     }
     // Attempt to decode a single packet
+    if (packetReady(conn.getFD())) {
+        bool success = conn.processPacket();
+        if (!success) {
+            Console::getConsole().Error("processPacket() Failure");
+        }
+    }
+    /*
     if (!conn.processPacket()) { 
         // Avoid busy waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    */
     netThreads->enqueue([this,conn]() mutable {
             processConnection(conn);
         });

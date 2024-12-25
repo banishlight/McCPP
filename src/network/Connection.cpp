@@ -6,6 +6,9 @@
 #include <network/CubSock.hpp>
 
 Connection::Connection(int fd) { 
+    #ifdef DEBUG
+        Console::getConsole().Entry("Creating connection");
+    #endif
     this->file_d = fd;
     connected = true;
 }
@@ -20,7 +23,7 @@ void Connection::decode_packet(void* packetData, int packetID) {
                 Console::getConsole().Error("In Handshake, 0x00 found.  Unhandled.");
             }
             else {
-                Console::getConsole().Error("Bad Packet ID in Handshake");
+                Console::getConsole().Error("Unknown Packet ID in Handshake");
             }
             break;
         case Status:
@@ -33,7 +36,7 @@ void Connection::decode_packet(void* packetData, int packetID) {
                 Console::getConsole().Error("In Status, 0x01 found.  Unhandled.");
             }
             else {
-                Console::getConsole().Error("Bad Packet ID in Status");
+                Console::getConsole().Error("Unknown Packet ID in Status");
             }
             break;
         case Login:
@@ -59,7 +62,7 @@ void Connection::decode_packet(void* packetData, int packetID) {
                     Console::getConsole().Error("In Login, 0x04 found.  Unhandled.");
                     break;
                 default:
-                    Console::getConsole().Error("Bad Packet ID in Login");
+                    Console::getConsole().Error("Unknown Packet ID in Login");
             }
             break;
         case Config:
@@ -97,7 +100,7 @@ void Connection::decode_packet(void* packetData, int packetID) {
                     Console::getConsole().Error("In Config, 0x07 found.  Unhandled.");
                     break;
                 default:
-                    Console::getConsole().Error("Bad Packet ID in Config");
+                    Console::getConsole().Error("Unknown Packet ID in Config");
             }
             break;
         case Play:
@@ -118,12 +121,40 @@ bool Connection::isConnected() {
 
 // Public call to grab packet from self fd and decode it
 bool Connection::processPacket() {
-    #warning "Needs error catching" // TODO Error catching needs to be done
-    int length = readVarIntFromSocket(this->getFD());
-    int id = readVarIntFromSocket(this->getFD());
-    void* buff = malloc(sizeof(char) * length);
-    int error = Recieve(this->getFD(), buff, length);
-    decode_packet(buff, id);
+    #ifdef DEBUG
+        Console::getConsole().Entry("Begun processing packet");
+    #endif
+    int pLen = readVarIntFromSocket(this->getFD(), nullptr);
+    int iLen = 0;
+    #ifdef DEBUG
+        Console::getConsole().Entry("Length of packet in bytes: " + std::to_string(pLen));
+    #endif
+    int id = readVarIntFromSocket(this->getFD(), &iLen);
+    #ifdef DEBUG
+        Console::getConsole().Entry("id len: " + std::to_string(iLen));
+    #endif
+    if ((pLen - iLen) > 0) {
+        #ifdef DEBUG
+            Console::getConsole().Entry("Reading Data from packet");
+        #endif
+        void* buff = malloc(sizeof(char) * (pLen - iLen));
+        int error = Recieve(this->getFD(), buff, (pLen - iLen));
+        if (error < 0) {
+            Console::getConsole().Error("Error with recieving packet data");
+            return false;
+        }
+        decode_packet(buff, id);
+        free(buff);
+    }
+    else {
+        #ifdef DEBUG
+            Console::getConsole().Entry("No data packet");
+        #endif
+        decode_packet(nullptr, id);
+    }    
+    #ifdef DEBUG
+        Console::getConsole().Entry("Finished processing packet");
+    #endif
     return true;
 }
 

@@ -49,9 +49,6 @@ int Accept(int listen_fd) {  // Sus implementation
     socklen_t addr_size = sizeof(client_addr);
     int new_sock = accept(listen_fd, (struct sockaddr*)&client_addr, &addr_size);
     if (new_sock < 0) {
-        #ifdef DEBUG
-            Console::getConsole().Error("Accept failed");
-        #endif
         return -1;
     }
     return new_sock;
@@ -85,13 +82,22 @@ int Recieve(int fd, void* buff, int size) {
     return recv(fd, buff, size, 0);
 }
 
-int readVarIntFromSocket(int fd) {
+// pass nullptr to byte_count to ignore byte counting
+int readVarIntFromSocket(int fd, int* byte_count) {
 	Int32 value = 0;
     int position = 0;
     uint8_t currentByte;
-
+    if (byte_count != nullptr) {
+        *byte_count = 0;
+    }
+    #ifdef DEBUG
+        Console::getConsole().Entry("Starting VarInt Read");
+    #endif
     while (true) {
         ssize_t bytesRead = recv(fd, &currentByte, 1, 0);
+        #ifdef DEBUG
+            Console::getConsole().Entry("Reading one byte for VarInt");
+        #endif
 
         if (bytesRead == 0) {
             throw std::runtime_error("Connection closed while reading VarInt");
@@ -102,7 +108,9 @@ int readVarIntFromSocket(int fd) {
 
         // Accumulate the VarInt value
         value |= (currentByte & 0x7F) << position;
-
+        if (byte_count != nullptr) {
+            *byte_count += 1;
+        }
         // Check if this byte is the last in the VarInt
         if ((currentByte & 0x80) == 0) {
             break;
@@ -114,4 +122,14 @@ int readVarIntFromSocket(int fd) {
         }
     }
     return value;
+}
+
+// Checks if a packet is ready at the file descriptor
+bool packetReady(int fd) {
+    char buff[1024];
+    ssize_t rec = recv(fd, buff, sizeof(buff), MSG_PEEK);
+    if (rec <= 0) {
+        return false;
+    }
+    return true;
 }
