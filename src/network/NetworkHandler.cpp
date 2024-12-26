@@ -23,6 +23,7 @@ void NetworkHandler::close() {
     #ifdef DEBUG
         Console::getConsole().Entry("Network Handler closing");
     #endif
+    ConnectionList::getList().closeAllConnections();
     acceptConnections = false;
     while (!acceptThread.joinable()) {
         #ifdef DEBUG

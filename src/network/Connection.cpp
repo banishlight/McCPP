@@ -215,3 +215,21 @@ void ConnectionList::removeConnection(Connection conn) {
     }
     Console::getConsole().Error("Connection not found by FD.");
 }
+
+void ConnectionList::closeAllConnections() {
+    for (auto& conn : connections) { 
+        int fd = conn.getFD();
+        if (fd >= 0) {
+            if (Closefd(fd) == 0) {
+                Console::getConsole().Entry("Connection closed successfully for FD: " + std::to_string(fd));
+            } else {
+                Console::getConsole().Error("Failed to close connection for FD: " + std::to_string(fd));
+            }
+        } else {
+            Console::getConsole().Error("Invalid file descriptor for a connection.");
+        }
+    }
+    connections.clear(); 
+    count = 0;
+    Console::getConsole().Entry("All connections closed.");
+}

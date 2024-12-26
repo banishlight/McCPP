@@ -18,6 +18,7 @@ ThreadPool::~ThreadPool() {
     for(std::thread& worker : workerList) {
         worker.join();
     }
+    Console::getConsole().Entry("Thread pool closed");
 }
 
 void ThreadPool::enqueue(std::function<void()> task) {
