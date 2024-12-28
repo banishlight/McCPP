@@ -19,7 +19,7 @@ DEPS := $(OBJ:.o=.d)
 all: directories $(TARGET)
 
 # Debug target
-debug: CXXFLAGS += -D DEBUG
+debug: CXXFLAGS += -D DEBUG -g
 debug: LDFLAGS += -g
 debug: directories $(TARGET)
 
