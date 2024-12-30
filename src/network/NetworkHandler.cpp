@@ -23,7 +23,6 @@ void NetworkHandler::close() {
     #ifdef DEBUG
         Console::getConsole().Entry("Network Handler closing");
     #endif
-    ConnectionList::getList().closeAllConnections();
     acceptConnections = false;
     while (!acceptThread.joinable()) {
         #ifdef DEBUG
@@ -31,6 +30,7 @@ void NetworkHandler::close() {
         #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    ConnectionList::getList().closeAllConnections();
     acceptThread.join();
     #ifdef DEBUG
         Console::getConsole().Entry("Accept Thread joined");
@@ -93,12 +93,6 @@ void NetworkHandler::processConnection(Connection conn) {
             Console::getConsole().Error("processPacket() Failure");
         }
     }
-    /*
-    if (!conn.processPacket()) { 
-        // Avoid busy waiting
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    */
     netThreads->enqueue([this,conn]() mutable {
             processConnection(conn);
         });

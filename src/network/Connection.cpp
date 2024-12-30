@@ -11,6 +11,7 @@ Connection::Connection(int fd) {
     #endif
     this->file_d = fd;
     connected = true;
+    setSocketBlocking(fd, false);
 }
 
 Connection::~Connection() = default;
@@ -158,6 +159,21 @@ bool Connection::processPacket() {
     return true;
 }
 
+int Connection::close() {
+    int result = Closefd(file_d);
+    if (0 == result) {
+        #ifdef DEBUG
+            Console::getConsole().Entry("Successfully closed connection fd: " + std::to_string(file_d));
+        #endif
+        connected = false;
+        return 0;
+    }
+    #ifdef DEBUG
+        Console::getConsole().Entry("Failed to close connection fd: " + std::to_string(file_d));
+    #endif
+    return -1;
+}
+
 ConnectionList::ConnectionList() {
     Properties& myProperties = Properties::getProperties();
     this->connections.reserve(myProperties.max_players);
@@ -191,25 +207,13 @@ int ConnectionList::getListenfd() {
     return listen_fd;
 }
 
-int ConnectionList::close() {
-    int result = 0;
-    for (auto it = connections.begin(); it != connections.end(); it++) {
-        result = Closefd(it->getFD());
-        if (result != 0) {
-            Console::getConsole().Error("Failed to close connection on fd: " + it->getFD());
-            return -1;
-        }
-    }
-    return 0;
-}
-
 void ConnectionList::removeConnection(Connection conn) {
     int fd = conn.getFD();
     for (auto it = connections.begin(); it != connections.end(); ++it) {
         if (it->getFD() == fd) { // No const requirement here
             connections.erase(it); // Remove the connection
             count -= 1;
-            Console::getConsole().Entry("Connection removed successfully by FD.");
+            Console::getConsole().Entry("Connection removed successfully: " + std::to_string(fd));
             return;
         }
     }
@@ -217,19 +221,26 @@ void ConnectionList::removeConnection(Connection conn) {
 }
 
 void ConnectionList::closeAllConnections() {
-    for (auto& conn : connections) { 
-        int fd = conn.getFD();
-        if (fd >= 0) {
-            if (Closefd(fd) == 0) {
-                Console::getConsole().Entry("Connection closed successfully for FD: " + std::to_string(fd));
-            } else {
-                Console::getConsole().Error("Failed to close connection for FD: " + std::to_string(fd));
-            }
-        } else {
-            Console::getConsole().Error("Invalid file descriptor for a connection.");
+    std::vector<Connection> failedCloses;
+    int failures = 0;
+    for (auto i = connections.begin(); i != connections.end(); ) { 
+        int result = i->close();
+        if (result == 0) {
+            count -= 1;
+            i = connections.erase(i);
+        }
+        else {
+            failures += 1;
+            failedCloses.push_back(*i);
+            i++;
         }
     }
-    connections.clear(); 
-    count = 0;
-    Console::getConsole().Entry("All connections closed.");
+    if (count == 0) {
+        Console::getConsole().Entry("All connections closed.");
+    }
+    else {
+        count = failures;
+        connections = failedCloses;
+        Console::getConsole().Entry("Some connections failed to close when closing all.");
+    }
 }

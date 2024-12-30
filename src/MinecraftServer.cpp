@@ -1,6 +1,5 @@
 #include <Standards.hpp>
 #include <Properties.hpp>
-#include <network/Connection.hpp>
 #include <network/CubSock.hpp>
 #include <Console.hpp>
 #include <network/NetworkHandler.hpp>
@@ -18,7 +17,6 @@ int main() {
         if (Console::getConsole().Command() == 1) { break; }
     }
     // Clean up memory and threads here
-    ConnectionList::getList().close();
     NetworkHandler::getHandler().close();
     return 0;
 }

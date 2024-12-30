@@ -14,17 +14,26 @@ ThreadPool::~ThreadPool() {
         std::unique_lock<std::mutex> lock(queueMutex);
         stop = true;
     }
+    #ifdef DEBUG
+        Console::getConsole().Entry("notifying all workers on network");
+    #endif
     cv.notify_all();
     for(std::thread& worker : workerList) {
+        #ifdef DEBUG
+            Console::getConsole().Entry("Joining thread");
+        #endif
         worker.join();
     }
+    
     Console::getConsole().Entry("Thread pool closed");
 }
 
 void ThreadPool::enqueue(std::function<void()> task) {
     {
         std::unique_lock<std::mutex> lock(queueMutex);
-        taskQ.push(std::move(task));
+        if (!stop) {
+            taskQ.push(std::move(task));
+        }
     }
     cv.notify_one();
 }

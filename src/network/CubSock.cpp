@@ -9,6 +9,7 @@
 #include <network/Connection.hpp>
 #include <Standards.hpp> 
 #include <fcntl.h> // for non-blocking fd
+#include <errno.h> // for error checking
 
 bool setSocketBlocking(int fd, bool blocking) {
     if (fd < 0) return false;
@@ -132,4 +133,9 @@ bool packetReady(int fd) {
         return false;
     }
     return true;
+}
+
+int checkErrno() {
+    #warning "Missing implementation"
+    return 0;
 }

@@ -3,6 +3,7 @@
 #include <vector>
 #include <Standards.hpp>
 #include <network/VarIntLong.hpp>
+#include <mutex>
 
 class Connection {
     public:
@@ -11,6 +12,7 @@ class Connection {
         int getFD();
         bool isConnected();
         bool processPacket();
+        int close();
     private:
         enum Connection_State {
             Handshake,
@@ -33,7 +35,6 @@ class ConnectionList {
         void addConnection(Connection member);
         void setListenfd(int fd);
         int getListenfd();
-        int close();
         void removeConnection(Connection conn);
         void closeAllConnections();
     private:
