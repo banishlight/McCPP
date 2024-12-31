@@ -2,19 +2,22 @@
 #include <string>
 #include <memory>
 #include <netinet/in.h>
+#include <vector>
+#include <cstdint> 
 
 typedef std::string string;
 typedef std::size_t size;
-typedef signed long long Int64;
-typedef signed int Int32;
-typedef signed short Int16;
-typedef signed char Int8;
+typedef int64_t Int64;
+typedef int32_t Int32;
+typedef int16_t Int16;
+typedef int8_t Int8;
 
-typedef unsigned long long UInt64;
-typedef unsigned int UInt32;
-typedef unsigned short UInt16;
-typedef unsigned char UInt8;
+typedef uint64_t UInt64;
+typedef uint32_t UInt32;
+typedef uint16_t UInt16;
+typedef uint8_t UInt8;
 
+// Possibly unnecessary:
 typedef unsigned char Byte;
 typedef Byte ColourID;
 typedef unsigned char ByteArray[256];
@@ -22,6 +25,13 @@ typedef string JsonTextComponent;
 typedef Int64 UUID; // needs to be 128bit int
 typedef string Identifier;
 typedef string TextComponent;
+
+typedef struct {
+  int size;
+  int id;
+  int dsize;
+  std::vector<Byte> data;
+} Packet;
 
 
 
