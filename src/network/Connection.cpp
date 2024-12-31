@@ -174,6 +174,31 @@ int Connection::close() {
     return -1;
 }
 
+int Connection::addPending(int size, int id, int dsize, std::vector<Byte> data) {
+    Packet newPacket;
+    newPacket.size = size;
+    newPacket.id = id;
+    newPacket.dsize = dsize;
+    newPacket.data = data;
+    pending.push(newPacket);
+    return 0;
+}
+
+int Connection::countPending() {
+    return pending.size();
+}
+
+Packet Connection::getPending() {
+    if (pending.size() > 0) {
+        Packet p;
+        p = pending.front();
+        pending.pop();
+        return p;
+    }
+    std::runtime_error("Cannot get pending when pending is empty.\n");
+    return Packet();
+}
+
 ConnectionList::ConnectionList() {
     Properties& myProperties = Properties::getProperties();
     this->connections.reserve(myProperties.max_players);

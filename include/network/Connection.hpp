@@ -4,6 +4,7 @@
 #include <Standards.hpp>
 #include <network/VarIntLong.hpp>
 #include <mutex>
+#include <queue>
 
 class Connection {
     public:
@@ -13,6 +14,9 @@ class Connection {
         bool isConnected();
         bool processPacket();
         int close();
+        int addPending(int size, int id, int dsize, std::vector<Byte> data);
+        int countPending();
+        Packet getPending();
     private:
         enum Connection_State {
             Handshake,
@@ -27,6 +31,7 @@ class Connection {
         int file_d = -1;
         void decode_packet(void* packet, int packetID);
         bool connected = false;
+        std::queue<Packet> pending;
 };
 
 class ConnectionList {
