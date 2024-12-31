@@ -77,6 +77,13 @@ void NetworkHandler::acceptConnectionsLoop() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50)); 
         }
     }
+    int result = Closefd(listen_fd);
+    if (result == 0) {
+        Console::getConsole().Entry("Successfully stopped listening on listening port.");
+    }
+    else {
+        Console::getConsole().Entry("Failed to close listening port.");
+    }
     Console::getConsole().Entry("Stopped accepting connections.  Accept thread closing.");
 }
 
