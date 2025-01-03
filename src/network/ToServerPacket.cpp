@@ -1,15 +1,37 @@
 #include <network/ToServerPacket.hpp>
 #include <Standards.hpp>
 #include <network/VarIntLong.hpp>
+#include <network/Connection.hpp>
+#include <Console.hpp>
+#include <network/readData.hpp>
 
 // Handshake State
 // VarInt protocol_version, string server_address, UInt16 server_port, VarInt next_state
-void server_Handshake(void* packetData) {
-
+void server_Handshake(Connection conn, void* data) {
+    VarInt proto_ver = VarInt(data);
+    #warning "Need to finish fetching data to work properly"
+    string serv_add; // string[255]
+    UInt16 port; 
+    VarInt state = VarInt(data);
+    int value = state.getValue();
+    switch(value) {
+        case 1: // Status
+            conn.setState(Connection::Connection_State::Status);
+            break;
+        case 2: // Login
+            conn.setState(Connection::Connection_State::Login);
+            break;
+        case 3: // Transfer
+            // Transfer state??
+            Console::getConsole().Error("Unhandled transfer state in handshake.");
+            break;
+        default:
+            Console::getConsole().Error("Unknown state in handshake packet.");
+    }
 }
 
 // Status State
-void server_Status_Request(void) {
+void server_Status_Request(Connection conn) {
 
 }
 

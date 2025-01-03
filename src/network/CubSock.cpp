@@ -83,6 +83,21 @@ int Recieve(int fd, void* buff, int size) {
     return recv(fd, buff, size, 0);
 }
 
+// Checks if a packet is ready at the file descriptor
+bool packetReady(int fd) {
+    char buff[1024];
+    ssize_t rec = recv(fd, buff, sizeof(buff), MSG_PEEK);
+    if (rec <= 0) {
+        return false;
+    }
+    return true;
+}
+
+int checkErrno() {
+    #warning "Missing implementation"
+    return 0;
+}
+
 // pass nullptr to byte_count to ignore byte counting
 int readVarIntFromSocket(int fd, int* byte_count) {
 	Int32 value = 0;
@@ -123,19 +138,4 @@ int readVarIntFromSocket(int fd, int* byte_count) {
         }
     }
     return value;
-}
-
-// Checks if a packet is ready at the file descriptor
-bool packetReady(int fd) {
-    char buff[1024];
-    ssize_t rec = recv(fd, buff, sizeof(buff), MSG_PEEK);
-    if (rec <= 0) {
-        return false;
-    }
-    return true;
-}
-
-int checkErrno() {
-    #warning "Missing implementation"
-    return 0;
 }

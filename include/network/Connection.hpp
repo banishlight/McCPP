@@ -8,16 +8,6 @@
 
 class Connection {
     public:
-        Connection(int fd);
-        ~Connection();
-        int getFD();
-        bool isConnected();
-        bool processPacket();
-        int close();
-        int addPending(int size, int id, int dsize, std::vector<Byte> data);
-        int countPending();
-        Packet getPending();
-    private:
         enum Connection_State {
             Handshake,
             Status,
@@ -26,6 +16,18 @@ class Connection {
             Play,
             Closed
         };
+        Connection(int fd);
+        ~Connection();
+        int getFD();
+        bool isConnected();
+        bool processIncPacket();
+        int close();
+        int addPending(int size, int id, int dsize, std::vector<Byte> data);
+        int countPending();
+        Packet getPending();
+        void setState(Connection::Connection_State state);
+    private:
+        
         Connection_State myState = Connection_State::Handshake;
         string ipaddress;
         int file_d = -1;

@@ -5,6 +5,7 @@
 #include <network/VarIntLong.hpp>
 #include <network/CubSock.hpp>
 
+// Must pass a valid network file descriptor
 Connection::Connection(int fd) { 
     #ifdef DEBUG
         Console::getConsole().Entry("Creating connection");
@@ -121,7 +122,7 @@ bool Connection::isConnected() {
 }
 
 // Public call to grab packet from self fd and decode it
-bool Connection::processPacket() {
+bool Connection::processIncPacket() {
     #ifdef DEBUG
         Console::getConsole().Entry("Begun processing packet");
     #endif
@@ -188,6 +189,7 @@ int Connection::countPending() {
     return pending.size();
 }
 
+// Will return a blank packet when attempting on an empty queue
 Packet Connection::getPending() {
     if (pending.size() > 0) {
         Packet p;
@@ -197,6 +199,10 @@ Packet Connection::getPending() {
     }
     std::runtime_error("Cannot get pending when pending is empty.\n");
     return Packet();
+}
+
+void Connection::setState(Connection::Connection_State state) {
+    myState = state;
 }
 
 ConnectionList::ConnectionList() {

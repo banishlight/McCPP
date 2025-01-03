@@ -1,11 +1,12 @@
 #pragma once
 #include <Standards.hpp>
+#include <network/Connection.hpp>
 
 // Handshaking State
-void server_Handshake(void* packetData);
+void server_Handshake(Connection conn, void* data);
 
 // Status State
-void server_Status_Request(void);
+void server_Status_Request(Connection conn);
 void server_Ping_Request(void* packetData);
 
 // Login State

@@ -95,7 +95,7 @@ void NetworkHandler::processConnection(Connection conn) {
     }
     // Attempt to decode a single packet
     if (packetReady(conn.getFD())) {
-        bool success = conn.processPacket();
+        bool success = conn.processIncPacket();
         if (!success) {
             Console::getConsole().Error("processPacket() Failure");
         }
