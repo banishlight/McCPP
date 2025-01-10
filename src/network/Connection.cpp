@@ -126,6 +126,7 @@ bool Connection::processIncPacket() {
     #ifdef DEBUG
         Console::getConsole().Entry("Begun processing packet");
     #endif
+    setSocketBlocking(file_d, true);
     int pLen = readVarIntFromSocket(this->getFD(), nullptr);
     int iLen = 0;
     #ifdef DEBUG
@@ -153,7 +154,8 @@ bool Connection::processIncPacket() {
             Console::getConsole().Entry("No data packet");
         #endif
         decode_packet(nullptr, id);
-    }    
+    }
+    setSocketBlocking(file_d, false);    
     #ifdef DEBUG
         Console::getConsole().Entry("Finished processing packet");
     #endif
