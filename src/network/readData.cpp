@@ -1,91 +1,101 @@
 #include <Standards.hpp>
 #include <cstring>
 #include <cstdint> // for uint8_t
+#include <Console.hpp>
+#include <network/VarIntLong.hpp>
 
-string readString(void* packet, int max) {
-    
-}
 
-template <typename T>
-T readData(void*& data) {
-    T value;
-    std::memcpy(&value, data, sizeof(T));
-    data = static_cast<uint8_t*>(data) + sizeof(T);
-    return value;
-}
-
-// Unsigned Int's
-
-template<>
-UInt8 readData<UInt8>(void*& data) {
-    UInt8 value;
-    std::memcpy(&value, data, sizeof(UInt8));
-    // might need to convert network to host byte order
-    data = static_cast<uint8_t*>(data) + sizeof(UInt8);
-    return value;
-}
-
-template<>
-UInt16 readData<UInt16>(void*& data) {
-    UInt16 value;
-    std::memcpy(&value, data, sizeof(UInt16));
-    // might need to convert network to host byte order
-    data = static_cast<uint8_t*>(data) + sizeof(UInt16);
-    return value;
-}
-
-template<>
-UInt32 readData<UInt32>(void*& data) {
-    UInt32 value;
-    std::memcpy(&value, data, sizeof(UInt32));
-    // might need to convert network to host byte order
-    data = static_cast<uint8_t*>(data) + sizeof(UInt32);
-    return value;
-}
-
-template<>
-UInt64 readData<UInt64>(void*& data) {
-    UInt64 value;
-    std::memcpy(&value, data, sizeof(UInt64));
-    // might need to convert network to host byte order
-    data = static_cast<uint8_t*>(data) + sizeof(UInt64);
-    return value;
-}
-
-// Signed Int's
-
-template<>
-Int8 readData<Int8>(void*& data) {
-    Int8 value;
-    std::memcpy(&value, data, sizeof(Int8));
-    // might need to convert network to host byte order
+int readData(void*& data, Int8& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for Int8 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(Int8));
     data = static_cast<uint8_t*>(data) + sizeof(Int8);
-    return value;
+    return 0;
 }
 
-template<>
-Int16 readData<Int16>(void*& data) {
-    Int16 value;
-    std::memcpy(&value, data, sizeof(Int16));
-    // might need to convert network to host byte order
+int readData(void*& data, Int16& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for Int16 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(Int16));
     data = static_cast<uint8_t*>(data) + sizeof(Int16);
-    return value;
+    return 0;
 }
 
-template<>
-Int32 readData<Int32>(void*& data) {
-    Int32 value;
-    std::memcpy(&value, data, sizeof(Int32));
-    // might need to convert network to host byte order
+int readData(void*& data, Int32& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for Int32 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(Int32));
     data = static_cast<uint8_t*>(data) + sizeof(Int32);
-    return value;
+    return 0;
 }
 
-template<>
-Int64 readData<Int64>(void*& data) {
-    Int64 value;
-    std::memcpy(&value, data, sizeof(Int64));
-    // might need to convert network to host byte order
+int readData(void*& data, Int64& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for Int64 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(Int64));
     data = static_cast<uint8_t*>(data) + sizeof(Int64);
-    return value;
+    return 0;
+}
+
+int readData(void*& data, UInt8& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for UInt8 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(UInt8));
+    data = static_cast<uint8_t*>(data) + sizeof(UInt8);
+    return 0;
+}
+
+int readData(void*& data, UInt16& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for UInt16 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(UInt16));
+    data = static_cast<uint8_t*>(data) + sizeof(UInt16);
+    return 0;
+}
+
+int readData(void*& data, UInt32& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for UInt32 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(UInt32));
+    data = static_cast<uint8_t*>(data) + sizeof(UInt32);
+    return 0;
+}
+
+int readData(void*& data, UInt64& dest, int size) {
+    if (size != 0) {
+        Console::getConsole().Error("Non zero size given for UInt64 reading.");
+        return -1;
+    }
+    std::memcpy(&dest, data, sizeof(UInt64));
+    data = static_cast<uint8_t*>(data) + sizeof(UInt64);
+    return 0;
+}
+
+int readData(void*& data, string& dest, int size) {
+    if (size == 0) {
+        Console::getConsole().Error("Size not given to string read");
+    }
+    int rSize = VarInt(data).getValue();
+    if (rSize != size) {
+        Console::getConsole().Error("Size given does not match size gathered");
+    }
+    // memcpy correct number of bytes onto stack
+    // convert UTF8 or UTF16 characters to string
+    // iterate pointer
+    #warning "Missing implementation"
+    return 0;
 }
