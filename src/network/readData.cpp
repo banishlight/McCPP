@@ -90,8 +90,8 @@ int readData(void*& data, string& dest, int size) {
     if (size == 0) {
         Console::getConsole().Error("Size not given to string read");
     }
-    int rSize = VarInt(data).getValue();
-    if (rSize != size) {
+    int strSize = VarInt(data).getValue();
+    if (strSize != size) {
         Console::getConsole().Error("Size given does not match size gathered");
     }
     // memcpy correct number of bytes onto stack

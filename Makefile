@@ -14,7 +14,7 @@ OBJ := $(SRC:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 DEPS := $(OBJ:.o=.d)
 
 # Rules
-.PHONY: all clean directories debug fast
+.PHONY: all clean directories debug fast clang
 
 all: directories $(TARGET)
 
@@ -25,6 +25,10 @@ debug: directories $(TARGET)
 # Optimizations included
 fast: CXXFLAGS += -Ofast
 fast: directories $(TARGET)
+
+# build using clang & llvm
+clang: CXX := clang # Currently throws a linker error
+clang: directories $(TARGET)
 
 # Link the final executable
 $(TARGET): $(OBJ)
