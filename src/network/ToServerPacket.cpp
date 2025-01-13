@@ -10,7 +10,7 @@
 void server_Handshake(Connection conn, void* data) {
     VarInt proto_ver = VarInt(data);
     string serv_add; 
-    readData(data, serv_add, 255); // string[255]
+    readData(data, serv_add, 255);
     UInt16 port;
     readData(data, port); 
     VarInt state = VarInt(data);
@@ -24,7 +24,7 @@ void server_Handshake(Connection conn, void* data) {
             break;
         case 3: // Transfer
             // Transfer state??
-            #warning "Unhandled transfer state switch"
+            #warning "Unhandled transfer state switch in server_Handshake()"
             Console::getConsole().Error("Unhandled transfer state in handshake.");
             break;
         default:

@@ -4,6 +4,7 @@
 #include <Console.hpp>
 #include <network/VarIntLong.hpp>
 
+// More types added as packets are implemented
 
 int readData(void*& data, Int8& dest, int size) {
     if (size != 0) {

@@ -20,7 +20,6 @@ all: directories $(TARGET)
 
 # Debug target
 debug: CXXFLAGS += -D DEBUG -g
-debug: LDFLAGS += -g
 debug: directories $(TARGET)
 
 # Optimizations included

@@ -1,6 +1,8 @@
 #pragma once
 #include <Standards.hpp>
 
+// More types added as packets are implemented
+
 int readData(void*& data, Int8& dest, int size = 0);
 int readData(void*& data, Int16& dest, int size = 0);
 int readData(void*& data, Int32& dest, int size = 0);
