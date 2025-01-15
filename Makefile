@@ -27,7 +27,7 @@ fast: CXXFLAGS += -Ofast
 fast: directories $(TARGET)
 
 # build using clang & llvm
-clang: CXX := clang # Currently throws a linker error
+clang: CXX := clang++ # Currently throws a linker error
 clang: directories $(TARGET)
 
 # Link the final executable
