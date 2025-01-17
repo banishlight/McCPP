@@ -5,7 +5,7 @@
 #include <sys/types.h>
 #include <cstring>
 #include <Console.hpp>
-#include <network/CubSock.hpp>
+#include <network/CubaSocket.hpp>
 #include <network/Connection.hpp>
 #include <Standards.hpp> 
 #include <fcntl.h> // for non-blocking fd
