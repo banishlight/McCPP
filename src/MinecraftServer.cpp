@@ -1,6 +1,6 @@
 #include <Standards.hpp>
 #include <Properties.hpp>
-#include <network/CubSock.hpp>
+#include <network/CubaSocket.hpp>
 #include <Console.hpp>
 #include <network/NetworkHandler.hpp>
 

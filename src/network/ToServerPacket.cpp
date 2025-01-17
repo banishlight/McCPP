@@ -38,7 +38,7 @@ void server_Status_Request(Connection conn) {
 }
 
 // Int64 payload
-void server_Ping_Request(void* pacpacketDataket) {
+void server_Ping_Request(void* packetData) {
 
 }
 

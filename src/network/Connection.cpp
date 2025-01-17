@@ -3,7 +3,7 @@
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>
 #include <network/VarIntLong.hpp>
-#include <network/CubSock.hpp>
+#include <network/CubaSocket.hpp>
 
 // Must pass a valid network file descriptor
 Connection::Connection(int fd) { 
@@ -177,6 +177,7 @@ int Connection::close() {
     return -1;
 }
 
+// This parameter list could be reduced and calculated within the function
 int Connection::addPending(int size, int id, int dsize, std::vector<Byte> data) {
     Packet newPacket;
     newPacket.size = size;

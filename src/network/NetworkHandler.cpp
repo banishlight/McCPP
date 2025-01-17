@@ -1,7 +1,7 @@
 #include <network/NetworkHandler.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
-#include <network/CubSock.hpp>
+#include <network/CubaSocket.hpp>
 #include <network/Connection.hpp>
 #include <ThreadPool.hpp>
 
