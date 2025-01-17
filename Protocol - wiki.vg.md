@@ -8,13 +8,13 @@ The changes between versions may be viewed at [Protocol History](https://wiki.vg
 
 ## Contents
 
--   [1 Definitions](https://wiki.vg/Protocol#Definitions)
-    -   [1.1 Data types](https://wiki.vg/Protocol#Data_types)
-    -   [1.2 Identifier](https://wiki.vg/Protocol#Identifier)
-    -   [1.3 VarInt and VarLong](https://wiki.vg/Protocol#VarInt_and_VarLong)
-    -   [1.4 Position](https://wiki.vg/Protocol#Position)
-    -   [1.5 Fixed-point numbers](https://wiki.vg/Protocol#Fixed-point_numbers)
-    -   [1.6 Bit sets](https://wiki.vg/Protocol#Bit_sets)
+-   [1 Definitions](#definitions)
+    -   [1.1 Data types](#data-types)
+    -   [1.2 Identifier](#identifier)
+    -   [1.3 VarInt and VarLong](#varint-and-varlong)
+    -   [1.4 Position](#position)
+    -   [1.5 Fixed-point numbers](#fixed-point-numbers)
+    -   [1.6 Bit sets](#bit-sets)
         -   [1.6.1 BitSet](https://wiki.vg/Protocol#BitSet)
         -   [1.6.2 Fixed BitSet](https://wiki.vg/Protocol#Fixed_BitSet)
     -   [1.7 Other definitions](https://wiki.vg/Protocol#Other_definitions)
