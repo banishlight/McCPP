@@ -18,7 +18,7 @@ typedef uint16_t UInt16;
 typedef uint8_t UInt8;
 
 // Possibly unnecessary:
-typedef unsigned char Byte;
+typedef uint8_t Byte;
 typedef Byte ColourID;
 typedef unsigned char ByteArray[256];
 typedef string JsonTextComponent;

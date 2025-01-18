@@ -141,18 +141,18 @@ int readVarIntFromSocket(int fd, int* byte_count) {
     return value;
 }
 
-std::vector<UInt8> decompress(const void* compData, size_t size) {
+std::vector<Byte> decompress(const uint8_t* compData, size_t size) {
     #warning "Untested zlib decompression"
-    std::vector<UInt8> decompData;
+    std::vector<Byte> decompData;
     z_stream stream{};
-    stream.next_in = const_case<Bytef*> (compData);
+    stream.next_in = const_cast<Bytef*>(compData);
     stream.avail_in = static_cast<uInt>(size);
-    if (infateInit(&stream) != Z_OK) {
+    if (inflateInit(&stream) != Z_OK) {
         Console::getConsole().Error("Failed to init zlib interface");
     }
     const size_t CHUNK_SIZE = 4096;
-    UInt8 buffer[CHUNK_SIZE];
-    int ret
+    Byte buffer[CHUNK_SIZE];
+    int ret;
     do {
         stream.next_out = buffer;
         stream.avail_out = CHUNK_SIZE;
