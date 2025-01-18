@@ -10,6 +10,7 @@
 #include <Standards.hpp> 
 #include <fcntl.h> // for non-blocking fd
 #include <errno.h> // for error checking
+#include <zlib.h>
 
 bool setSocketBlocking(int fd, bool blocking) {
     if (fd < 0) return false;
@@ -138,4 +139,30 @@ int readVarIntFromSocket(int fd, int* byte_count) {
         }
     }
     return value;
+}
+
+std::vector<UInt8> decompress(const void* compData, size_t size) {
+    #warning "Untested zlib decompression"
+    std::vector<UInt8> decompData;
+    z_stream stream{};
+    stream.next_in = const_case<Bytef*> (compData);
+    stream.avail_in = static_cast<uInt>(size);
+    if (infateInit(&stream) != Z_OK) {
+        Console::getConsole().Error("Failed to init zlib interface");
+    }
+    const size_t CHUNK_SIZE = 4096;
+    UInt8 buffer[CHUNK_SIZE];
+    int ret
+    do {
+        stream.next_out = buffer;
+        stream.avail_out = CHUNK_SIZE;
+        ret = inflate(&stream, Z_NO_FLUSH);
+        if (ret == Z_MEM_ERROR || ret == Z_DATA_ERROR || ret == Z_STREAM_ERROR) {
+            inflateEnd(&stream);
+            throw std::runtime_error("Error during compression");
+        }
+        decompData.insert(decompData.end(), buffer, buffer + (CHUNK_SIZE - stream.avail_out));
+    } while (ret != Z_STREAM_END);
+    inflateEnd(&stream);
+    return decompData;
 }

@@ -123,42 +123,39 @@ bool Connection::isConnected() {
 
 // Public call to grab packet from self fd and decode it
 bool Connection::processIncPacket() {
-    #ifdef DEBUG
-        Console::getConsole().Entry("Begun processing packet");
-    #endif
     setSocketBlocking(file_d, true);
     int pLen = readVarIntFromSocket(this->getFD(), nullptr);
-    int iLen = 0;
-    #ifdef DEBUG
-        Console::getConsole().Entry("Length of packet in bytes: " + std::to_string(pLen));
-    #endif
-    int id = readVarIntFromSocket(this->getFD(), &iLen);
-    #ifdef DEBUG
-        Console::getConsole().Entry("id len: " + std::to_string(iLen));
-    #endif
-    if ((pLen - iLen) > 0) {
-        #ifdef DEBUG
-            Console::getConsole().Entry("Reading Data from packet");
-        #endif
-        void* buff = malloc(sizeof(char) * (pLen - iLen));
-        int error = Recieve(this->getFD(), buff, (pLen - iLen));
-        if (error < 0) {
-            Console::getConsole().Error("Error with recieving packet data");
-            return false;
+    bool has_data = false;
+    int id = -1;
+    void* buff;
+    if (compress_threshold != -1 && pLen >= compress_threshold) {
+        // decompress packet data and load buffer
+
+    }
+    else {
+        // handle packet normally
+        int iLen = 0;
+        id = readVarIntFromSocket(this->getFD(), &iLen);
+        if ((pLen - iLen) > 0) {
+            has_data = true;
+            buff = malloc(sizeof(char) * (pLen - iLen));
+            int error = Recieve(this->getFD(), buff, (pLen - iLen));
+            if (error < 0) {
+                Console::getConsole().Error("Error with recieving uncompressed packet data");
+                setSocketBlocking(file_d, false);
+                return false;
+            }
         }
+    }
+
+    if (has_data) {
         decode_packet(buff, id);
         free(buff);
     }
     else {
-        #ifdef DEBUG
-            Console::getConsole().Entry("No data packet");
-        #endif
         decode_packet(nullptr, id);
     }
-    setSocketBlocking(file_d, false);    
-    #ifdef DEBUG
-        Console::getConsole().Entry("Finished processing packet");
-    #endif
+    setSocketBlocking(file_d, false);
     return true;
 }
 
