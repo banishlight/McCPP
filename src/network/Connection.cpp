@@ -130,7 +130,7 @@ bool Connection::processIncPacket() {
     void* buff;
     if (compress_threshold != -1 && pLen >= compress_threshold) {
         // decompress packet data and load buffer
-
+        #warning "Need to handle packet decompression"
     }
     else {
         // handle packet normally

@@ -97,6 +97,6 @@ int readData(void*& data, string& dest, int size) {
     // memcpy correct number of bytes onto stack
     // convert UTF8 or UTF16 characters to string
     // iterate pointer
-    #warning "Missing implementation"
+    #warning "Urgent! Missing implementation"
     return 0;
 }
