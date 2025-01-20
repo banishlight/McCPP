@@ -5,7 +5,8 @@
 - Extend connection processing to send packets while they are being processed.
 - Complete all packet handling to send recieve the required packets for the player to recieve the server information
     - may need to import a json library [like this](https://github.com/nlohmann/json)
-
+- Structure a general commands system to allow for externally made commands and for new commands to be easily appended when needed.  (Some sort of lookup table?)
+- the Console class is not thread safe.  It currently relies on cout buffering.
 
 
 
