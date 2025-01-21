@@ -175,12 +175,8 @@ int Connection::close() {
 }
 
 // This parameter list could be reduced and calculated within the function
-int Connection::addPending(int size, int id, int dsize, std::vector<Byte> data) {
-    Packet newPacket;
-    newPacket.size = size;
-    newPacket.id = id;
-    newPacket.dsize = dsize;
-    newPacket.data = data;
+int Connection::addPending(Packet newPacket) {
+    // TODO check to ensure packet is loaded with correct values
     pending.push(newPacket);
     return 0;
 }

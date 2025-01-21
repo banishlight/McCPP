@@ -19,8 +19,8 @@ struct ConfigEntries {
 // No Handshake Packet
 
 // Status State
-void client_Status_Reponse(string json_response);
-void client_Ping_Response(long payload);
+void client_Status_Reponse(Connection conn, string json);
+void client_Ping_Response(Connection conn, Int64 payload);
 
 // Login State
 void client_Disconnect_login(JsonTextComponent reason);

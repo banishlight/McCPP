@@ -1,4 +1,5 @@
 #include <network/ToServerPacket.hpp>
+#include <network/ToClientPacket.hpp>
 #include <Standards.hpp>
 #include <network/VarIntLong.hpp>
 #include <network/Connection.hpp>
@@ -36,12 +37,16 @@ void server_Handshake(Connection conn, void* data) {
 // Status State
 
 void server_Status_Request(Connection conn) {
-
+    string json;
+    #warning "Need to build json here"
+    client_Status_Reponse(conn, json);
 }
 
 // Int64 payload
 void server_Ping_Request(Connection conn, void* data) {
-
+    Int64 ping;
+    readData(data, ping);
+    client_Ping_Response(conn, ping);
 }
 
 // Login State

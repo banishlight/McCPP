@@ -22,7 +22,7 @@ class Connection {
         bool isConnected();
         bool processIncPacket();
         int close();
-        int addPending(int size, int id, int dsize, std::vector<Byte> data);
+        int addPending(Packet newPacket);
         int countPending();
         Packet getPending();
         void setState(Connection::Connection_State state);
