@@ -53,12 +53,15 @@ void server_Ping_Request(Connection conn, void* data) {
 
 // string name, UUID player_uuid
 void server_Login_Start(Connection conn, void* data) {
-
+    Int64 first;
+    readData(data, first);
+    Int64 second;
+    readData(data, second);
 }
 
 // VarInt shared_secret_length, ByteArray shared_secret, VarInt verify_token_length, ByteArray verify_token
 void server_Encryption_Response(Connection conn, void* data) {
-
+    
 }
 
 // VarInt message_id, bool success, ByteArray data

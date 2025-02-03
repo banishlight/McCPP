@@ -1,5 +1,6 @@
 #pragma once
 #include <Standards.hpp>
+#include <network/Connection.hpp>
 #include <network/VarIntLong.hpp>
 
 struct LoginProperty { // Property array in Login Success 
