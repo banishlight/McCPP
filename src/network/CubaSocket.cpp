@@ -95,7 +95,7 @@ bool packetReady(int fd) {
 }
 
 int checkErrno() {
-    #warning "Missing implementation"
+    // TODO: Check errno value for debug reporting
     return 0;
 }
 
