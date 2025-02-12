@@ -21,3 +21,6 @@ Much of the work done deconstructing minecraft and its network protocol has been
 
 ## Networking
 This server handles networking by creating a thread that will focus on accepting new connections and adding them to the network queue(Round robin scheduler).  A thread pool then pops these connections off the queue, sends and recieves any packets they need and then add them to the back of the queue.  When the connection is closed, it is processed and then it is not added back into to the queue.  This is all orchestrated in the NetworkHandler class.
+
+## JSON Parsing
+Using [this](https://github.com/nlohmann/json) library to parse json's.  Its a header library in the ```include/lin``` directory.  
