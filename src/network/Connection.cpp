@@ -1,9 +1,11 @@
+#include <Standards.hpp>
 #include <network/Connection.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <network/ToServerPacket.hpp>
 #include <network/VarIntLong.hpp>
 #include <network/CubaSocket.hpp>
+
 
 // Must pass a valid network file descriptor
 Connection::Connection(int fd) { 
@@ -185,16 +187,17 @@ int Connection::countPending() {
     return pending.size();
 }
 
+// Must check if pending is non-empty before calling
 // Will return a blank packet when attempting on an empty queue
 Packet Connection::getPending() {
+    Packet p;
     if (pending.size() > 0) {
-        Packet p;
         p = pending.front();
         pending.pop();
         return p;
     }
-    std::runtime_error("Cannot get pending when pending is empty.\n");
-    return Packet();
+    Console::getConsole().Error("Attempted to get pending packet from empty queue.");
+    return p;
 }
 
 void Connection::setState(Connection::Connection_State state) {

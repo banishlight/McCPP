@@ -1,37 +1,41 @@
 #pragma once
-#include <Standards.hpp>
 #include <vector>
+#include <cstdint>
 
 class VarInt {
     public:
         // VarInt(int num);
-        VarInt(Int32 num);
+        VarInt();
+        VarInt(int32_t num);
         VarInt(void* packet);
-        Int32 getRawValue();
+        int32_t getRawValue();
         int getValue();
-        std::vector<Int8> getBytes();
+        std::vector<uint8_t> getBytes();
 
     private:
-        Int32 decode(void*& packet);
-        Int32 value = 0;
-        std::vector<Int8> bytes;
-        static Byte constexpr SEGMENT_BITS = 0x7F;
-        static Byte constexpr CONTINUE_BIT = 0x80;
+        void encode();
+        int32_t decode(void*& packet);
+        int32_t value = 0;
+        std::vector<uint8_t> bytes;
+        static uint8_t constexpr SEGMENT_BITS = 0x7F;
+        static uint8_t constexpr CONTINUE_BIT = 0x80;
 };
 
 class VarLong {
     public:
         // VarLong(long long num);
-        VarLong(Int64 num);
+        VarLong();
+        VarLong(int64_t num);
         VarLong(void* packet);
-        Int64 getRawValue();
+        int64_t getRawValue();
         long long getValue();
-        std::vector<Int8> getBytes();
+        std::vector<uint8_t> getBytes();
         
     private:
-        Int64 decode(void*& packet);
-        Int64 value;
-        std::vector<Int8> bytes;
-        static Byte constexpr SEGMENT_BITS = 0x7FL;
-        static Byte constexpr CONTINUE_BIT = 0x80L;
+        void encode();
+        int64_t decode(void*& packet);
+        int64_t value;
+        std::vector<uint8_t> bytes;
+        static uint8_t constexpr SEGMENT_BITS = 0x7FL;
+        static uint8_t constexpr CONTINUE_BIT = 0x80L;
 };

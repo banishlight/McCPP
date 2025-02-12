@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <vector>
 #include <cstdint> 
+#include <network/VarIntLong.hpp>
 
 
 typedef std::string string;
@@ -27,12 +28,12 @@ typedef Int64 UUID[2]; // needs to be 128bit int
 typedef string Identifier;
 typedef string TextComponent;
 
-typedef struct {
-  int size;
-  int id;
-  int dsize;
+struct Packet{
+  VarInt len = 0;
+  VarInt id = 0;
   std::vector<Byte> data;
-} Packet;
+  Packet() = default;
+};
 
 const string PROTOCOL_VERSION = "764";
 const string SERVER_VERSION = "1.20.2";

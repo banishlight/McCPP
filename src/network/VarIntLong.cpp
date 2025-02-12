@@ -1,22 +1,29 @@
 #include <network/VarIntLong.hpp>
-#include <Standards.hpp>
+// #include <Standards.hpp>
 #include <Console.hpp>
 #include <cstring>   // For memcpy
 #include <vector>
-
-// When Standards moves to fixed int sizes, uncomment constructors
+#include <cstdint> // For int32_t, int64_t
 
 // ==VarInt==
 /*
 VarInt::VarInt(int num) : value(static_cast<Int32>(num)) {}
 */
-VarInt::VarInt(Int32 num) : value(num) {}
+VarInt::VarInt() {
+	value = 0;
+	encode();
+}
+
+VarInt::VarInt(int32_t num) {
+	value = num;
+	encode();
+}
 
 VarInt::VarInt(void* packet) {
 	value = decode(packet);
 }
 
-Int32 VarInt::getRawValue() {
+int32_t VarInt::getRawValue() {
 	return value;
 }
 
@@ -25,10 +32,10 @@ int VarInt::getValue() {
 	return static_cast<int>(value);
 }
 
-Int32 VarInt::decode(void*& packet) {
-	Int32 value = 0;
+int32_t VarInt::decode(void*& packet) {
+	int32_t value = 0;
     int position = 0;
-    Int8 currentByte;
+    uint8_t currentByte;
 	while(true) {
 		std::memcpy(&currentByte, packet, 1);
 		bytes.push_back(currentByte);
@@ -45,21 +52,41 @@ Int32 VarInt::decode(void*& packet) {
 	return value;
 }
 
-std::vector<Int8> VarInt::getBytes() {
+std::vector<uint8_t> VarInt::getBytes() {
 	return bytes;
+}
+
+void VarInt::encode() {
+	int32_t value = this->value;
+	do {
+		uint8_t temp = value & SEGMENT_BITS;
+		value >>= 7;
+		if (value != 0) {
+			temp |= CONTINUE_BIT;
+		}
+		bytes.push_back(temp);
+	} while (value != 0);
 }
 
 // ==VarLong==
 /*
 VarLong::VarLong(long long num) : value(static_cast<Int64>(num)) {}
 */
-VarLong::VarLong(Int64 num) : value(num) {}
+VarLong::VarLong() {
+	value = 0;
+	encode();
+}
+
+VarLong::VarLong(int64_t num) {
+	value = num;
+	encode();
+}
 
 VarLong::VarLong(void* packet) {
 	value = decode(packet);
 }
 
-Int64 VarLong::getRawValue() {
+int64_t VarLong::getRawValue() {
 	return value;
 }
 
@@ -67,10 +94,10 @@ long long VarLong::getValue() {
 	return static_cast<long long>(value);
 }
 
-Int64 VarLong::decode(void*& packet) {
-	Int64 value = 0;
+int64_t VarLong::decode(void*& packet) {
+	int64_t value = 0;
     int position = 0;
-    Int8 currentByte;
+    uint8_t currentByte;
 	while(true) {
 		std::memcpy(&currentByte, packet, 1);
 		bytes.push_back(currentByte);
@@ -87,6 +114,18 @@ Int64 VarLong::decode(void*& packet) {
 	return value;
 }
 
-std::vector<Int8> VarLong::getBytes() {
+std::vector<uint8_t> VarLong::getBytes() {
 	return bytes;
+}
+
+void VarLong::encode() {
+	int64_t value = this->value;
+	do {
+		uint8_t temp = value & SEGMENT_BITS;
+		value >>= 7;
+		if (value != 0) {
+			temp |= CONTINUE_BIT;
+		}
+		bytes.push_back(temp);
+	} while (value != 0);
 }
