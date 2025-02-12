@@ -19,6 +19,7 @@ DEPS := $(OBJ:.o=.d)
 
 default: linux
 
+# Use these defines for platform specific code
 linux: CXXFLAGS += -D LINUX
 linux: directories $(TARGET)
 
