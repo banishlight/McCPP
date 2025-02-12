@@ -8,6 +8,8 @@ class Properties {
         static Properties& getProperties();
         string getIP();
         string getPort();
+        string getMotd();
+        string getMaxPlayers();
 
         enum Difficulties {
             Peaceful,

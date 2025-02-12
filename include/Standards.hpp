@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint> 
 
+
 typedef std::string string;
 typedef std::size_t size;
 typedef int64_t Int64;
@@ -33,7 +34,8 @@ typedef struct {
   std::vector<Byte> data;
 } Packet;
 
-
+const string PROTOCOL_VERSION = "764";
+const string SERVER_VERSION = "1.20.2";
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \

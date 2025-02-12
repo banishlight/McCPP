@@ -5,10 +5,12 @@
 #include <network/Connection.hpp>
 #include <Console.hpp>
 #include <network/readData.hpp>
+#include <Properties.hpp>
+#include <lib/json.hpp>
+using json = nlohmann::json;
 
 // Handshake State
 
-// VarInt protocol_version, string server_address, UInt16 server_port, VarInt next_state
 void server_Handshake(Connection conn, void* data) {
     VarInt proto_ver = VarInt(data);
     string serv_add; 
@@ -37,26 +39,41 @@ void server_Handshake(Connection conn, void* data) {
 // Status State
 
 void server_Status_Request(Connection conn) {
-    string json;
-    #warning "Need to build json here"
-    client_Status_Reponse(conn, json);
+    string maxplayers = Properties::getProperties().getMaxPlayers();
+    string motd = Properties::getProperties().getMotd();
+    json status_json = {
+        {"version", {
+            {"name", SERVER_VERSION},
+            {"protocol", PROTOCOL_VERSION}
+        }},
+        {"players", {
+            {"max", maxplayers},
+            {"online", 0}
+        }},
+        {"description", {
+            {"text", motd}
+        }}
+    };
+    client_Status_Reponse(conn, status_json);
 }
 
-// Int64 payload
 void server_Ping_Request(Connection conn, void* data) {
-    Int64 ping;
-    readData(data, ping);
-    client_Ping_Response(conn, ping);
+    Int64 timestamp;
+    readData(data, timestamp);
+    client_Ping_Response(conn, timestamp);
 }
 
 // Login State
 
-// string name, UUID player_uuid
 void server_Login_Start(Connection conn, void* data) {
+    // string name, UUID player_uuid
+    string name;
+    readData(data, name, 16);
     Int64 first;
     readData(data, first);
     Int64 second;
     readData(data, second);
+    // TODO do something with name and UUID
 }
 
 // VarInt shared_secret_length, ByteArray shared_secret, VarInt verify_token_length, ByteArray verify_token

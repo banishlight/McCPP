@@ -333,3 +333,10 @@ string Properties::getPort() {
     return this->server_port;
 }
 
+string Properties::getMotd() {
+    return this->motd;
+}
+
+string Properties::getMaxPlayers() {
+    return std::to_string(this->max_players);
+}

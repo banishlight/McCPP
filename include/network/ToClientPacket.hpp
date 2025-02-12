@@ -2,6 +2,8 @@
 #include <Standards.hpp>
 #include <network/Connection.hpp>
 #include <network/VarIntLong.hpp>
+#include <lib/json.hpp>
+using json = nlohmann::json;
 
 struct LoginProperty { // Property array in Login Success 
   string name;
@@ -13,18 +15,17 @@ struct LoginProperty { // Property array in Login Success
 struct ConfigEntries {
   Identifier registryID;
   VarInt entryCount;
-
 };
 
 // Handshake State
 // No Handshake Packet
 
 // Status State
-void client_Status_Reponse(Connection conn, string json);
+void client_Status_Reponse(Connection conn, json status_json);
 void client_Ping_Response(Connection conn, Int64 payload);
 
 // Login State
-void client_Disconnect_login(JsonTextComponent reason);
+void client_Disconnect_login(Connection conn, json reason);
 void client_Encryption_Request(string server_id, VarInt public_key_length, ByteArray public_key, VarInt verify_token_length, ByteArray verify_token, bool should_auth);
 void client_Login_Success(UUID uuid, string username, VarInt num_of_prop, struct LoginProperty properties[], bool strict_error_handling); // Look into how to parameterize Property array struct
 void client_Set_Compression(VarInt threshold);
