@@ -4,7 +4,6 @@
 
 class VarInt {
     public:
-        // VarInt(int num);
         VarInt();
         VarInt(int32_t num);
         VarInt(void* packet);
@@ -23,7 +22,6 @@ class VarInt {
 
 class VarLong {
     public:
-        // VarLong(long long num);
         VarLong();
         VarLong(int64_t num);
         VarLong(void* packet);

@@ -26,8 +26,6 @@ linux: directories $(TARGET)
 windows: CXXFLAGS += -D WINDOWS
 windows: directories $(TARGET)
 
-
-
 # Debug target
 debug: CXXFLAGS += -D DEBUG -g
 debug: directories $(TARGET)
