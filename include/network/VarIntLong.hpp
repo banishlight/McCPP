@@ -9,7 +9,7 @@ class VarInt {
         VarInt(void* packet);
         int32_t getRawValue();
         int getValue();
-        std::vector<uint8_t> getBytes();
+        std::vector<uint8_t> getBytes() const;
 
     private:
         void encode();
@@ -27,7 +27,7 @@ class VarLong {
         VarLong(void* packet);
         int64_t getRawValue();
         long long getValue();
-        std::vector<uint8_t> getBytes();
+        std::vector<uint8_t> getBytes() const;
         
     private:
         void encode();

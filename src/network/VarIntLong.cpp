@@ -52,7 +52,7 @@ int32_t VarInt::decode(void*& packet) {
 	return value;
 }
 
-std::vector<uint8_t> VarInt::getBytes() {
+std::vector<uint8_t> VarInt::getBytes() const {
 	return bytes;
 }
 
@@ -114,7 +114,7 @@ int64_t VarLong::decode(void*& packet) {
 	return value;
 }
 
-std::vector<uint8_t> VarLong::getBytes() {
+std::vector<uint8_t> VarLong::getBytes() const {
 	return bytes;
 }
 

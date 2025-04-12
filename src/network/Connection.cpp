@@ -5,6 +5,7 @@
 #include <network/ToServerPacket.hpp>
 #include <network/VarIntLong.hpp>
 #include <network/CubaSocket.hpp>
+#include <cstring> // for memcpy
 
 
 // Must pass a valid network file descriptor
@@ -198,6 +199,76 @@ Packet Connection::getPending() {
     }
     Console::getConsole().Error("Attempted to get pending packet from empty queue.");
     return p;
+}
+
+int Connection::serializePacket(const Packet& packet, void*& buffer) {
+    // Get the encoded bytes for packet length and ID
+    std::vector<uint8_t> lengthBytes = packet.len.getBytes();
+    std::vector<uint8_t> idBytes = packet.id.getBytes();
+    
+    // Calculate total buffer size
+    int lengthSize = lengthBytes.size();
+    int idSize = idBytes.size();
+    int dataSize = packet.data.size();
+    int totalSize = lengthSize + idSize + dataSize;
+    
+    // Allocate buffer (freed in sendPendingPackets)
+    buffer = malloc(totalSize);
+    if (!buffer) {
+        Console::getConsole().Error("Failed to allocate memory for packet serialization");
+        return -1;
+    }
+    
+    // Copy data into the buffer
+    uint8_t* ptr = static_cast<uint8_t*>(buffer);
+    
+    // Write length VarInt
+    if (!lengthBytes.empty()) {
+        std::memcpy(ptr, lengthBytes.data(), lengthSize);
+        ptr += lengthSize;
+    }
+    
+    // Write packet ID VarInt
+    if (!idBytes.empty()) {
+        std::memcpy(ptr, idBytes.data(), idSize);
+        ptr += idSize;
+    }
+    
+    // Write packet data if there is any
+    if (!packet.data.empty()) {
+        std::memcpy(ptr, packet.data.data(), dataSize);
+    }
+    
+    return totalSize;
+}
+
+int Connection::sendPendingPackets() {
+    int sentCount = 0;
+    while (!pending.empty()) {
+        Packet packet = pending.front();
+        // Serialize the packet
+        void* serializedData = nullptr;
+        int dataSize = serializePacket(packet, serializedData);
+        
+        if (dataSize > 0 && serializedData != nullptr) {
+            // Send the data
+            int result = send(file_d, serializedData, dataSize, 0);
+            // Malloc'd in serializePacket, so free it here
+            free(serializedData);
+            
+            if (result < 0) {
+                Console::getConsole().Error("Failed to send packet");
+                return sentCount;
+            }
+            
+            pending.pop();
+            sentCount++;
+        } else {
+            Console::getConsole().Error("Failed to serialize packet");
+            pending.pop();
+        }
+    }
+    return sentCount;
 }
 
 void Connection::setState(Connection::Connection_State state) {

@@ -23,18 +23,20 @@ class Connection {
         bool processIncPacket();
         int close();
         int addPending(Packet newPacket);
-        int countPending();
-        Packet getPending();
         void setState(Connection::Connection_State state);
+        int sendPendingPackets();
     
     private:
         Connection_State myState = Connection_State::Handshake;
         string ipaddress;
         int file_d = -1;
-        void decode_packet(void* packet, int packetID);
         bool connected = false;
         std::queue<Packet> pending;
         int compress_threshold = -1; // Enabled on non negative
+        int countPending();
+        Packet getPending();
+        void decode_packet(void* packet, int packetID);
+        int serializePacket(const Packet& packet, void*& buffer);
 };
 
 class ConnectionList {

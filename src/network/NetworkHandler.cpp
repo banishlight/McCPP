@@ -100,6 +100,9 @@ void NetworkHandler::processConnection(Connection conn) {
             Console::getConsole().Error("processPacket() Failure");
         }
     }
+    // Send all packets in the queue
+    conn.sendPendingPackets();
+    // Put the connection back into the thread pool
     netThreads->enqueue([this,conn]() mutable {
             processConnection(conn);
         });
