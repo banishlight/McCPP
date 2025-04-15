@@ -20,3 +20,13 @@ int main() {
     NetworkHandler::getHandler().close();
     return 0;
 }
+
+
+#ifdef TEST
+// Put test cases here
+int main() {
+
+
+
+}
+#endif

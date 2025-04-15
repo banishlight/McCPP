@@ -3,31 +3,31 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
-#include <Command.hpp>
 #include <Standards.hpp>
-
+#include <mutex>
+#include <thread>
+#include <atomic>
 
 class Console {
-    enum Stream {
+    public:
+        Console& getConsole();
+        int Entry(string text);
+        int Error(string text);
+        int Post();
+    private:
+        enum Stream {
             OUT,
             IN,
             ERR
         };
-    public:
-        static Console& getConsole();
-        int Entry(string text);
-        string Post();
-        int Error(string text);
-        int Command();
-    private:
-        Console();
-        ~Console();
-        int CommandDecode(string command);
-        void setColour(int colour, Stream stream);
-        int initList();
-        bool opened = false;
-        std::ofstream myLog;
-        std::unordered_map<string, string> commandList;
+        struct Message {
+            string text;
+            Stream stream;
+        };
+        struct LogBuffer {
+            std::vector<Message> enteries;
+            std::mutex mutex;
+        };
         enum Colours {
             none=0,
             black=30,
@@ -39,7 +39,19 @@ class Console {
             cyan=36,
             lightgray=37
         };
-        const int IN_COLOUR = none;
-        const int OUT_COLOUR = green;
-        const int ERR_COLOUR = red;
+        Colours IN_COLOUR = none;
+        Colours OUT_COLOUR = green;
+        Colours ERR_COLOUR = red;
+        Colours myColour = none;
+        std::array<LogBuffer, 4> buffers;
+        std::thread workerThread;
+        std::atomic<bool> running{true};
+        std::ofstream logFile;
+
+        void createLog();
+        void processBuffers(); // THREAD
+        void startThread();
+        void processBuffers();
+        int addToBuff(Message msg);
+        void setColour(int colour, Stream stream);
 };
