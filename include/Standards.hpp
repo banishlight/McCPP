@@ -28,11 +28,12 @@ typedef Int64 UUID[2]; // needs to be 128bit int
 typedef string Identifier;
 typedef string TextComponent;
 
-struct Packet{
-  VarInt len = 0;
-  VarInt id = 0;
-  std::vector<Byte> data;
-  Packet() = default;
+enum ConnectionState {
+    Handshake,
+    Status,
+    Login,
+    Play,
+    Closed
 };
 
 const string PROTOCOL_VERSION = "764";

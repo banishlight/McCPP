@@ -8,14 +8,6 @@
 
 class Connection {
     public:
-        enum Connection_State {
-            Handshake,
-            Status,
-            Login,
-            Config,
-            Play,
-            Closed
-        };
         Connection(int fd);
         ~Connection();
         int getFD();
@@ -37,20 +29,4 @@ class Connection {
         Packet getPending();
         void decode_packet(void* packet, int packetID);
         int serializePacket(const Packet& packet, void*& buffer);
-};
-
-class ConnectionList {
-    public:
-        static ConnectionList& getList();
-        void addConnection(Connection member);
-        void setListenfd(int fd);
-        int getListenfd();
-        void removeConnection(Connection conn);
-        void closeAllConnections();
-    private:
-        int listen_fd = -1;
-        int count = -1;
-        std::vector<Connection> connections;
-        ConnectionList();
-        ~ConnectionList();
 };
