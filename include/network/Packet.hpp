@@ -303,7 +303,7 @@ class Cookie_Response_config_p : public Config_Packet, public Incoming_Packet {
 }
 class Serverbound_Plugin_Message_config_p : public Config_Packet, public Incoming_Packet {
     public:
-        int getID() const override { return PACK_PACKET_IDET_ID; }
+        int getID() const override { return _PACKET_ID; }
         int deserialize(const void* in_buff) override;
     private:
         static int constexpr _PACKET_ID = 0x02;
