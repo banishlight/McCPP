@@ -9,3 +9,13 @@ int Handshake_p::deserialize(const void* in_buff) override {
     // TODO Implementation here
     return 0;
 }
+
+int Status_Response_p::serialize(void* out_buffer) const override {
+    // TODO Implementation here
+    return 0;
+}
+
+int Pong_Response_p::serialize(void* out_buffer) const override {
+    // TODO Implementation here
+    return 0;
+}
