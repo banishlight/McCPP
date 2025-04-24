@@ -32,6 +32,7 @@ enum ConnectionState {
     Handshake,
     Status,
     Login,
+    Config,
     Play,
     Closed
 };
