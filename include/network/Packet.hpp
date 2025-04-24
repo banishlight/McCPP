@@ -166,3 +166,182 @@ class Cookie_Response_login_p : public Login_Packet, public Incoming_Packet {
 }
 
 // **Config Packets**
+
+class Cookie_Request_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x00;
+}
+class Clientbound_Plugin_Message_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x01;
+}
+class Disconnect_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x02;
+}
+class Finish_Config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x03;
+}
+class Clientbound_Keep_Alive_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x04;
+}
+class Ping_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x05;
+}
+class Reset_Chat_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x06;
+}
+class Registry_Data_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x07;
+}
+class Remove_Resource_Pack_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x08;
+}
+class Add_Resource_Pack_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x09;
+}
+class Store_Cookie_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x0A;
+}
+class Transfer_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x0B;
+}
+class Feature_Flags_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x0C;
+}
+class Update_Tags_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x0D;
+}
+class Clientbound_Known_Packs_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x0E;
+}
+class Custom_Report_Details_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x0F;
+}
+class Server_Links_config_p : public Config_Packet, public Outgoing_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int serialize(void* out_buffer) const override;
+    private:
+        int constexpr PACKET_ID = 0x10;
+}
+
+class Client_Information_config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x00;
+}
+class Cookie_Response_config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x01;
+}
+class Serverbound_Plugin_Message_config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x02;
+}
+class Acknowledge_Finish_Config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x03;
+}
+class Serverbound_Keep_Alive_config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x04;
+}
+class Pong_config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x05;
+}
+class Resource_Pack_Response_config_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x06;
+}
+class Serverbound_Known_Packs_p : public Config_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return PACKET_ID; }
+        int deserialize(const void* in_buff) override;
+    private:
+        int constexpr PACKET_ID = 0x07;
+}
+
+// **Play Packets**
