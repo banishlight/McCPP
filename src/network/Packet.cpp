@@ -1,5 +1,7 @@
 #include <Standards.hpp>
 #include <network/Packet.hpp>
+#include <memory>
+#include <vector>
 #include <lib/json.hpp>
 using json = nlohmann::json;
 
@@ -210,3 +212,58 @@ int Serverbound_Known_Packs_p::deserialize(void* out_buffer) const override {
     return 0;
 }
 
+Packet_Registry::Packet_Registry() {
+    initializeRegistry();
+}
+
+Packet_Registry& Packet_Registry::getInstance() {
+    static Packet_Registry instance;
+    return instance;
+}
+
+std::shared_ptr<Incoming_Packet> Packet_Registry::fetchIncomingPacket(Connection_State state, int packetID) {
+    if (state >= Incoming_Registry.size() || 
+            packetID >= Incoming_Registry[state].size() ||
+            !Incoming_Registry[state][packetID]) {
+            return nullptr;
+        }
+    return Incoming_Registry[state][packetID];
+}
+
+void Packet_Registry::initializeRegistry() {
+    // Perform Resizes to enforce correct size
+    Incoming_Registry.resize(INC_SIZE);
+    HandshakeVec.resize(HANDSHAKE_SIZE);
+    StatusVec.resize(STATUS_SIZE);
+    LoginVec.resize(LOGIN_SIZE);
+    ConfigVec.resize(CONFIG_SIZE);
+    // TODO PlayVec.resize(PLAY_SIZE);
+    // Build vectors of vectors for each state
+    // All packets must be pushed in the correct order
+    HandshakeVec.push_back(std::make_shared<Handshake_p>());
+
+    StatusVec.push_back(std::make_shared<Status_Request_p>());
+    StatusVec.push_back(std::make_shared<Ping_Request_status_p>());
+    
+    LoginVec.push_back(std::make_shared<Login_Start_p>());
+    LoginVec.push_back(std::make_shared<Encryption_Response_p>());
+    LoginVec.push_back(std::make_shared<Login_Plugin_Response_p>());
+    LoginVec.push_back(std::make_shared<Login_Acknowledge_p>());
+    LoginVec.push_back(std::make_shared<Cookie_Response_login_p>());
+
+    ConfigVec.push_back(std::make_shared<Client_Information_config_p>());
+    ConfigVec.push_back(std::make_shared<Cookie_Response_config_p>());
+    ConfigVec.push_back(std::make_shared<Serverbound_Plugin_Message_config_p>());
+    ConfigVec.push_back(std::make_shared<Acknowledge_Finish_Config_p>());
+    ConfigVec.push_back(std::make_shared<Serverbound_Keep_Alive_config_p>());
+    ConfigVec.push_back(std::make_shared<Pong_config_p>());
+    ConfigVec.push_back(std::make_shared<Resource_Pack_Response_config_p>());
+    ConfigVec.push_back(std::make_shared<Serverbound_Known_Packs_p>());
+
+    // Initialize the registry with packet instances
+    Incoming_Registry.push_back(HandshakeVec);
+    Incoming_Registry.push_back(StatusVec);
+    Incoming_Registry.push_back(LoginVec);
+    Incoming_Registry.push_back(ConfigVec);
+    Incoming_Registry.push_back(PlayVec);
+}
