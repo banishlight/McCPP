@@ -5,6 +5,9 @@
 #include <lib/json.hpp>
 using json = nlohmann::json;
 
+int deserializeID(const void* buff);
+int deserializeSize(const void* buff);
+
 class Packet {
     public:
         virtual ~Packet() = default;

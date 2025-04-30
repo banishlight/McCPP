@@ -6,6 +6,16 @@
 using json = nlohmann::json;
 
 
+int deserializeID(const void* buff) {
+	
+
+}
+
+int deserializeSize(const void* buff) {
+
+
+}
+
 
 int Handshake_p::deserialize(const void* in_buff, Connection& conn) override {
     // TODO Implementation here
