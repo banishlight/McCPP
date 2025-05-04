@@ -17,6 +17,7 @@ DEPS := $(OBJ:.o=.d)
 # Rules
 .PHONY: default clean directories debug fast clang linux windows
 
+# Either linux or windows must be defined, but never both
 default: linux
 
 # Use these defines for platform specific code
