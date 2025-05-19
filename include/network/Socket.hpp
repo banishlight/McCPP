@@ -1,17 +1,33 @@
 #pragma once
 #include <Standards.hpp>
 
+// Will need to support zlib compression in the future
+// Thread safety!
 
 class Socket {
     public:
-        Socket();
+		#ifdef LINUX
+        Socket(int fd);
+		#endif
+		#ifdef WINDOWS
+		Socket(); // ??
+		#endif
         ~Socket();
-
-        int getSocketFD() const;
-        void setSocketFD(int socket_fd);
-
+	
         bool isValid() const;
+		std::unique_ptr<Incoming_Packet> receivePacket();
+		bool packetAvailable();
+		void sendPacket(const Outgoing_Packet* packet);
+		void setBlocking(bool blocking);
+		bool isBlocking() const;
 
-        void close();
-        bool isClosed() const;
-}
+    protected:
+	// Independent variables per OS
+	#ifdef LINUX
+		int fd = -1;
+		bool blocking = true;
+	#endif
+	#ifdef WINDOWS
+
+	#endif
+};

@@ -29,15 +29,15 @@ windows: directories $(TARGET)
 
 # Debug target
 debug: CXXFLAGS += -D DEBUG -g
-debug: directories $(TARGET)
+debug: linux
 
 # Optimizations included
 fast: CXXFLAGS += -Ofast
-fast: directories $(TARGET)
+fast: linux
 
 # build using clang & llvm
 clang: CXX := clang++ 
-clang: directories $(TARGET)
+clang: linux
 
 # Link the final executable
 $(TARGET): $(OBJ)

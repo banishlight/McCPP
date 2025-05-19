@@ -13,6 +13,8 @@ class Packet {
         virtual ~Packet() = default;
         virtual Connection_State getState() const = 0;
         virtual int getID() const = 0;
+    private:
+        int size = -1;
 };
 
 class Incoming_Packet : public virtual Packet {
