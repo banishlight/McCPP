@@ -63,13 +63,14 @@ std::vector<Byte> Socket::receivePacket() {
     int size = fetchVarInt();
     std::vector<Byte> buffer(size);
     // Unsure if I want to enforce blocking while receiving data
+    ssize_t rec;
     if (_blocking == false) {
         setBlocking(true);
-        ssize_t rec = recv(_fd, buffer.data(), size, 0);
+        rec = recv(_fd, buffer.data(), size, 0);
         setBlocking(false);
     }
     else {
-        ssize_t rec = recv(_fd, buffer.data(), size, 0);
+        rec = recv(_fd, buffer.data(), size, 0);
     }
     if (rec < 0) {
         throw std::runtime_error("Failed to receive packet");
