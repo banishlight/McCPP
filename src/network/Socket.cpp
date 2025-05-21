@@ -5,52 +5,104 @@
 
 // Linux implementation
 #ifdef LINUX
+#include <unistd.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <cstring>
+#include <fcntl.h> // for non-blocking fd
+
+int Socket::fetchVarInt() {
+    int value = 0;
+    int position = 0;
+    Byte currentByte;
+    
+    do {
+        // Read 1 byte
+        int bytesRead = recv(_fd, &currentByte, 1, 0);
+        if (bytesRead != 1) {
+            throw std::runtime_error("Failed to read VarInt byte");
+        }
+        
+        // Add the 7 bits to our value
+        value |= (currentByte & 0x7F) << position;
+        position += 7;
+        
+        if (position >= 32) {
+            throw std::runtime_error("VarInt too big");
+        }
+        
+    } while ((currentByte & 0x80) != 0);
+    
+    return value;
+}
 
 // sock_fd is the file descriptor accepted from the server socket
-Socket::Socket(int sock_fd) {
-    fd = sock_fd;
+Socket::Socket(int fd) {
+    _fd = fd;
+    if (isValid()) setBlocking(true);
+    else throw std::runtime_error("Invalid socket file descriptor");
 }
 
 Socket::~Socket() {
     // If socket close fails, might cause a memory leak?
-    close();
+    close(_fd);
 }
 
 bool Socket::isValid() const {
-    return fd > 0;
+    return _fd > 0;
 }
 
-std::unique_ptr<Incoming_Packet> Socket::receivePacket(ConnectionState state) {
-    if (fd < 0) return nullptr;
-    if (!packetAvailable()) return nullptr;
+std::vector<Byte> Socket::receivePacket() {
+    if (_fd < 0) return std::vector<Byte>();
+    if (!packetAvailable()) return std::vector<Byte>();
 
-    // Deserialize packet ID
-    // Deserialize size
-    // Then return the packet ptr?
+    // Deserialize packet size then
+    // fetch the packet into vector
+    int size = fetchVarInt();
+    std::vector<Byte> buffer(size);
+    // Unsure if I want to enforce blocking while receiving data
+    if (_blocking == false) {
+        setBlocking(true);
+        ssize_t rec = recv(_fd, buffer.data(), size, 0);
+        setBlocking(false);
+    }
+    else {
+        ssize_t rec = recv(_fd, buffer.data(), size, 0);
+    }
+    if (rec < 0) {
+        throw std::runtime_error("Failed to receive packet");
+    } else if (rec == 0) {
+        throw std::runtime_error("Connection closed");
+    }
+    if (rec != size) {
+        throw std::runtime_error("Incomplete packet received");
+    }
+    return buffer;
 }
 
 bool Socket::packetAvailable() {
     char buff[8];  // Unsure if size is correct
-    ssize_t rec = recv(fd, buff, sizeof(buff), MSG_PEEK);
+    ssize_t rec = recv(_fd, buff, sizeof(buff), MSG_PEEK);
     return rec > 0;
 }
 
-void Socket::sendPacket(const Outgoing_Packet* packet) {
+void Socket::sendPacket(const Outgoing_Packet& packet) {
     // Unsure of how I want to serialize then send the packet
 }
 
 void Socket::setBlocking(bool block) {
-    if (fd < 0) return;
-    int flags = fcntl(fd, F_GETFL, 0);
+    if (_fd < 0) return;
+    int flags = fcntl(_fd, F_GETFL, 0);
     if (flags == -1) return;
-    flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
-    fcntl(fd, F_SETFL, flags);
-    blocking = block;
+    flags = _blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+    fcntl(_fd, F_SETFL, flags);
+    _blocking = block;
 }
 
 bool Socket::isBlocking() const {
-    return blocking;
+    return _blocking;
 }
 #endif
 

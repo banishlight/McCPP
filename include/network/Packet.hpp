@@ -23,7 +23,7 @@ class Incoming_Packet : public virtual Packet {
 };
 class Outgoing_Packet : public virtual Packet {
     public:
-        virtual int serialize(void* out_buffer) const = 0;
+        virtual int serialize(std::vector<Byte>& out_buffer) const = 0;
 };
 
 

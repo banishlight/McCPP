@@ -15,17 +15,18 @@ class Socket {
         ~Socket();
 	
         bool isValid() const;
-		std::unique_ptr<Incoming_Packet> receivePacket();
+		std::vector<Byte> receivePacket();
 		bool packetAvailable();
-		void sendPacket(const Outgoing_Packet* packet);
+		void sendPacket(const Outgoing_Packet& packet);
 		void setBlocking(bool blocking);
 		bool isBlocking() const;
 
     protected:
 	// Independent variables per OS
 	#ifdef LINUX
-		int fd = -1;
-		bool blocking = true;
+		int fetchVarInt();
+		int _fd = -1;
+		bool _blocking = false;
 	#endif
 	#ifdef WINDOWS
 
