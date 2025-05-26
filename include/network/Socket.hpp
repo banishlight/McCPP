@@ -23,12 +23,12 @@ class Socket {
 
     protected:
 	// Independent variables per OS
-	#ifdef LINUX
-		int fetchVarInt();
-		int _fd = -1;
-		bool _blocking = false;
-	#endif
-	#ifdef WINDOWS
+		#ifdef LINUX
+			int fetchVarInt();
+			int _fd = -1;
+			bool _blocking = true;
+		#endif
+		#ifdef WINDOWS
 
-	#endif
+		#endif
 };

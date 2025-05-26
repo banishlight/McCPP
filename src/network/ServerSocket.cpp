@@ -32,16 +32,17 @@ ServerSocket::ServerSocket(const string ip, const string port) : Socket(ip, port
         throw std::runtime_error("Failed to listen on socket");
     }
 }
+
 ServerSocket::~ServerSocket() {
     close(fd);
 }
 
-Socket ServerSocket::acceptConnection() {
+Socket ServerSocket::Accept() {
     sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
     int client_fd = accept(fd, (struct sockaddr*)&client_addr, &addr_len);
     if (client_fd < 0) {
-        throw std::runtime_error("Failed to accept connection");
+        // Failed to accept a fd
     }
     return Socket(client_fd);
 }
@@ -60,7 +61,7 @@ ServerSocket::~ServerSocket() {
 
 }
 
-Socket ServerSocket::acceptConnection() {
+Socket ServerSocket::Accept() {
 
 }
 #endif
