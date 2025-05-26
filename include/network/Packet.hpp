@@ -1,17 +1,16 @@
 #pragma once
 #include <Standards.hpp>
+#include <network/Connection.hpp>   
 #include <memory>
 #include <vector>
 #include <lib/json.hpp>
 using json = nlohmann::json;
 
-int deserializeID(const void* buff);
-int deserializeSize(const void* buff);
 
 class Packet {
     public:
         virtual ~Packet() = default;
-        virtual Connection_State getState() const = 0;
+        virtual ConnectionState getState() const = 0;
         virtual int getID() const = 0;
     private:
         int size = -1;
@@ -29,23 +28,23 @@ class Outgoing_Packet : public virtual Packet {
 
 class Handshake_Packet : public virtual Packet {
     public:
-        Connection_State getState() const override { return ConnectionState::Handshake; }
+        ConnectionState getState() const override { return ConnectionState::Handshake; }
 };
 class Status_Packet : public virtual Packet {
     public:
-        Connection_State getState() const override { return ConnectionState::Status; }
+        ConnectionState getState() const override { return ConnectionState::Status; }
 };
 class Login_Packet : public virtual Packet {
     public:
-        Connection_State getState() const override { return ConnectionState::Login; }
+        ConnectionState getState() const override { return ConnectionState::Login; }
 };
 class Config_Packet : public virtual Packet {
     public:
-        Connection_State getState() const override { return ConnectionState::Config; }
+        ConnectionState getState() const override { return ConnectionState::Config; }
 };
 class Play_Packet : public virtual Packet {
     public:
-        Connection_State getState() const override { return ConnectionState::Play; }
+        ConnectionState getState() const override { return ConnectionState::Play; }
 };
 
 // **Handshake Packets**
@@ -99,7 +98,7 @@ class Disconnect_login_p : public Login_Packet, public Outgoing_Packet {
     private:
         static int constexpr _PACKET_ID = 0x00;
 };
-class Encryption_Response_p : public Login_Packet, public Outgoing_Packet {
+class Encryption_Request_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
         int serialize(std::vector<Byte>& out_buffer) const override;
@@ -116,21 +115,21 @@ class Login_Success_p : public Login_Packet, public Outgoing_Packet {
 class Set_Compression_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(const void* in_buff) override;
+        int serialize(std::vector<Byte>& out_buff) override;
     private:
         static int constexpr _PACKET_ID = 0x03;
 };
 class Login_Plugin_Request_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(const void* in_buff) override;
+        int serialize(std::vector<Byte>& out_buff) override;
     private:
         static int constexpr _PACKET_ID = 0x04;
 };
 class Cookie_Request_login_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(const void* in_buff) override;
+        int serialize(std::vector<Byte>& out_buff) override;
     private:
         static int constexpr _PACKET_ID = 0x05;
 };

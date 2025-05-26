@@ -4,7 +4,6 @@
 #include <netinet/in.h>
 #include <vector>
 #include <cstdint> 
-#include <network/VarIntLong.hpp>
 
 
 typedef std::string string;
@@ -50,6 +49,3 @@ const string SERVER_VERSION = "1.20.2";
   ((byte) & 0x04 ? '1' : '0'), \
   ((byte) & 0x02 ? '1' : '0'), \
   ((byte) & 0x01 ? '1' : '0')
-
-
-void decodePosition(Int64 position, Int32 *x, Int32 *y, Int32 *z);

@@ -9,23 +9,23 @@ ThreadPool::ThreadPool(int num_threads) : stop(false) {
 }
 
 ThreadPool::~ThreadPool() {
-    Console::getConsole().Entry("Closing ThreadPool");
+    // Console::getConsole().Entry("Closing ThreadPool");
     {
         std::unique_lock<std::mutex> lock(queueMutex);
         stop = true;
     }
     #ifdef DEBUG
-        Console::getConsole().Entry("notifying all workers on network");
+        // Console::getConsole().Entry("notifying all workers on network");
     #endif
     cv.notify_all();
     for(std::thread& worker : workerList) {
         #ifdef DEBUG
-            Console::getConsole().Entry("Joining thread");
+            // Console::getConsole().Entry("Joining thread");
         #endif
         worker.join();
     }
     
-    Console::getConsole().Entry("Thread pool closed");
+    // Console::getConsole().Entry("Thread pool closed");
 }
 
 void ThreadPool::enqueue(std::function<void()> task) {

@@ -6,17 +6,6 @@
 using json = nlohmann::json;
 
 
-int deserializeID(const void* buff) {
-	
-
-}
-
-int deserializeSize(const void* buff) {
-
-
-}
-
-
 int Handshake_p::deserialize(const void* in_buff, Connection& conn) override {
     // TODO Implementation here
     return 0;
@@ -47,7 +36,7 @@ int Disconnect_login_p::serialize(void* out_buffer) const override {
     return 0;
 }
 
-int Encryption_Response_p::serialize(void* out_buffer) const override {
+int Encryption_Request_p::serialize(void* out_buffer) const override {
     // TODO Implementation here
     return 0;
 }

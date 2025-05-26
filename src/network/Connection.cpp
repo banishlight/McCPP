@@ -29,6 +29,15 @@ void Connection::receivePackets() {
     }
 }
 
+void Connection::sendPackets() {
+    // Send all packets from queue
+    for(int i = 0; i < _sendQueue.size(); i++) {
+        _socket.sendPacket(_sendQueue[i]);
+    }
+    // Clear the queue
+    _sendQueue.erase();
+}
+
 bool Connection::isValid() {
     return _socket.isValid();
 }

@@ -1,29 +1,18 @@
 #include <Standards.hpp>
 #include <Properties.hpp>
-#include <network/CubaSocket.hpp>
 #include <Console.hpp>
-#include <network/NetworkHandler.hpp>
+#include <network/ConnectionManager.hpp>
 
 int main() {
     Console::getConsole().Entry("A C++ Minecraft Server");
-    
-    NetworkHandler::getHandler(); // Init Network
-
-    Console::getConsole().Entry("Ready!");
-    while(true) {
-        #ifdef DEBUG
-            Console::getConsole().Entry("Waiting on Command!");
-        #endif
-        if (Console::getConsole().Command() == 1) { break; }
-    }
-    // Clean up memory and threads here
-    NetworkHandler::getHandler().close();
+    ConnectionManager cm = ConnectionManager::getInstance();
+    cm.initialize();
     return 0;
 }
 
 
 #ifdef TEST
-// Put test cases here
+// Unit test here.
 int main() {
 
 

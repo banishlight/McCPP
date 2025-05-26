@@ -58,8 +58,8 @@ void Console::processBuffers() {
             
             {
                 std::lock_guard<std::mutex> lock(buffer.mutex);
-                if (!buffer.messages.empty()) {
-                    toProcess.swap(buffer.messages);
+                if (!buffer.enteries.empty()) {
+                    toProcess.swap(buffer.enteries);
                     processedAny = true;
                 }
             }
@@ -69,10 +69,10 @@ void Console::processBuffers() {
                 for (const auto& msg : toProcess) {
                     // Actual output happens here
                     
-                    if msg.stream == OUT {
+                    if (msg.stream == OUT) {
                         setColour(OUT_COLOUR, msg.stream);
                         std::cout << msg.text;
-                    } else if msg.stream == ERR {
+                    } else if (msg.stream == ERR) {
                         setColour(ERR_COLOUR, msg.stream);
                         std::cerr << msg.text;
                     }

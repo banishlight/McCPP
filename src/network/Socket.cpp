@@ -1,7 +1,7 @@
 #include <Standards.hpp>
 #include <network/Socket.hpp>
 #include <network/Packet.hpp>
-
+#include <network/PacketUtils.hpp>
 
 // Linux implementation
 #ifdef LINUX
@@ -36,6 +36,51 @@ int Socket::fetchVarInt() {
     } while ((currentByte & 0x80) != 0);
     
     return value;
+}
+
+void Socket::sendData(const std::vector<Byte> data) {
+    if (_fd < 0) {
+        throw std::runtime_error("Invalid socket file descriptor");
+    }
+    
+    if (data.empty()) {
+        return; // Nothing to send
+    }
+    
+    // Temporarily set to blocking for sending to ensure all data is sent
+    bool wasBlocking = _blocking;
+    if (!wasBlocking) {
+        setBlocking(true);
+    }
+    
+    size_t totalSent = 0;
+    size_t dataSize = data.size();
+    const Byte* dataPtr = data.data();
+    
+    try {
+        while (totalSent < dataSize) {
+            ssize_t sent = send(_fd, dataPtr + totalSent, dataSize - totalSent, 0);
+            
+            if (sent < 0) {
+                throw std::runtime_error("Failed to send data: " + std::string(strerror(errno)));
+            } else if (sent == 0) {
+                throw std::runtime_error("Connection closed during send");
+            }
+            
+            totalSent += sent;
+        }
+    } catch (...) {
+        // Restore original blocking state before re-throwing
+        if (!wasBlocking) {
+            setBlocking(false);
+        }
+        throw;
+    }
+    
+    // Restore original blocking state
+    if (!wasBlocking) {
+        setBlocking(false);
+    }
 }
 
 // sock_fd is the file descriptor accepted from the server socket
@@ -90,7 +135,54 @@ bool Socket::packetAvailable() {
 }
 
 void Socket::sendPacket(const Outgoing_Packet& packet) {
-    // Unsure of how I want to serialize then send the packet
+    if (_fd < 0) {
+        throw std::runtime_error("Invalid socket file descriptor");
+    }
+    
+    try {
+        // Step 1: Serialize the packet data
+        std::vector<Byte> packetData;
+        int serializeResult = packet.serialize(packetData);
+        
+        if (serializeResult < 0) {
+            throw std::runtime_error("Failed to serialize packet");
+        }
+        
+        // Step 2: Get the packet ID as VarInt bytes
+        std::vector<Byte> packetIdBytes = varIntSerialize(packet.getID());
+        
+        // Step 3: Calculate total packet size (ID + data)
+        size_t totalPacketSize = packetIdBytes.size() + packetData.size();
+        
+        // Step 4: Get the packet length as VarInt bytes
+        std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(totalPacketSize));
+        
+        // Step 5: Combine all parts: [Length][PacketID][PacketData]
+        std::vector<Byte> finalBuffer;
+        
+        // Pre-allocate space to avoid multiple reallocations
+        finalBuffer.reserve(lengthBytes.size() + packetIdBytes.size() + packetData.size());
+        
+        // Add packet length
+        finalBuffer.insert(finalBuffer.end(), lengthBytes.begin(), lengthBytes.end());
+        
+        // Add packet ID
+        finalBuffer.insert(finalBuffer.end(), packetIdBytes.begin(), packetIdBytes.end());
+        
+        // Add packet data
+        finalBuffer.insert(finalBuffer.end(), packetData.begin(), packetData.end());
+        
+        // Step 6: Send the complete packet
+        sendData(finalBuffer);
+        
+        #ifdef DEBUG
+        std::cout << "Sent packet ID: 0x" << std::hex << packet.getID() 
+                  << ", size: " << std::dec << totalPacketSize << " bytes" << std::endl;
+        #endif
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to send packet: ") + e.what());
+    }
 }
 
 void Socket::setBlocking(bool block) {

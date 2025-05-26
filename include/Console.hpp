@@ -1,9 +1,9 @@
 #pragma once
+#include <Standards.hpp>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <unordered_map>
-#include <Standards.hpp>
 #include <mutex>
 #include <thread>
 #include <atomic>
@@ -15,6 +15,7 @@ class Console {
         int Error(string text);
         int Post();
     private:
+
         enum Stream {
             OUT,
             IN,
@@ -48,10 +49,11 @@ class Console {
         std::atomic<bool> running{true};
         std::ofstream logFile;
 
+        Console();
+        ~Console();
         void createLog();
         void processBuffers(); // THREAD
         void startThread();
-        void processBuffers();
         int addToBuff(Message msg);
         void setColour(int colour, Stream stream);
 };

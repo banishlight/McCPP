@@ -22,7 +22,8 @@ class Socket {
 		bool isBlocking() const;
 
     protected:
-	// Independent variables per OS
+		void sendData(const std::vector<Byte> data);
+		// Independent variables per OS
 		#ifdef LINUX
 			int fetchVarInt();
 			int _fd = -1;
