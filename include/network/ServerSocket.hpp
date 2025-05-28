@@ -10,7 +10,7 @@ class ServerSocket {
         Socket Accept();
     protected:
         #ifdef LINUX
-            int fd = -1;
+            int _fd = -1;
             bool blocking = true;
         #endif
         #ifdef WINDOWS
