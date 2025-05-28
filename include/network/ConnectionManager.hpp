@@ -9,7 +9,7 @@
 
 class ConnectionManager {
     public:
-        ConnectionManager& getInstance();
+        static ConnectionManager& getInstance();
         void initialize();
 
     private:

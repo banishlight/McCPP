@@ -4,9 +4,8 @@
 #include <network/ConnectionManager.hpp>
 
 int main() {
-    Console::getConsole().Entry("A C++ Minecraft Server");
-    ConnectionManager cm = ConnectionManager::getInstance();
-    cm.initialize();
+    // Console::getConsole().Entry("A C++ Minecraft Server");
+    ConnectionManager::getInstance().initialize();
     return 0;
 }
 

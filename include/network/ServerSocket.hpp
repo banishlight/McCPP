@@ -3,7 +3,7 @@
 
 
 
-class ServerSocket : public Socket {
+class ServerSocket {
     public:
         ServerSocket(const string ip, const string port);
         ~ServerSocket();

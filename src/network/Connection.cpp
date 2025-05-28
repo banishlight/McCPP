@@ -1,9 +1,11 @@
 #include <Standards.hpp>
 #include <network/Connection.hpp>
+#include <network/Socket.hpp>
+#include <network/Packet.hpp>
 
 
-Connection::Connection(Socket socket) {
-    _socket = socket;
+Connection::Connection(std::unique_ptr<Socket> socket) {
+    _socket(std::move(socket));
     _state = ConnectionState::Handshake;
 }
 

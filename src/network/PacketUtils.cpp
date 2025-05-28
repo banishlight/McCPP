@@ -24,7 +24,7 @@ std::vector<Byte> varIntSerialize(int num){
 
 int varIntDeserialize(std::vector<Byte> buff) {
     if (buff.empty()) {
-        throw std::runtime_error("Buffer is empty");
+        // throw std::runtime_error("Buffer is empty");
     }
     int32_t value = 0;
     int position = 0;
@@ -43,11 +43,11 @@ int varIntDeserialize(std::vector<Byte> buff) {
         
         // Prevent infinite loop and overflow
         if (position >= 32) {
-            throw std::runtime_error("VarInt is too big");
+            // throw std::runtime_error("VarInt is too big");
         }
     }
     // If we get here, the VarInt was incomplete
-    throw std::runtime_error("Incomplete VarInt");
+    // throw std::runtime_error("Incomplete VarInt");
 }
 
 std::vector<Byte> varLongSerialize(long num) {
@@ -72,7 +72,7 @@ std::vector<Byte> varLongSerialize(long num) {
 
 long varLongDeserialize(std::vector<Byte> buff) {
     if (buff.empty()) {
-        throw std::runtime_error("Buffer is empty");
+        // throw std::runtime_error("Buffer is empty");
     }
     
     int64_t value = 0;
@@ -93,12 +93,12 @@ long varLongDeserialize(std::vector<Byte> buff) {
         
         // Prevent infinite loop and overflow
         if (position >= 64) {
-            throw std::runtime_error("VarLong is too big");
+            // throw std::runtime_error("VarLong is too big");
         }
     }
     
     // If we get here, the VarLong was incomplete
-    throw std::runtime_error("Incomplete VarLong");
+    // throw std::runtime_error("Incomplete VarLong");
 }
 
 int getVarIntSize(int num) {

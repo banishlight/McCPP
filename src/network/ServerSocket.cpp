@@ -7,13 +7,14 @@
 #ifdef LINUX
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h> // close()
 
-ServerSocket::ServerSocket(const string ip, const string port) : Socket(ip, port) {
+ServerSocket::ServerSocket(const string ip, const string port) {
     // Create a socket
-    fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        throw std::runtime_error("Failed to create socket");
+    _fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (_fd < 0) {
+        // throw std::runtime_error("Failed to create socket");
     }
 
     // Set up the server address structure
@@ -23,24 +24,24 @@ ServerSocket::ServerSocket(const string ip, const string port) : Socket(ip, port
     inet_pton(AF_INET, ip.c_str(), &server_addr.sin_addr);
 
     // Bind the socket to the address
-    if (bind(fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        throw std::runtime_error("Failed to bind socket");
+    if (bind(_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        // throw std::runtime_error("Failed to bind socket");
     }
 
     // Listen for incoming connections
-    if (listen(fd, SOMAXCONN) < 0) {
-        throw std::runtime_error("Failed to listen on socket");
+    if (listen(_fd, SOMAXCONN) < 0) {
+        // throw std::runtime_error("Failed to listen on socket");
     }
 }
 
 ServerSocket::~ServerSocket() {
-    close(fd);
+    close(_fd);
 }
 
 Socket ServerSocket::Accept() {
     sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
-    int client_fd = accept(fd, (struct sockaddr*)&client_addr, &addr_len);
+    int client_fd = accept(_fd, (struct sockaddr*)&client_addr, &addr_len);
     if (client_fd < 0) {
         // Failed to accept a fd
     }
