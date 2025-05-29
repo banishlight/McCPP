@@ -11,14 +11,16 @@ class ConnectionManager {
     public:
         static ConnectionManager& getInstance();
         void initialize();
-
+        void close();
     private:
         ConnectionManager();
         ~ConnectionManager();
-        void processConnection();
+        void processConnection(Connection conn);
         void serverThreadLoop();
-        ServerSocket _serverSocket;
+        std::unique_ptr<ServerSocket> _serverSocket;
         std::vector<Connection> _connections;
         std::thread _serverConThread;
-        ThreadPool _conThreads;
+        std::unique_ptr<ThreadPool> _conThreads;
+        bool _initialized = false;
+        bool running = true;
 };

@@ -7,13 +7,14 @@ class Outgoing_Packet;
 
 class Connection {
     public:
-        Connection(std::unique_ptr<Socket> socket);
+        Connection(std::shared_ptr<Socket> socket);
         ~Connection();
-        void receivePackets();
+        void receivePacket();
         void sendPackets();
         bool isValid();
     private:
-        std::unique_ptr<Socket> _socket;
+        int deserializePacket(std::vector<Byte> packet);
+        std::shared_ptr<Socket> _socket;
         std::vector<std::shared_ptr<Outgoing_Packet>> _sendQueue;
         ConnectionState _state = ConnectionState::Handshake;
         bool _compression = false;

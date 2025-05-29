@@ -37,7 +37,7 @@ string Properties::difficulty_to_string(Difficulties d) {
 }
 
 void Properties::generateDefault() {
-    Console::getConsole().Entry("generating default properties file");
+    // Console::getConsole().Entry("generating default properties file");
     std::ofstream MyFile("server.properties");
     MyFile << "allow-flight=" + std::to_string(allow_flight) + "\n";
     MyFile << "allow-nether=" + std::to_string(allow_nether) + "\n";
@@ -324,7 +324,7 @@ void Properties::checkString(string input) {
 string Properties::getIP() {
     if (this->server_ip.compare("") == 0) {
         // ERROR no ip set, throw exception
-        Console::getConsole().Error("Properties::getIP() : No IP set.");
+        // Console::getConsole().Error("Properties::getIP() : No IP set.");
     }
     return this->server_ip;
 }

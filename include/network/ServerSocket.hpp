@@ -1,3 +1,4 @@
+#pragma once
 #include <Standards.hpp>
 #include <network/Socket.hpp>
 
@@ -8,6 +9,7 @@ class ServerSocket {
         ServerSocket(const string ip, const string port);
         ~ServerSocket();
         Socket Accept();
+        bool isValid();
     protected:
         #ifdef LINUX
             int _fd = -1;

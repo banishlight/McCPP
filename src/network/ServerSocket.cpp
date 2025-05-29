@@ -47,6 +47,10 @@ Socket ServerSocket::Accept() {
     }
     return Socket(client_fd);
 }
+
+bool ServerSocket::isValid() {
+    return _fd > 0;
+}
 #endif
 
 
