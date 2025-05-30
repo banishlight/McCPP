@@ -1,8 +1,8 @@
 #pragma once
 #include <fstream>
 #include <Standards.hpp>
-//using namespace std;
 
+// Requires initialization
 class Properties {
     public:
         static Properties& getProperties();
@@ -10,6 +10,7 @@ class Properties {
         string getPort();
         string getMotd();
         string getMaxPlayers();
+        void initialize();
 
         enum Difficulties {
             Peaceful,

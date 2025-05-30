@@ -7,6 +7,7 @@
 
 #define THREAD_COUNT 4
 
+// Requires initialization
 class ConnectionManager {
     public:
         static ConnectionManager& getInstance();

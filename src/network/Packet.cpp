@@ -1,6 +1,7 @@
 #include <Standards.hpp>
 #include <network/Packet.hpp>
 #include <network/Connection.hpp>
+#include <Console.hpp>
 #include <memory>
 #include <vector>
 #include <lib/json.hpp>
@@ -234,6 +235,9 @@ std::shared_ptr<Incoming_Packet> Packet_Registry::fetchIncomingPacket(Connection
 }
 
 void Packet_Registry::initializeRegistry() {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Packet_Registry::initializeRegistry(): Initializing packet registry.");    
+    #endif
     // Perform Resizes to enforce correct size
     Incoming_Registry.resize(INC_SIZE);
     HandshakeVec.resize(HANDSHAKE_SIZE);
@@ -269,4 +273,7 @@ void Packet_Registry::initializeRegistry() {
     Incoming_Registry.push_back(LoginVec);
     Incoming_Registry.push_back(ConfigVec);
     Incoming_Registry.push_back(PlayVec);
+    #ifdef DEBUG
+        Console::getConsole().Entry("Packet_Registry::initializeRegistry(): Packet registry initialized successfully.");
+    #endif
 }

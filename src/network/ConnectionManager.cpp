@@ -13,7 +13,7 @@ ConnectionManager::ConnectionManager() {
 }
 
 ConnectionManager::~ConnectionManager() {
-
+    close(); // Ensure resources are cleaned up
 }
 
 ConnectionManager& ConnectionManager::getInstance() {

@@ -2,6 +2,7 @@
 #include <network/Socket.hpp>
 #include <network/Packet.hpp>
 #include <network/PacketUtils.hpp>
+#include <Console.hpp>
 
 // Linux implementation
 #ifdef LINUX
@@ -62,9 +63,9 @@ void Socket::sendData(const std::vector<Byte> data) {
             ssize_t sent = send(_fd, dataPtr + totalSent, dataSize - totalSent, 0);
             
             if (sent < 0) {
-                throw std::runtime_error("Failed to send data: " + std::string(strerror(errno)));
+                Console::getConsole().Error("Socket::sendData(): Failed to send data: " + std::string(strerror(errno)));
             } else if (sent == 0) {
-                throw std::runtime_error("Connection closed during send");
+                Console::getConsole().Error("Socket::sendData(): Connection closed during send");
             }
             
             totalSent += sent;
@@ -87,7 +88,7 @@ void Socket::sendData(const std::vector<Byte> data) {
 Socket::Socket(int fd) {
     _fd = fd;
     if (isValid()) setBlocking(true);
-    else throw std::runtime_error("Invalid socket file descriptor");
+    else Console::getConsole().Error("Socket::Socket(): Invalid socket file descriptor: " + std::to_string(fd));
 }
 
 Socket::~Socket() {
@@ -118,12 +119,12 @@ std::vector<Byte> Socket::receivePacket() {
         rec = recv(_fd, buffer.data(), size, 0);
     }
     if (rec < 0) {
-        throw std::runtime_error("Failed to receive packet");
+        Console::getConsole().Error("Socket::receivePacket(): Failed to receive packet: " + std::string(strerror(errno)));
     } else if (rec == 0) {
-        throw std::runtime_error("Connection closed");
+        Console::getConsole().Error("Socket::receivePacket(): Connection closed by peer");
     }
     if (rec != size) {
-        throw std::runtime_error("Incomplete packet received");
+        Console::getConsole().Error("Socket::receivePacket(): Incomplete packet received, expected " + std::to_string(size) + " bytes, got " + std::to_string(rec) + " bytes");
     }
     return buffer;
 }
@@ -136,7 +137,7 @@ bool Socket::packetAvailable() {
 
 void Socket::sendPacket(const Outgoing_Packet& packet) {
     if (_fd < 0) {
-        throw std::runtime_error("Invalid socket file descriptor");
+        Console::getConsole().Error("Socket::sendPacket(): Invalid socket file descriptor: " + std::to_string(_fd));
     }
     
     try {
@@ -145,7 +146,7 @@ void Socket::sendPacket(const Outgoing_Packet& packet) {
         int serializeResult = packet.serialize(packetData);
         
         if (serializeResult < 0) {
-            throw std::runtime_error("Failed to serialize packet");
+            Console::getConsole().Error("Socket::sendPacket(): Failed to serialize packet with ID: " + std::to_string(packet.getID()));
         }
         
         // Step 2: Get the packet ID as VarInt bytes
@@ -176,12 +177,12 @@ void Socket::sendPacket(const Outgoing_Packet& packet) {
         sendData(finalBuffer);
         
         #ifdef DEBUG
-        std::cout << "Sent packet ID: 0x" << std::hex << packet.getID() 
-                  << ", size: " << std::dec << totalPacketSize << " bytes" << std::endl;
+            Console::getConsole().Entry("Socket::sendPacket(): Sent packet with ID: " + std::to_string(packet.getID()) + 
+                                      ", size: " + std::to_string(totalPacketSize) + " bytes");
         #endif
         
     } catch (const std::exception& e) {
-        throw std::runtime_error(std::string("Failed to send packet: ") + e.what());
+        Console::getConsole().Error("Socket::sendPacket(): Exception occurred while sending packet: " + std::string(e.what()));
     }
 }
 

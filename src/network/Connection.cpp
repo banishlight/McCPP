@@ -3,7 +3,7 @@
 #include <network/Socket.hpp>
 #include <network/Packet.hpp>
 #include <network/PacketUtils.hpp>
-
+#include <Console.hpp>
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
     // _socket(std::move(socket));
@@ -31,8 +31,7 @@ void Connection::receivePacket() {
             deserializePacket(packet);
         }
         else {
-            
-            // std::cerr << "Invalid socket. Cannot receive packets." << std::endl;
+            Console::getConsole().Error("Connection::receivePacket(): Cannot receieve empty packets?.");
         }
     }
 }

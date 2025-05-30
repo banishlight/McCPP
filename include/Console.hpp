@@ -10,7 +10,7 @@
 
 class Console {
     public:
-        Console& getConsole();
+        static Console& getConsole();
         int Entry(string text);
         int Error(string text);
         int Post();

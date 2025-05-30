@@ -9,15 +9,19 @@
 
 
 Properties::Properties() {
+    
+}
+
+Properties::~Properties() {
+    // maybe save changes to the properties that might've taken place while it was running?
+}
+
+void Properties::initialize() {
     // if the file exists, loadValues().
     // if it does not, generateDefault().
     std::ifstream file("server.properties");
     if (file.is_open()) { loadValues(file); }
     else { generateDefault(); }
-}
-
-Properties::~Properties() {
-    // maybe save changes to the properties that might've taken place while it was running?
 }
 
 // This  is a thread safe singleton starting with C++11
@@ -324,7 +328,7 @@ void Properties::checkString(string input) {
 string Properties::getIP() {
     if (this->server_ip.compare("") == 0) {
         // ERROR no ip set, throw exception
-        // Console::getConsole().Error("Properties::getIP() : No IP set.");
+        Console::getConsole().Error("Properties::getIP() : No IP set.");
     }
     return this->server_ip;
 }
