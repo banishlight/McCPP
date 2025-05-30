@@ -104,6 +104,7 @@ int Console::Error(string text) {
 
 int Console::Post() {
     // TODO: Something special for input
+    return 0;
 }
 
 int Console::addToBuff(Message msg) {

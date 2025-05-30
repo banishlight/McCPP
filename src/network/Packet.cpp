@@ -226,7 +226,7 @@ Packet_Registry& Packet_Registry::getInstance() {
 
 std::shared_ptr<Incoming_Packet> Packet_Registry::fetchIncomingPacket(ConnectionState state, int packetID) {
     if (state >= Incoming_Registry.size() || 
-            packetID >= Incoming_Registry[state].size() ||
+            static_cast<std::size_t>(packetID) >= Incoming_Registry[state].size() ||
             !Incoming_Registry[state][packetID]) {
             return nullptr;
         }

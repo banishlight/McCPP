@@ -48,6 +48,7 @@ int varIntDeserialize(std::vector<Byte> buff) {
     }
     // If we get here, the VarInt was incomplete
     // throw std::runtime_error("Incomplete VarInt");
+    return 0;
 }
 
 std::vector<Byte> varLongSerialize(long num) {
@@ -99,6 +100,7 @@ long varLongDeserialize(std::vector<Byte> buff) {
     
     // If we get here, the VarLong was incomplete
     // throw std::runtime_error("Incomplete VarLong");
+    return 0;
 }
 
 int getVarIntSize(int num) {

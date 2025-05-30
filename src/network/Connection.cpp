@@ -2,6 +2,7 @@
 #include <network/Connection.hpp>
 #include <network/Socket.hpp>
 #include <network/Packet.hpp>
+#include <network/PacketUtils.hpp>
 
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
@@ -16,7 +17,10 @@ Connection::~Connection() {
 
 int Connection::deserializePacket(std::vector<Byte> packet) {
 	int packetID;
-
+    packetID = varIntDeserialize(packet);
+    Packet_Registry& registry = Packet_Registry::getInstance();
+    std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
+    incomingPacket->deserialize(packet, *this);
 	return 0;
 }
 
@@ -27,6 +31,7 @@ void Connection::receivePacket() {
             deserializePacket(packet);
         }
         else {
+            
             // std::cerr << "Invalid socket. Cannot receive packets." << std::endl;
         }
     }
@@ -34,11 +39,6 @@ void Connection::receivePacket() {
 
 void Connection::sendPackets() {
     // Send all packets from queue
-    // for(int i = 0; i < _sendQueue.size(); i++) {
-    //     std::vector<Byte> bytes;
-    //     _sendQueue[i]->serialize(bytes);
-    //     _socket->sendPacket(bytes);
-    // }
     for(auto& packet : _sendQueue) {
         _socket->sendPacket(*packet);
     }
