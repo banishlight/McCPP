@@ -15,13 +15,29 @@ Connection::~Connection() {
 
 }
 
-int Connection::deserializePacket(std::vector<Byte> packet) {
+void Connection::deserializePacket(std::vector<Byte> packet) {
 	int packetID;
     packetID = varIntDeserialize(packet);
     Packet_Registry& registry = Packet_Registry::getInstance();
     std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
     incomingPacket->deserialize(packet, *this);
-	return 0;
+	return;
+}
+
+std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> packet) {
+    if (packet == nullptr) {
+        // If packet is null, something has gone very wrong.
+        Console::getConsole().Error("Connection::serializePacket(): Cannot serialize a null packet.");
+        return std::vector<Byte>();
+    }
+    // Serialize the packet and add it to the send queue
+    std::vector<Byte> serializedPacket;
+    packet->serialize(serializedPacket);
+    if (serializedPacket.empty()) {
+        Console::getConsole().Error("Connection::serializePacket(): Serialized packet is empty.");
+        return std::vector<Byte>();
+    }
+    return serializedPacket;
 }
 
 void Connection::receivePacket() {
@@ -39,7 +55,8 @@ void Connection::receivePacket() {
 void Connection::sendPackets() {
     // Send all packets from queue
     for(auto& packet : _sendQueue) {
-        _socket->sendPacket(*packet);
+        std::vector<Byte> serializedPacket = serializePacket(packet);
+        _socket->sendPacket(serializedPacket);
     }
     // Clear the queue
     _sendQueue.clear();
