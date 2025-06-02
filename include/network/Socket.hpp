@@ -4,8 +4,6 @@
 // Will need to support zlib compression in the future
 // Thread safety!
 
-// Forward declaration
-class Outgoing_Packet;
 
 class Socket {
     public:
