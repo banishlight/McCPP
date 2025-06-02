@@ -23,7 +23,7 @@ class Incoming_Packet : public virtual Packet {
 };
 class Outgoing_Packet : public virtual Packet {
     public:
-        virtual int serialize(std::vector<Byte>& out_buff) const = 0;
+        virtual int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const = 0;
 };
 
 
@@ -63,14 +63,14 @@ class Handshake_p : public Handshake_Packet, public Incoming_Packet {
 class Status_Response_p : public Status_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x00;
 };
 class Pong_Response_p : public Status_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x01;
 };
@@ -95,42 +95,42 @@ class Ping_Request_status_p : public Status_Packet, public Incoming_Packet {
 class Disconnect_login_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x00;
 };
 class Encryption_Request_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x01;
 };
 class Login_Success_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x02;
 };
 class Set_Compression_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x03;
 };
 class Login_Plugin_Request_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x04;
 };
 class Cookie_Request_login_p : public Login_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x05;
 };
@@ -176,119 +176,119 @@ class Cookie_Response_login_p : public Login_Packet, public Incoming_Packet {
 class Cookie_Request_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x00;
 };
 class Clientbound_Plugin_Message_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x01;
 };
 class Disconnect_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x02;
 };
 class Finish_Config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x03;
 };
 class Clientbound_Keep_Alive_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x04;
 };
 class Ping_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x05;
 };
 class Reset_Chat_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x06;
 };
 class Registry_Data_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x07;
 };
 class Remove_Resource_Pack_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x08;
 };
 class Add_Resource_Pack_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x09;
 };
 class Store_Cookie_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x0A;
 };
 class Transfer_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x0B;
 };
 class Feature_Flags_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x0C;
 };
 class Update_Tags_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x0D;
 };
 class Clientbound_Known_Packs_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x0E;
 };
 class Custom_Report_Details_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x0F;
 };
 class Server_Links_config_p : public Config_Packet, public Outgoing_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
-        int serialize(std::vector<Byte>& out_buff) const override;
+        int serialize(std::vector<Byte>& out_buff, PacketContext& cont) const override;
     private:
         static int constexpr _PACKET_ID = 0x10;
 };
