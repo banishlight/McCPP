@@ -3,6 +3,7 @@
 #include <network/Socket.hpp>
 #include <network/Packet.hpp>
 #include <network/PacketUtils.hpp>
+#include <network/PacketContext.hpp>
 #include <Console.hpp>
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
@@ -16,11 +17,12 @@ Connection::~Connection() {
 }
 
 void Connection::deserializePacket(std::vector<Byte> packet) {
-	int packetID;
-    packetID = varIntDeserialize(packet);
+	int packetID = varIntDeserialize(packet);
     Packet_Registry& registry = Packet_Registry::getInstance();
     std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
-    incomingPacket->deserialize(packet, *this);
+    PacketContext cont(*this);
+    // TODO set action processor for context if needed
+    incomingPacket->deserialize(packet, cont);
 	return;
 }
 

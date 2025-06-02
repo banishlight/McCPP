@@ -20,4 +20,6 @@ class Connection {
         ConnectionState _state = ConnectionState::Handshake;
         bool _compression = false;
         int _threshold = -1;
+        // TODO Hold reference to action processor
+        // std::shared_ptr<ActionProcessor> _actionProcessor;
 };
