@@ -42,37 +42,59 @@ int Status_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& con
         {"enforcesSecureChat", false},
         {"previewsChat", false}
     };
-
-    // Convert JSON to string
     string json_str = status_json.dump();
-    
-    // Serialize the string length as VarInt
     std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(json_str.size()));
-    
-    // Add length bytes to output buffer
+    std::vector<Byte> packetID = varIntSerialize(getID());
+    std::vector<Byte> serial_json = serializeString(json_str);
     out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
-    
-    // Add the JSON string bytes to output buffer
-    out_buff.insert(out_buff.end(), json_str.begin(), json_str.end());
+    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
+    out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
     return 0;
 }
 
 // Clientbound Status packet 0x01
 int Pong_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
-    // TODO Implementation here
+    // Serialize the current timestamp as a Long
+    long timestamp = cont.connection.getPing();
+    std::vector<Byte> packetID = varIntSerialize(getID());
+    std::vector<Byte> timestampBytes;
+    timestampBytes.reserve(8);
+    timestampBytes[0] = static_cast<Byte>(timestamp & 0xFF);
+    timestampBytes[1] = static_cast<Byte>((timestamp >> 8) & 0xFF);
+    timestampBytes[2] = static_cast<Byte>((timestamp >> 16) & 0xFF);
+    timestampBytes[3] = static_cast<Byte>((timestamp >> 24) & 0xFF);
+    timestampBytes[4] = static_cast<Byte>((timestamp >> 32) & 0xFF);
+    timestampBytes[5] = static_cast<Byte>((timestamp >> 40) & 0xFF);
+    timestampBytes[6] = static_cast<Byte>((timestamp >> 48) & 0xFF);
+    timestampBytes[7] = static_cast<Byte>((timestamp >> 56) & 0xFF);
+    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(timestampBytes.size() + packetID.size()));
+    out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
+    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
+    out_buff.insert(out_buff.end(), timestampBytes.begin(), timestampBytes.end());
     return 0;
 }
 
 // Serverbound Status packet 0x00
 int Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // Queue status response packet
+    // No Data to deserialize
     std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Status_Response_p>();
     cont.connection.addPacket(responsePacket);
     return 0;
 }
 
 int Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    // skip the first two bytes which are the packet ID and length always
+    in_buff.erase(in_buff.begin(), in_buff.begin() + 2);
+    long timestamp = in_buff[0] | 
+                    (static_cast<long>(in_buff[1]) << 8) |
+                    (static_cast<long>(in_buff[2]) << 16) | 
+                    (static_cast<long>(in_buff[3]) << 24) |
+                    (static_cast<long>(in_buff[4]) << 32) |
+                    (static_cast<long>(in_buff[5]) << 40) |
+                    (static_cast<long>(in_buff[6]) << 48) |
+                    (static_cast<long>(in_buff[7]) << 56);
+    // respond with a Pong_Response_p packet
+    cont.connection.setPing(timestamp);
     return 0;
 }
 

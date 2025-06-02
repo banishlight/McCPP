@@ -130,3 +130,9 @@ string deserializeString(std::vector<Byte>& data) {
     data.erase(data.begin(), data.begin() + varIntSize + size);
     return result;
 }
+
+std::vector<Byte> serializeString(const string& str) {
+    std::vector<Byte> result = varIntSerialize(static_cast<int>(str.size()));
+    result.insert(result.end(), str.begin(), str.end());
+    return result;
+}

@@ -65,7 +65,7 @@ void Connection::sendPackets() {
     _sendQueue.clear();
 }
 
-bool Connection::isValid() {
+bool Connection::isValid() const {
     return _socket->isValid();
 }
 
@@ -79,4 +79,12 @@ void Connection::addPacket(std::shared_ptr<Outgoing_Packet> packet) {
         return;
     }
     _sendQueue.push_back(packet);
+}
+
+void Connection::setPing(long ping) {
+    _timestamp = ping;
+}
+
+long Connection::getPing() const {
+    return _timestamp;
 }

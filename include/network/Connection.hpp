@@ -11,9 +11,11 @@ class Connection {
         ~Connection();
         void receivePacket();
         void sendPackets();
-        bool isValid();
+        bool isValid() const;
         void setState(ConnectionState state);
         void addPacket(std::shared_ptr<Outgoing_Packet> packet);
+        void setPing(long ping);
+        long getPing() const;
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
@@ -22,7 +24,6 @@ class Connection {
         ConnectionState _state = ConnectionState::Handshake;
         bool _compression = false;
         int _threshold = -1;
-        long timestamp = -1;
-        // TODO Hold reference to action processor
-        // std::shared_ptr<ActionProcessor> _actionProcessor;
+        long _timestamp = -1;
+        // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
 };

@@ -12,3 +12,4 @@ int getVarIntSize(int num);
 int getVarLongSize(long num);
 
 string deserializeString(std::vector<Byte>& data);
+std::vector<Byte> serializeString(const string& str);
