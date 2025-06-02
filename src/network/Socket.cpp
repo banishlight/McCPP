@@ -1,7 +1,5 @@
 #include <Standards.hpp>
 #include <network/Socket.hpp>
-#include <network/Packet.hpp>
-#include <network/PacketUtils.hpp>
 #include <Console.hpp>
 
 // Linux implementation
