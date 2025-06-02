@@ -1,5 +1,6 @@
 #include <Standards.hpp>
 #include <network/Packet.hpp>
+#include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
 #include <Console.hpp>
 #include <memory>
@@ -8,8 +9,16 @@
 using json = nlohmann::json;
 
 // Serverbound Handshake packet 0x00
-int Handshake_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+int Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    int protocolVersion = varIntDeserialize(in_buff);
+    int i = getVarIntSize(protocolVersion);
+    in_buff.erase(in_buff.begin(), in_buff.begin() + i);
+    string serverAddress = deserializeString(in_buff);
+    short int port = (static_cast<uint16_t>(in_buff[0]) << 8) | static_cast<uint16_t>(in_buff[1]);
+    in_buff.erase(in_buff.begin(), in_buff.begin() + 2);
+    int nextState = varIntDeserialize(in_buff);
+    cont.connection.setState(static_cast<ConnectionState>(nextState));
+    Console::getConsole().Entry("ip received: " + serverAddress + ":" + std::to_string(port));
     return 0;
 }
 
@@ -26,12 +35,12 @@ int Pong_Response_p::serialize(std::vector<Byte>& out_buff) const {
 }
 
 // Serverbound Status packet 0x00
-int Status_Request_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Ping_Request_status_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
@@ -66,27 +75,27 @@ int Cookie_Request_login_p::serialize(std::vector<Byte>& out_buff) const {
     return 0;
 }
 
-int Login_Start_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Encryption_Response_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Login_Plugin_Response_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Login_Plugin_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Login_Acknowledge_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Login_Acknowledge_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Cookie_Response_login_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Cookie_Response_login_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
@@ -176,42 +185,42 @@ int Server_Links_config_p::serialize(std::vector<Byte>& out_buff) const {
     return 0;
 }
 
-int Client_Information_config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Client_Information_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Cookie_Response_config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Cookie_Response_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Serverbound_Plugin_Message_config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Serverbound_Plugin_Message_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Acknowledge_Finish_Config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Serverbound_Keep_Alive_config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Serverbound_Keep_Alive_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Pong_config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Pong_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Resource_Pack_Response_config_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Resource_Pack_Response_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }
 
-int Serverbound_Known_Packs_p::deserialize(const std::vector<Byte> in_buff, PacketContext& cont) {
+int Serverbound_Known_Packs_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
     return 0;
 }

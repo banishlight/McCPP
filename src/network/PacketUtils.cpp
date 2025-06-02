@@ -122,3 +122,11 @@ int getVarLongSize(long num) {
     } while (value != 0);
     return size;
 }
+
+string deserializeString(std::vector<Byte>& data) {
+    int size = varIntDeserialize(data);
+    int varIntSize = getVarIntSize(size);
+    string result(data.begin() + varIntSize, data.begin() + varIntSize + size);
+    data.erase(data.begin(), data.begin() + varIntSize + size);
+    return result;
+}

@@ -67,3 +67,7 @@ void Connection::sendPackets() {
 bool Connection::isValid() {
     return _socket->isValid();
 }
+
+void Connection::setState(ConnectionState state) {
+    _state = state;
+}

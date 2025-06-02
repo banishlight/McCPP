@@ -10,3 +10,5 @@ long varLongDeserialize(std::vector<Byte> buff);
 
 int getVarIntSize(int num);
 int getVarLongSize(long num);
+
+string deserializeString(std::vector<Byte>& data);
