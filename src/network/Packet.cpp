@@ -146,7 +146,7 @@ int Encryption_Request_p::serialize(std::vector<Byte>& out_buff, PacketContext& 
 }
 
 int Login_Success_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
-    
+
     return 0;
 }
 

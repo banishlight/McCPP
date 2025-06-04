@@ -22,5 +22,3 @@ std::vector<Byte> generateVerifyToken();
 
 std::vector<long> deserializeUUID(std::vector<Byte>& data);
 std::vector<Byte> serializeUUID(const std::vector<long>& data);
-
-std::vector<Byte> decompressData(const std::vector<Byte>& compressedData);

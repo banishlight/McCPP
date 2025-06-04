@@ -4,6 +4,7 @@
 #include <network/Packet.hpp>
 #include <network/PacketUtils.hpp>
 #include <network/PacketContext.hpp>
+#include <network/Compression.hpp>
 #include <Console.hpp>
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
