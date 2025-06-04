@@ -11,12 +11,19 @@ using json = nlohmann::json;
 
 // Serverbound Handshake packet 0x00
 int Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    int total_size = varIntDeserialize(in_buff);
+    in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(total_size));
+
+    // Remove the packet ID from the buffer
+    in_buff.erase(in_buff.begin(), in_buff.begin() + 1);
+
     int protocolVersion = varIntDeserialize(in_buff);
-    int i = getVarIntSize(protocolVersion);
-    in_buff.erase(in_buff.begin(), in_buff.begin() + i);
+    in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(protocolVersion));
+
     string serverAddress = deserializeString(in_buff);
-    short int port = (static_cast<uint16_t>(in_buff[0]) << 8) | static_cast<uint16_t>(in_buff[1]);
+    unsigned short int port = (static_cast<uint16_t>(in_buff[0]) << 8) | static_cast<uint16_t>(in_buff[1]);
     in_buff.erase(in_buff.begin(), in_buff.begin() + 2);
+    
     int nextState = varIntDeserialize(in_buff);
     cont.connection.setState(static_cast<ConnectionState>(nextState));
     Console::getConsole().Entry("ip received: " + serverAddress + ":" + std::to_string(port));
@@ -59,6 +66,7 @@ int Pong_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont)
     std::vector<Byte> packetID = varIntSerialize(getID());
     std::vector<Byte> timestampBytes;
     timestampBytes.reserve(8);
+    // Faster than a for loop
     timestampBytes[0] = static_cast<Byte>(timestamp & 0xFF);
     timestampBytes[1] = static_cast<Byte>((timestamp >> 8) & 0xFF);
     timestampBytes[2] = static_cast<Byte>((timestamp >> 16) & 0xFF);
@@ -99,7 +107,19 @@ int Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext&
 }
 
 int Disconnect_login_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
-    // TODO Implementation here
+    // Create JSON text component for the disconnect reason
+    json reason_json = {
+        {"text", "You have been disconnected"}  // Example reason text
+    };
+    // Convert JSON to string
+    string reason_str = reason_json.dump();
+    // Serialize the string length as VarInt
+    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(reason_str.size()));
+    std::vector<Byte> packetID = varIntSerialize(getID());
+    std::vector<Byte> serial_json = serializeString(reason_str);
+    out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
+    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
+    out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
     return 0;
 }
 

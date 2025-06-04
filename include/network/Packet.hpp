@@ -7,14 +7,17 @@
 #include <lib/json.hpp>
 using json = nlohmann::json;
 
-
+// Packet Format:
+// Length (VarInt)
+// Packet ID (VarInt)
+// Data (Byte Array)
 class Packet {
     public:
         virtual ~Packet() = default;
         virtual ConnectionState getState() const = 0;
         virtual int getID() const = 0;
     private:
-        int size = -1;
+
 };
 
 class Incoming_Packet : public virtual Packet {

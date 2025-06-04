@@ -17,6 +17,7 @@ Connection::~Connection() {
 }
 
 void Connection::deserializePacket(std::vector<Byte> packet) {
+    // Wrong, need to iterate past size VarInt then fetch ID
 	int packetID = varIntDeserialize(packet);
     Packet_Registry& registry = Packet_Registry::getInstance();
     std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
