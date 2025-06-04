@@ -5,6 +5,7 @@
 #include <network/ServerSocket.hpp>
 #include <Properties.hpp>
 #include <ThreadPool.hpp>
+#include <network/Crypto.hpp>
 #include <thread>
 
 
@@ -23,6 +24,8 @@ ConnectionManager& ConnectionManager::getInstance() {
 
 void ConnectionManager::initialize() {
     if (_initialized) return; // Already initialized
+    // Initialize Crypto key
+    initCrypto();
     // Fetch server address and make socket
     auto& props = Properties::getProperties();
     _serverSocket = std::make_unique<ServerSocket>(props.getIP(), props.getPort());
@@ -39,6 +42,7 @@ void ConnectionManager::initialize() {
 
 void ConnectionManager::close() {
     if (!_initialized) return; // Not initialized
+    cleanupCrypto();
     if (_serverSocket) _serverSocket->~ServerSocket();
     running = false; // Stop the server thread loop
     if (_serverConThread.joinable()) _serverConThread.join();

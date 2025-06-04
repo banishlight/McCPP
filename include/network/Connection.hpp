@@ -26,4 +26,6 @@ class Connection {
         int _threshold = -1;
         long _timestamp = -1;
         // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
+        // TODO: string disconnectReason;
+        // TODO: bool readyToDisconnect = false; // Maybe?
 };

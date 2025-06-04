@@ -13,3 +13,7 @@ int getVarLongSize(long num);
 
 string deserializeString(std::vector<Byte>& data);
 std::vector<Byte> serializeString(const string& str);
+
+std::vector<Byte> serializePrefixedArray(const std::vector<Byte>& data);
+
+std::vector<Byte> generateVerifyToken();

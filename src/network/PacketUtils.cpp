@@ -136,3 +136,9 @@ std::vector<Byte> serializeString(const string& str) {
     result.insert(result.end(), str.begin(), str.end());
     return result;
 }
+
+std::vector<Byte> serializePrefixedArray(const std::vector<Byte>& data) {
+    std::vector<Byte> result = varIntSerialize(data.size());
+    result.insert(result.end(), data.begin(), data.begin());
+    return result;
+}

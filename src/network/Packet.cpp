@@ -3,6 +3,7 @@
 #include <network/Packet.hpp>
 #include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
+#include <network/Crypto.hpp>
 #include <Console.hpp>
 #include <memory>
 #include <vector>
@@ -109,12 +110,12 @@ int Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext&
 int Disconnect_login_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
     // Create JSON text component for the disconnect reason
     json reason_json = {
-        {"text", "You have been disconnected"}  // Example reason text
+        {"text", "Disconnected by server."}  // Example reason text
     };
     // Convert JSON to string
     string reason_str = reason_json.dump();
     // Serialize the string length as VarInt
-    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(reason_str.size()));
+    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(reason_str.size()) + 1);
     std::vector<Byte> packetID = varIntSerialize(getID());
     std::vector<Byte> serial_json = serializeString(reason_str);
     out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
@@ -124,7 +125,25 @@ int Disconnect_login_p::serialize(std::vector<Byte>& out_buff, PacketContext& co
 }
 
 int Encryption_Request_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
-    // TODO Implementation here
+    // Server ID (string 20)
+    // Public key (Prefixed array of byte)
+    // Verify Token (Prefixed array of byte)
+    // Should authenticate (Boolean)
+    string server_id = "";
+    std::vector<Byte> pub_key = generatePublicKey();
+    std::vector<Byte> verify_token = generateVerifyToken();
+    pub_key = serializePrefixedArray(pub_key);
+    verify_token = serializePrefixedArray(verify_token);
+    Byte authenticate = 0x01; // 0x00 false, 0x01 true
+    std::vector<Byte> data = serializeString(server_id);
+    data.insert(data.end(), pub_key.begin(), pub_key.end());
+    data.insert(data.end(), verify_token.begin(), verify_token.end());
+    data.push_back(authenticate);
+    std::vector<Byte> packetID = varIntSerialize(getID());
+    std::vector<Byte> size = varIntSerialize(data.size() + 1);
+    out_buff.insert(out_buff.end(), size.begin(), size.end());
+    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
+    out_buff.insert(out_buff.end(), data.begin(), data.end());
     return 0;
 }
 

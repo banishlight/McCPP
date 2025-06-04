@@ -21,6 +21,7 @@ DEPS := $(OBJ:.o=.d)
 default: linux
 
 # Use these defines for platform specific code
+linux: LDFLAGS += -lssl -lcrypto
 linux: CXXFLAGS += -D LINUX
 linux: directories $(TARGET)
 
