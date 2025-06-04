@@ -10,6 +10,7 @@ Connection::Connection(std::shared_ptr<Socket> socket) {
     // _socket(std::move(socket));
     _socket = socket;
     _state = ConnectionState::Handshake;
+    _playerUUID.reserve(2);
 }
 
 Connection::~Connection() {
@@ -17,8 +18,23 @@ Connection::~Connection() {
 }
 
 void Connection::deserializePacket(std::vector<Byte> packet) {
-    // Wrong, need to iterate past size VarInt then fetch ID
-	int packetID = varIntDeserialize(packet);
+    if (_threshold != -1) { // Compression enabled
+        int length = varIntDeserialize(packet);
+        // Remove length from packet
+        packet.erase(packet.begin(), packet.begin() + getVarIntSize(length));
+        if (packet.size() >= static_cast<unsigned long>(_threshold)) {
+            packet = decompressData(packet);
+        }
+        else {
+            // VarInt must be zero to indicate no compression
+            if (length != 0) {
+                return; // Throw away the packet
+            }
+        }
+    }
+    int packetID = varIntDeserialize(packet);
+    // Remove packet ID from packet
+    packet.erase(packet.begin(), packet.begin() + getVarIntSize(packetID));
     Packet_Registry& registry = Packet_Registry::getInstance();
     std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
     PacketContext cont(*this);
@@ -88,4 +104,16 @@ void Connection::setPing(long ping) {
 
 long Connection::getPing() const {
     return _timestamp;
+}
+
+void Connection::setUUID(std::vector<long> uuid) {
+    if (uuid.size() != 2) {
+        Console::getConsole().Error("Connection::setUUID(): bad UUID vector size.");
+        return;
+    }
+    _playerUUID = uuid;
+}
+
+std::vector<long> Connection::getUUID() const {
+    return _playerUUID;
 }

@@ -12,11 +12,11 @@ using json = nlohmann::json;
 
 // Serverbound Handshake packet 0x00
 int Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    int total_size = varIntDeserialize(in_buff);
-    in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(total_size));
+    // int total_size = varIntDeserialize(in_buff);
+    // in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(total_size));
 
     // Remove the packet ID from the buffer
-    in_buff.erase(in_buff.begin(), in_buff.begin() + 1);
+    // in_buff.erase(in_buff.begin(), in_buff.begin() + 1);
 
     int protocolVersion = varIntDeserialize(in_buff);
     in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(protocolVersion));
@@ -92,8 +92,6 @@ int Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
 }
 
 int Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // skip the first two bytes which are the packet ID and length always
-    in_buff.erase(in_buff.begin(), in_buff.begin() + 2);
     long timestamp = in_buff[0] | 
                     (static_cast<long>(in_buff[1]) << 8) |
                     (static_cast<long>(in_buff[2]) << 16) | 
@@ -148,7 +146,7 @@ int Encryption_Request_p::serialize(std::vector<Byte>& out_buff, PacketContext& 
 }
 
 int Login_Success_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
-    // TODO Implementation here
+    
     return 0;
 }
 

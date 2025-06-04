@@ -16,6 +16,8 @@ class Connection {
         void addPacket(std::shared_ptr<Outgoing_Packet> packet);
         void setPing(long ping);
         long getPing() const;
+        void setUUID(std::vector<long> uuid);
+        std::vector<long> getUUID() const;
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
@@ -25,6 +27,7 @@ class Connection {
         bool _compression = false;
         int _threshold = -1;
         long _timestamp = -1;
+        std::vector<long> _playerUUID;
         // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
         // TODO: string disconnectReason;
         // TODO: bool readyToDisconnect = false; // Maybe?
