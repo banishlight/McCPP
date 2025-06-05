@@ -31,7 +31,8 @@ void Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
 }
 
 // Clientbound Status packet 0x00
-int Status_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Status_Response_p::serialize(PacketContext& cont) const {
+    std::vector<Byte> out_buff;
     // Create the JSON response with server status information
     json status_json = {
         {"version", {
@@ -56,11 +57,12 @@ int Status_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& con
     out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
     out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
     out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
-    return 0;
+    return out_buff;
 }
 
 // Clientbound Status packet 0x01
-int Pong_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Pong_Response_p::serialize(PacketContext& cont) const {
+    std::vector<Byte> out_buff;
     // Serialize the current timestamp as a Long
     long timestamp = cont.connection.getPing();
     std::vector<Byte> packetID = varIntSerialize(getID());
@@ -79,7 +81,7 @@ int Pong_Response_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont)
     out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
     out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
     out_buff.insert(out_buff.end(), timestampBytes.begin(), timestampBytes.end());
-    return 0;
+    return out_buff;
 }
 
 // Serverbound Status packet 0x00
@@ -102,7 +104,8 @@ void Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext
     cont.connection.setPing(timestamp);
 }
 
-int Disconnect_login_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Disconnect_login_p::serialize(PacketContext& cont) const {
+    std::vector<Byte> out_buff;
     // Create JSON text component for the disconnect reason
     json reason_json = {
         {"text", "Disconnected by server."}  // Example reason text
@@ -116,10 +119,11 @@ int Disconnect_login_p::serialize(std::vector<Byte>& out_buff, PacketContext& co
     out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
     out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
     out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
-    return 0;
+    return out_buff;
 }
 
-int Encryption_Request_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Encryption_Request_p::serialize(PacketContext& cont) const {
+    std::vector<Byte> out_buff;
     // Server ID (string 20)
     // Public key (Prefixed array of byte)
     // Verify Token (Prefixed array of byte)
@@ -139,27 +143,27 @@ int Encryption_Request_p::serialize(std::vector<Byte>& out_buff, PacketContext& 
     out_buff.insert(out_buff.end(), size.begin(), size.end());
     out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
     out_buff.insert(out_buff.end(), data.begin(), data.end());
-    return 0;
+    return out_buff;
 }
 
-int Login_Success_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
-
-    return 0;
+std::vector<Byte> Login_Success_p::serialize(PacketContext& cont) const {
+    
+    return std::vector<Byte>();
 }
 
-int Set_Compression_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Set_Compression_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Login_Plugin_Request_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Login_Plugin_Request_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Cookie_Request_login_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Cookie_Request_login_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
 void Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -182,89 +186,89 @@ void Cookie_Response_login_p::deserialize(std::vector<Byte> in_buff, PacketConte
     // TODO Implementation here
 }
 
-int Cookie_Request_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Cookie_Request_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Clientbound_Plugin_Message_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Clientbound_Plugin_Message_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Disconnect_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Disconnect_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Finish_Config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Finish_Config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Clientbound_Keep_Alive_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Clientbound_Keep_Alive_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Ping_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Ping_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Reset_Chat_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Reset_Chat_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Registry_Data_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Registry_Data_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Remove_Resource_Pack_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Remove_Resource_Pack_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Add_Resource_Pack_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Add_Resource_Pack_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Store_Cookie_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Store_Cookie_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Transfer_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Transfer_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Feature_Flags_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Feature_Flags_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Update_Tags_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Update_Tags_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Clientbound_Known_Packs_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Clientbound_Known_Packs_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Custom_Report_Details_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Custom_Report_Details_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
-int Server_Links_config_p::serialize(std::vector<Byte>& out_buff, PacketContext& cont) const {
+std::vector<Byte> Server_Links_config_p::serialize(PacketContext& cont) const {
     // TODO Implementation here
-    return 0;
+    return std::vector<Byte>();
 }
 
 void Client_Information_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

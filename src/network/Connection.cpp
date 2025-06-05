@@ -51,9 +51,8 @@ std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> p
         return std::vector<Byte>();
     }
     // Serialize the packet and add it to the send queue
-    std::vector<Byte> serializedPacket;
     PacketContext cont(*this);
-    packet->serialize(serializedPacket, cont);
+    std::vector<Byte> serializedPacket = packet->serialize(cont);
     if (serializedPacket.empty()) {
         Console::getConsole().Error("Connection::serializePacket(): Serialized packet is empty.");
         return std::vector<Byte>();
