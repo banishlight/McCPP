@@ -12,12 +12,6 @@ using json = nlohmann::json;
 
 // Serverbound Handshake packet 0x00
 void Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // int total_size = varIntDeserialize(in_buff);
-    // in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(total_size));
-
-    // Remove the packet ID from the buffer
-    // in_buff.erase(in_buff.begin(), in_buff.begin() + 1);
-
     int protocolVersion = varIntDeserialize(in_buff);
     in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(protocolVersion));
 
@@ -156,9 +150,55 @@ std::vector<Byte> Encryption_Request_p::serialize() const {
     return out_buff;
 }
 
+Login_Success_p::Login_Success_p(const std::vector<long>& uuid, const std::string& username) {
+    _uuid = uuid;
+    _username = username;
+}
+
 std::vector<Byte> Login_Success_p::serialize() const {
-    
-    return std::vector<Byte>();
+    // UUID
+    // String (16)
+    // Properties array (16)
+        // String (64)
+        // String (32767)
+        // Prefixed Optional String (1024)
+    std::vector<Byte> out_buff;
+    std::vector<Byte> packet_data;
+
+    std::vector<Byte> uuid_bytes = serializeUUID(_uuid);
+    packet_data.insert(packet_data.end(), uuid_bytes.begin(), uuid_bytes.end());
+
+    std::vector<Byte> username_bytes = serializeString(_username);
+    packet_data.insert(packet_data.end(), username_bytes.begin(), username_bytes.end());
+    // Serialize properties 
+    if (_properties.size() > 0) {
+        packet_data.push_back(0x01); // Bool true, properties present
+        std::vector<Byte> properties_size = varIntSerialize(static_cast<int>(_properties.size()));
+        packet_data.insert(packet_data.end(), properties_size.begin(), properties_size.end());
+        for (const auto& prop : _properties) {
+            std::vector<Byte> name_bytes = serializeString(prop.name);
+            std::vector<Byte> value_bytes = serializeString(prop.value);
+            std::vector<Byte> signature_bytes = serializeString(prop.signature);
+            packet_data.insert(packet_data.end(), name_bytes.begin(), name_bytes.end());
+            packet_data.insert(packet_data.end(), value_bytes.begin(), value_bytes.end());
+            // Prefixed optional string for signature (unsure if this is correct, but it seems to be the case)
+            if (!prop.signature.empty()) {
+                packet_data.push_back(0x01); // Bool true, signature present
+                packet_data.insert(packet_data.end(), signature_bytes.begin(), signature_bytes.end());
+            } else {
+                packet_data.push_back(0x00); // Bool false, no signature
+            }
+        }
+    }
+    else {
+        packet_data.push_back(0x00); // Bool false, no properties
+    }
+    std::vector<Byte> packetID_bytes = varIntSerialize(getID());
+    std::vector<Byte> size_bytes = varIntSerialize(static_cast<int>(packet_data.size() + 1)); // +1 for the packet ID
+    out_buff.insert(out_buff.end(), size_bytes.begin(), size_bytes.end());
+    out_buff.insert(out_buff.end(), packetID_bytes.begin(), packetID_bytes.end());
+    out_buff.insert(out_buff.end(), packet_data.begin(), packet_data.end());
+    return out_buff;
 }
 
 std::vector<Byte> Set_Compression_p::serialize() const {

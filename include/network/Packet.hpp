@@ -117,10 +117,19 @@ class Encryption_Request_p : public Login_Packet, public Outgoing_Packet {
 };
 class Login_Success_p : public Login_Packet, public Outgoing_Packet {
     public:
+        Login_Success_p(const std::vector<long>& uuid, const std::string& username);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
+        struct login_properties {
+            std::string name;
+            std::string value;
+            std::string signature;
+        };
     private:
         static int constexpr _PACKET_ID = 0x02;
+        std::vector<long> _uuid;
+        std::string _username;
+        std::vector<login_properties> _properties; // Optional properties
 };
 class Set_Compression_p : public Login_Packet, public Outgoing_Packet {
     public:
