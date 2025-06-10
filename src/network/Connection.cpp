@@ -123,3 +123,6 @@ bool Connection::isCompressionEnabled() const {
 void Connection::setCompressionThreshold(int threshold) {
     _threshold = threshold;
 }
+int Connection::getCompressionThreshold() const {
+    return _threshold;
+}

@@ -20,6 +20,7 @@ class Connection {
         std::vector<long> getUUID() const;
         bool isCompressionEnabled() const;
         void setCompressionThreshold(int threshold);
+        int getCompressionThreshold() const;
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);

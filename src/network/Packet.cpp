@@ -89,7 +89,7 @@ std::vector<Byte> Pong_Response_p::serialize() const {
 void Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // No Data to deserialize
     // TODO: NEED TO PASS THE PROPER PACKET COMPRESSION
-    std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Status_Response_p>(-1);
+    std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Status_Response_p>(cont.connection.getCompressionThreshold());
     cont.connection.addPacket(responsePacket);
 }
 
