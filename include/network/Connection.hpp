@@ -18,13 +18,14 @@ class Connection {
         long getPing() const;
         void setUUID(std::vector<long> uuid);
         std::vector<long> getUUID() const;
+        bool isCompressionEnabled() const;
+        void setCompressionThreshold(int threshold);
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
         std::shared_ptr<Socket> _socket;
         std::vector<std::shared_ptr<Outgoing_Packet>> _sendQueue;
         ConnectionState _state = ConnectionState::Handshake;
-        bool _compression = false;
         int _threshold = -1;
         long _timestamp = -1;
         std::vector<long> _playerUUID;

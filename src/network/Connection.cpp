@@ -116,3 +116,10 @@ void Connection::setUUID(std::vector<long> uuid) {
 std::vector<long> Connection::getUUID() const {
     return _playerUUID;
 }
+
+bool Connection::isCompressionEnabled() const {
+    return _threshold >= 0;
+}
+void Connection::setCompressionThreshold(int threshold) {
+    _threshold = threshold;
+}
