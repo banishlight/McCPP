@@ -171,28 +171,23 @@ std::vector<Byte> Login_Success_p::serialize() const {
     std::vector<Byte> username_bytes = serializeString(_username);
     packet_data.insert(packet_data.end(), username_bytes.begin(), username_bytes.end());
     // Serialize properties 
-    if (_properties.size() > 0) {
-        packet_data.push_back(0x01); // Bool true, properties present
-        std::vector<Byte> properties_size = varIntSerialize(static_cast<int>(_properties.size()));
-        packet_data.insert(packet_data.end(), properties_size.begin(), properties_size.end());
-        for (const auto& prop : _properties) {
-            std::vector<Byte> name_bytes = serializeString(prop.name);
-            std::vector<Byte> value_bytes = serializeString(prop.value);
-            std::vector<Byte> signature_bytes = serializeString(prop.signature);
-            packet_data.insert(packet_data.end(), name_bytes.begin(), name_bytes.end());
-            packet_data.insert(packet_data.end(), value_bytes.begin(), value_bytes.end());
-            // Prefixed optional string for signature (unsure if this is correct, but it seems to be the case)
-            if (!prop.signature.empty()) {
-                packet_data.push_back(0x01); // Bool true, signature present
-                packet_data.insert(packet_data.end(), signature_bytes.begin(), signature_bytes.end());
-            } else {
-                packet_data.push_back(0x00); // Bool false, no signature
-            }
+    std::vector<Byte> properties_size = varIntSerialize(static_cast<int>(_properties.size()));
+    packet_data.insert(packet_data.end(), properties_size.begin(), properties_size.end());
+    for (const auto& prop : _properties) {
+        std::vector<Byte> name_bytes = serializeString(prop.name);
+        std::vector<Byte> value_bytes = serializeString(prop.value);
+        std::vector<Byte> signature_bytes = serializeString(prop.signature);
+        packet_data.insert(packet_data.end(), name_bytes.begin(), name_bytes.end());
+        packet_data.insert(packet_data.end(), value_bytes.begin(), value_bytes.end());
+        // Prefixed optional string for signature (unsure if this is correct, but it seems to be the case)
+        if (!prop.signature.empty()) {
+            packet_data.push_back(0x01); // Bool true, signature present
+            packet_data.insert(packet_data.end(), signature_bytes.begin(), signature_bytes.end());
+        } else {
+            packet_data.push_back(0x00); // Bool false, no signature
         }
     }
-    else {
-        packet_data.push_back(0x00); // Bool false, no properties
-    }
+    // Serialize the packet ID and size
     std::vector<Byte> packetID_bytes = varIntSerialize(getID());
     std::vector<Byte> size_bytes = varIntSerialize(static_cast<int>(packet_data.size() + 1)); // +1 for the packet ID
     out_buff.insert(out_buff.end(), size_bytes.begin(), size_bytes.end());
