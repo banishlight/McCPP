@@ -24,6 +24,10 @@ void Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     Console::getConsole().Entry("ip received: " + serverAddress + ":" + std::to_string(port));
 }
 
+Status_Response_p::Status_Response_p(int threshold) {
+    _threshold = threshold;
+}
+
 // Clientbound Status packet 0x00
 std::vector<Byte> Status_Response_p::serialize() const {
     std::vector<Byte> out_buff;
@@ -54,7 +58,8 @@ std::vector<Byte> Status_Response_p::serialize() const {
     return out_buff;
 }
 
-Pong_Response_p::Pong_Response_p(long timestamp) {
+Pong_Response_p::Pong_Response_p(int threshold, long timestamp) {
+    _threshold = threshold;
     _timestamp = timestamp;
 }
 
@@ -83,7 +88,8 @@ std::vector<Byte> Pong_Response_p::serialize() const {
 // Serverbound Status packet 0x00
 void Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // No Data to deserialize
-    std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Status_Response_p>();
+    // TODO: NEED TO PASS THE PROPER PACKET COMPRESSION
+    std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Status_Response_p>(-1);
     cont.connection.addPacket(responsePacket);
 }
 
@@ -100,7 +106,8 @@ void Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext
     cont.connection.setPing(timestamp);
 }
 
-Disconnect_login_p::Disconnect_login_p(const std::string& reason) {
+Disconnect_login_p::Disconnect_login_p(int threshold, const std::string& reason) {
+    _threshold = threshold;
     if (reason.empty()) {
         _reason = "Disconnected by server.";
     } else {
@@ -124,6 +131,10 @@ std::vector<Byte> Disconnect_login_p::serialize() const {
     out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
     out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
     return out_buff;
+}
+
+Encryption_Request_p::Encryption_Request_p(int threshold) {
+    _threshold = threshold;
 }
 
 std::vector<Byte> Encryption_Request_p::serialize() const {
@@ -150,7 +161,8 @@ std::vector<Byte> Encryption_Request_p::serialize() const {
     return out_buff;
 }
 
-Login_Success_p::Login_Success_p(const std::vector<long>& uuid, const std::string& username) {
+Login_Success_p::Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username) {
+    _threshold = threshold;
     _uuid = uuid;
     _username = username;
 }

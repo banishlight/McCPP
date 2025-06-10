@@ -24,9 +24,12 @@ class Incoming_Packet : public virtual Packet {
     public:
         virtual void deserialize(std::vector<Byte> in_buff, PacketContext& cont) = 0;
 };
+// Every Constructor must atleast contain the compression threshold
 class Outgoing_Packet : public virtual Packet {
     public:
         virtual std::vector<Byte> serialize() const = 0;
+    protected:
+        int _threshold = -1;
 };
 
 
@@ -65,7 +68,7 @@ class Handshake_p : public Handshake_Packet, public Incoming_Packet {
 
 class Status_Response_p : public Status_Packet, public Outgoing_Packet {
     public:
-        Status_Response_p() = default;
+        Status_Response_p(int threshold);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -73,7 +76,7 @@ class Status_Response_p : public Status_Packet, public Outgoing_Packet {
 };
 class Pong_Response_p : public Status_Packet, public Outgoing_Packet {
     public:
-        Pong_Response_p(long timestamp);
+        Pong_Response_p(int threshold, long timestamp);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -100,7 +103,7 @@ class Ping_Request_status_p : public Status_Packet, public Incoming_Packet {
 
 class Disconnect_login_p : public Login_Packet, public Outgoing_Packet {
     public:
-        Disconnect_login_p(const std::string& reason);
+        Disconnect_login_p(int threshold, const std::string& reason);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -109,7 +112,7 @@ class Disconnect_login_p : public Login_Packet, public Outgoing_Packet {
 };
 class Encryption_Request_p : public Login_Packet, public Outgoing_Packet {
     public:
-        Encryption_Request_p();
+        Encryption_Request_p(int threshold);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -117,7 +120,7 @@ class Encryption_Request_p : public Login_Packet, public Outgoing_Packet {
 };
 class Login_Success_p : public Login_Packet, public Outgoing_Packet {
     public:
-        Login_Success_p(const std::vector<long>& uuid, const std::string& username);
+        Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
         struct login_properties {
