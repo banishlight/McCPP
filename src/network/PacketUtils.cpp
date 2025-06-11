@@ -1,4 +1,5 @@
 #include <network/PacketUtils.hpp>
+#include <network/Compression.hpp>
 #include <Standards.hpp>
 #include <vector>
 
@@ -181,6 +182,22 @@ std::vector<Byte> serializeUUID(const std::vector<long>& data) {
     // Serialize least significant 64 bits (8 bytes, big-endian)
     for (int i = 7; i >= 0; i--) {
         result.push_back(static_cast<Byte>((leastSignificant >> (i * 8)) & 0xFF));
+    }
+    return result;
+}
+
+std::vector<Byte> compressedPacket(int threshold, const std::vector<Byte>& data) {
+    if (threshold  < 0) return data; // No compression if threshold is negative
+    std::vector<Byte> result;
+    if (data.size() >= static_cast<unsigned long>(threshold)) {
+        // Compress the data
+        result = varIntSerialize(data.size());
+        std::vector<Byte> compressed_data = compressData(data);
+        result.insert(result.end(), compressed_data.begin(), compressed_data.end());
+    } else {
+        // No compression, just serialize the size and data
+        result = varIntSerialize(0); // VarInt 0 indicates no compression
+        result.insert(result.end(), data.begin(), data.end());
     }
     return result;
 }
