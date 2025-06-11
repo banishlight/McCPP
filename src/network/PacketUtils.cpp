@@ -186,18 +186,46 @@ std::vector<Byte> serializeUUID(const std::vector<long>& data) {
     return result;
 }
 
-std::vector<Byte> compressedPacket(int threshold, const std::vector<Byte>& data) {
-    if (threshold  < 0) return data; // No compression if threshold is negative
-    std::vector<Byte> result;
-    if (data.size() >= static_cast<unsigned long>(threshold)) {
-        // Compress the data
-        result = varIntSerialize(data.size());
-        std::vector<Byte> compressed_data = compressData(data);
-        result.insert(result.end(), compressed_data.begin(), compressed_data.end());
-    } else {
-        // No compression, just serialize the size and data
-        result = varIntSerialize(0); // VarInt 0 indicates no compression
-        result.insert(result.end(), data.begin(), data.end());
+std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>& data) {
+    std::vector<Byte> packet;
+    if (threshold < 0) {
+        // No compression
+        int size = data.size() + getVarIntSize(id);
+        packet = varIntSerialize(size);
+        std::vector<Byte> packetID = varIntSerialize(id);
+        packet.insert(packet.end(), packetID.begin(), packetID.end());
+        packet.insert(packet.end(), data.begin(), data.end());
     }
-    return result;
+    else {
+        // Compression enabled
+        // 1. Packet length
+        // 2. Data length
+        // 3. Packet ID
+        // 4. Data
+        if (data.size() >= static_cast<unsigned long>(threshold)) {
+            // Compress the data
+            int size;
+            std::vector<Byte> packet_id = varIntSerialize(id);
+            std::vector<Byte> data_length = varIntSerialize(static_cast<int>(data.size() + packet_id.size()));
+            std::vector<Byte> precomp_data = packet_id;
+            precomp_data.insert(precomp_data.end(), data.begin(), data.end());
+            std::vector<Byte> compressed_data = compressData(precomp_data);
+            size = compressed_data.size() + data_length.size();
+            packet = varIntSerialize(size);
+            packet.insert(packet.end(), data_length.begin(), data_length.end());
+            packet.insert(packet.end(), compressed_data.begin(), compressed_data.end());
+        } else {
+            // No compression, below threshold
+            std::vector<Byte> data_length = varIntSerialize(0);
+            std::vector<Byte> packetID = varIntSerialize(id);
+            int size = data.size() + data_length.size() + packetID.size();
+            packet = varIntSerialize(size);
+            packet.insert(packet.end(), data_length.begin(), data_length.end());
+            packet.insert(packet.end(), packetID.begin(), packetID.end());
+            packet.insert(packet.end(), data.begin(), data.end());
+        }
+    }
+
+
+    return packet;
 }

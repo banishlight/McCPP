@@ -22,3 +22,6 @@ std::vector<Byte> generateVerifyToken();
 
 std::vector<long> deserializeUUID(std::vector<Byte>& data);
 std::vector<Byte> serializeUUID(const std::vector<long>& data);
+
+std::vector<Byte> compressedPacket(int id, const std::vector<Byte>& data);
+std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>& data);

@@ -30,7 +30,7 @@ Status_Response_p::Status_Response_p(int threshold) {
 
 // Clientbound Status packet 0x00
 std::vector<Byte> Status_Response_p::serialize() const {
-    std::vector<Byte> out_buff;
+    std::vector<Byte> packet;
     // Create the JSON response with server status information
     json status_json = {
         {"version", {
@@ -49,13 +49,10 @@ std::vector<Byte> Status_Response_p::serialize() const {
         {"previewsChat", false}
     };
     string json_str = status_json.dump();
-    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(json_str.size()));
-    std::vector<Byte> packetID = varIntSerialize(getID());
+
     std::vector<Byte> serial_json = serializeString(json_str);
-    out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
-    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
-    out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
-    return out_buff;
+    packet = assemblePacket(getID(), _threshold, serial_json);
+    return packet;
 }
 
 Pong_Response_p::Pong_Response_p(int threshold, long timestamp) {
@@ -65,7 +62,7 @@ Pong_Response_p::Pong_Response_p(int threshold, long timestamp) {
 
 // Clientbound Status packet 0x01
 std::vector<Byte> Pong_Response_p::serialize() const {
-    std::vector<Byte> out_buff;
+    std::vector<Byte> packet;
     std::vector<Byte> packetID = varIntSerialize(getID());
     std::vector<Byte> timestampBytes;
     timestampBytes.reserve(8);
@@ -78,11 +75,8 @@ std::vector<Byte> Pong_Response_p::serialize() const {
     timestampBytes[5] = static_cast<Byte>((_timestamp >> 40) & 0xFF);
     timestampBytes[6] = static_cast<Byte>((_timestamp >> 48) & 0xFF);
     timestampBytes[7] = static_cast<Byte>((_timestamp >> 56) & 0xFF);
-    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(timestampBytes.size() + packetID.size()));
-    out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
-    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
-    out_buff.insert(out_buff.end(), timestampBytes.begin(), timestampBytes.end());
-    return out_buff;
+    packet = assemblePacket(getID(), _threshold, timestampBytes);
+    return packet;
 }
 
 // Serverbound Status packet 0x00
@@ -116,21 +110,16 @@ Disconnect_login_p::Disconnect_login_p(int threshold, const std::string& reason)
 }
 
 std::vector<Byte> Disconnect_login_p::serialize() const {
-    std::vector<Byte> out_buff;
+    std::vector<Byte> packet;
     // Create JSON text component for the disconnect reason
     json reason_json = {
         {"text", _reason}  // Example reason text
     };
     // Convert JSON to string
     string reason_str = reason_json.dump();
-    // Serialize the string length as VarInt
-    std::vector<Byte> lengthBytes = varIntSerialize(static_cast<int>(reason_str.size()) + 1);
-    std::vector<Byte> packetID = varIntSerialize(getID());
     std::vector<Byte> serial_json = serializeString(reason_str);
-    out_buff.insert(out_buff.end(), lengthBytes.begin(), lengthBytes.end());
-    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
-    out_buff.insert(out_buff.end(), serial_json.begin(), serial_json.end());
-    return out_buff;
+    packet = assemblePacket(getID(), _threshold, serial_json);
+    return packet;
 }
 
 Encryption_Request_p::Encryption_Request_p(int threshold) {
@@ -138,7 +127,7 @@ Encryption_Request_p::Encryption_Request_p(int threshold) {
 }
 
 std::vector<Byte> Encryption_Request_p::serialize() const {
-    std::vector<Byte> out_buff;
+    std::vector<Byte> packet;
     // Server ID (string 20)
     // Public key (Prefixed array of byte)
     // Verify Token (Prefixed array of byte)
@@ -153,12 +142,8 @@ std::vector<Byte> Encryption_Request_p::serialize() const {
     data.insert(data.end(), pub_key.begin(), pub_key.end());
     data.insert(data.end(), verify_token.begin(), verify_token.end());
     data.push_back(authenticate);
-    std::vector<Byte> packetID = varIntSerialize(getID());
-    std::vector<Byte> size = varIntSerialize(data.size() + 1);
-    out_buff.insert(out_buff.end(), size.begin(), size.end());
-    out_buff.insert(out_buff.end(), packetID.begin(), packetID.end());
-    out_buff.insert(out_buff.end(), data.begin(), data.end());
-    return out_buff;
+    packet = assemblePacket(getID(), _threshold, data);
+    return packet;
 }
 
 Login_Success_p::Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username) {
@@ -174,7 +159,7 @@ std::vector<Byte> Login_Success_p::serialize() const {
         // String (64)
         // String (32767)
         // Prefixed Optional String (1024)
-    std::vector<Byte> out_buff;
+    std::vector<Byte> packet;
     std::vector<Byte> packet_data;
 
     std::vector<Byte> uuid_bytes = serializeUUID(_uuid);
@@ -200,12 +185,8 @@ std::vector<Byte> Login_Success_p::serialize() const {
         }
     }
     // Serialize the packet ID and size
-    std::vector<Byte> packetID_bytes = varIntSerialize(getID());
-    std::vector<Byte> size_bytes = varIntSerialize(static_cast<int>(packet_data.size() + 1)); // +1 for the packet ID
-    out_buff.insert(out_buff.end(), size_bytes.begin(), size_bytes.end());
-    out_buff.insert(out_buff.end(), packetID_bytes.begin(), packetID_bytes.end());
-    out_buff.insert(out_buff.end(), packet_data.begin(), packet_data.end());
-    return out_buff;
+    packet = assemblePacket(getID(), _threshold, packet_data);
+    return packet;
 }
 
 std::vector<Byte> Set_Compression_p::serialize() const {
