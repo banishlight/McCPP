@@ -5,10 +5,10 @@
 #include <network/PacketUtils.hpp>
 #include <network/PacketContext.hpp>
 #include <network/Compression.hpp>
+#include <Properties.hpp>
 #include <Console.hpp>
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
-    // _socket(std::move(socket));
     _socket = socket;
     _state = ConnectionState::Handshake;
     _playerUUID.reserve(2);
@@ -19,6 +19,7 @@ Connection::~Connection() {
 }
 
 void Connection::deserializePacket(std::vector<Byte> packet) {
+    // TODO: Refactor compression handling
     if (_threshold != -1) { // Compression enabled
         int length = varIntDeserialize(packet);
         // Remove length from packet
@@ -64,8 +65,7 @@ void Connection::receivePacket() {
         std::vector<Byte> packet = _socket->receivePacket();
         if (packet.size() > 0) {
             deserializePacket(packet);
-        }
-        else {
+        } else {
             Console::getConsole().Error("Connection::receivePacket(): Cannot receieve empty packets?.");
         }
     }
@@ -76,6 +76,11 @@ void Connection::sendPackets() {
     for(auto& packet : _sendQueue) {
         std::vector<Byte> serializedPacket = serializePacket(packet);
         _socket->sendPacket(serializedPacket);
+        // Set to true in Set_Compression_p, once sent, all future packets will be using compression threshold
+        if (_enableCompression) {
+            _threshold = Properties::getProperties().getCompressionThreshold();
+            _enableCompression = false;
+        }
     }
     // Clear the queue
     _sendQueue.clear();
@@ -117,12 +122,10 @@ std::vector<long> Connection::getUUID() const {
     return _playerUUID;
 }
 
-bool Connection::isCompressionEnabled() const {
-    return _threshold >= 0;
-}
-void Connection::setCompressionThreshold(int threshold) {
-    _threshold = threshold;
-}
 int Connection::getCompressionThreshold() const {
     return _threshold;
+}
+
+void Connection::enableCompression() {
+    _enableCompression = true;
 }

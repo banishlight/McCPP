@@ -189,9 +189,22 @@ std::vector<Byte> Login_Success_p::serialize() const {
     return packet;
 }
 
+Set_Compression_p::Set_Compression_p(int threshold, std::shared_ptr<Connection> conn) {
+    _threshold = threshold;
+    // Set the connection compression threshold
+    if (conn) {
+        _my_conn = conn;
+    }
+}
+
 std::vector<Byte> Set_Compression_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    // WARNING, ACCESSES PROPERTIES
+    std::vector<Byte> packet;
+    // Compression threshold (VarInt)
+    std::vector<Byte> threshold_bytes = varIntSerialize(Properties::getProperties().getCompressionThreshold());
+    _my_conn->enableCompression();
+    packet = assemblePacket(getID(), _threshold, threshold_bytes);
+    return packet;
 }
 
 std::vector<Byte> Login_Plugin_Request_p::serialize() const {

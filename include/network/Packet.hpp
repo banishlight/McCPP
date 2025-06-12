@@ -136,9 +136,11 @@ class Login_Success_p : public Login_Packet, public Outgoing_Packet {
 };
 class Set_Compression_p : public Login_Packet, public Outgoing_Packet {
     public:
+        Set_Compression_p(int threshold, std::shared_ptr<Connection> conn);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
+        std::shared_ptr<Connection> _my_conn;
         static int constexpr _PACKET_ID = 0x03;
 };
 class Login_Plugin_Request_p : public Login_Packet, public Outgoing_Packet {

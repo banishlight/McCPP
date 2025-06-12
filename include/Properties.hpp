@@ -11,6 +11,7 @@ class Properties {
         string getMotd();
         string getMaxPlayers();
         void initialize();
+        int getCompressionThreshold() const;
 
         enum Difficulties {
             Peaceful,

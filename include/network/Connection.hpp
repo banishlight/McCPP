@@ -18,9 +18,8 @@ class Connection {
         long getPing() const;
         void setUUID(std::vector<long> uuid);
         std::vector<long> getUUID() const;
-        bool isCompressionEnabled() const;
-        void setCompressionThreshold(int threshold);
         int getCompressionThreshold() const;
+        void enableCompression();
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
@@ -30,6 +29,7 @@ class Connection {
         int _threshold = -1;
         long _timestamp = -1;
         std::vector<long> _playerUUID;
+        bool _enableCompression = false;
         // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
         // TODO: string disconnectReason;
         // TODO: bool readyToDisconnect = false; // Maybe?

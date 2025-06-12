@@ -225,7 +225,5 @@ std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>&
             packet.insert(packet.end(), data.begin(), data.end());
         }
     }
-
-
     return packet;
 }

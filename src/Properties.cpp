@@ -344,3 +344,7 @@ string Properties::getMotd() {
 string Properties::getMaxPlayers() {
     return std::to_string(this->max_players);
 }
+
+int Properties::getCompressionThreshold() const {
+    return this->network_compression_threshold;
+}
