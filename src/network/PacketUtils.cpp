@@ -138,6 +138,18 @@ std::vector<Byte> serializeString(const string& str) {
     return result;
 }
 
+std::vector<Byte> deserializePrefixedArray(std::vector<Byte>& data) {
+    int size = varIntDeserialize(data);
+    int varIntSize = getVarIntSize(size);
+    if (data.size() < static_cast<size_t>(varIntSize + size)) {
+        // Console::getConsole().Error("Not enough bytes to deserialize prefixed array");
+        return {}; // Return empty vector
+    }
+    std::vector<Byte> result(data.begin() + varIntSize, data.begin() + varIntSize + size);
+    data.erase(data.begin(), data.begin() + varIntSize + size);
+    return result;
+}
+
 std::vector<Byte> serializePrefixedArray(const std::vector<Byte>& data) {
     std::vector<Byte> result = varIntSerialize(data.size());
     result.insert(result.end(), data.begin(), data.begin());

@@ -102,14 +102,6 @@ void Connection::addPacket(std::shared_ptr<Outgoing_Packet> packet) {
     _sendQueue.push_back(packet);
 }
 
-void Connection::setPing(long ping) {
-    _timestamp = ping;
-}
-
-long Connection::getPing() const {
-    return _timestamp;
-}
-
 void Connection::setUUID(std::vector<long> uuid) {
     if (uuid.size() != 2) {
         Console::getConsole().Error("Connection::setUUID(): bad UUID vector size.");
@@ -128,4 +120,12 @@ int Connection::getCompressionThreshold() const {
 
 void Connection::enableCompression() {
     _enableCompression = true;
+}
+
+string Connection::getUsername() const {
+    return _username;
+}
+
+void Connection::setUsername(const string& username) {
+    _username = username;
 }

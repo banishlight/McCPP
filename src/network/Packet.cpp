@@ -20,7 +20,26 @@ void Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     in_buff.erase(in_buff.begin(), in_buff.begin() + 2);
     
     int nextState = varIntDeserialize(in_buff);
-    cont.connection.setState(static_cast<ConnectionState>(nextState));
+    // cont.connection.setState(static_cast<ConnectionState>(nextState));
+    switch (nextState) {
+        case 1: // Status
+            cont.connection.setState(ConnectionState::Status);
+            #ifdef DEBUG
+            Console::getConsole().Entry("Handshake received, switching to Status state.");
+            #endif
+            break;
+        case 2: // Login
+            cont.connection.setState(ConnectionState::Login);
+            #ifdef DEBUG
+            Console::getConsole().Entry("Handshake received, switching to Login state.");
+            #endif
+            break;
+        default:
+            #ifdef DEBUG
+            Console::getConsole().Error("Invalid next state in Handshake packet: " + std::to_string(nextState));
+            #endif
+            return; // Invalid state, do not proceed
+    }
     Console::getConsole().Entry("ip received: " + serverAddress + ":" + std::to_string(port));
 }
 
@@ -97,7 +116,9 @@ void Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext
                     (static_cast<long>(in_buff[6]) << 48) |
                     (static_cast<long>(in_buff[7]) << 56);
     // respond with a Pong_Response_p packet
-    cont.connection.setPing(timestamp);
+    int threshold = cont.connection.getCompressionThreshold();
+    std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Pong_Response_p>(threshold, timestamp);
+    cont.connection.addPacket(responsePacket);
 }
 
 Disconnect_login_p::Disconnect_login_p(int threshold, const std::string& reason) {
@@ -218,19 +239,42 @@ std::vector<Byte> Cookie_Request_login_p::serialize() const {
 }
 
 void Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    string username;
+    std::vector<long> uuid;
+    // Deserialize the username (string)
+    username = deserializeString(in_buff);
+    // Deserialize the UUID (array of 2 long)
+    uuid = deserializeUUID(in_buff);
+    cont.connection.setUsername(username);
+    cont.connection.setUUID(uuid);
+    std::shared_ptr<Outgoing_Packet> encryptionRequestPacket = std::make_shared<Encryption_Request_p>(cont.connection.getCompressionThreshold());
+    cont.connection.addPacket(encryptionRequestPacket);
 }
 
+// Queues set compression packet
 void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    std::vector<Byte> shared_secret;
+    std::vector<Byte> verify_token;
+    // Deserialize the shared secret (prefixed byte array)
+    shared_secret = deserializePrefixedArray(in_buff);
+    // Deserialize the verify token (prefixed byte array)
+    verify_token = deserializePrefixedArray(in_buff);
+    // TODO: Do something with this verification
+    std::shared_ptr<Outgoing_Packet> setCompressionPacket = std::make_shared<Set_Compression_p>(cont.connection.getCompressionThreshold(), std::make_shared<Connection>(cont.connection));
+    cont.connection.addPacket(setCompressionPacket);
+    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(cont.connection.getCompressionThreshold(), cont.connection.getUUID(), cont.connection.getUsername());
+    cont.connection.addPacket(login_success);
 }
 
 void Login_Plugin_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // TODO Implementation here
 }
 
+// Transition to Config state
 void Login_Acknowledge_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    // No data
+    // Transition to Config state
+    cont.connection.setState(ConnectionState::Config);
 }
 
 void Cookie_Response_login_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
