@@ -26,6 +26,7 @@ class Socket {
 		// Independent variables per OS
 		#ifdef LINUX
 			int fetchVarInt();
+			bool isValidFD(int fd) const;
 			int _fd = -1;
 			bool _blocking = true;
 		#endif

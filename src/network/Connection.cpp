@@ -12,6 +12,9 @@ Connection::Connection(std::shared_ptr<Socket> socket) {
     _socket = socket;
     _state = ConnectionState::Handshake;
     _playerUUID.reserve(2);
+    #ifdef DEBUG
+    Console::getConsole().Entry("Connection::Connection(): Created new connection");
+    #endif
 }
 
 Connection::~Connection() {
@@ -66,8 +69,11 @@ void Connection::receivePacket() {
         if (packet.size() > 0) {
             deserializePacket(packet);
         } else {
-            Console::getConsole().Error("Connection::receivePacket(): Cannot receieve empty packets?.");
+            // Console::getConsole().Error("Connection::receivePacket(): Cannot receieve empty packets?.");
         }
+    }
+    else {
+        Console::getConsole().Error("Connection::receivePacket(): Socket is not valid, cannot receive packets.");
     }
 }
 

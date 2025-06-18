@@ -65,7 +65,7 @@ void Console::processBuffers() {
             }
 
             if (!toProcess.empty()) {
-                // Empty buffer
+                // Non-Empty buffer
                 for (const auto& msg : toProcess) {
                     // Actual output happens here
                     
@@ -77,6 +77,7 @@ void Console::processBuffers() {
                         std::cerr << msg.text;
                     }
                     setColour(0, msg.stream);
+                    logFile.write(msg.text.c_str(), msg.text.size());
                 }
                 logFile.flush();
             }

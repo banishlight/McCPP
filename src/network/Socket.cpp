@@ -21,7 +21,11 @@ int Socket::fetchVarInt() {
         // Read 1 byte
         int bytesRead = recv(_fd, &currentByte, 1, 0);
         if (bytesRead != 1) {
-            throw std::runtime_error("Failed to read VarInt byte");
+            // throw std::runtime_error("Failed to read VarInt byte");
+            Console::getConsole().Error("Socket::fetchVarInt(): Failed to read VarInt byte: " + std::string(strerror(errno)));
+            Console::getConsole().Error("Bytes read: " + std::to_string(bytesRead));
+            Console::getConsole().Error("Socket::fetchVarInt(): Socket file descriptor: " + std::to_string(_fd));
+            return -1;
         }
         
         // Add the 7 bits to our value
@@ -29,7 +33,7 @@ int Socket::fetchVarInt() {
         position += 7;
         
         if (position >= 32) {
-            throw std::runtime_error("VarInt too big");
+            Console::getConsole().Error("Socket::fetchVarInt(): VarInt is too big, exceeds 32 bits.");
         }
         
     } while ((currentByte & 0x80) != 0);
@@ -50,7 +54,15 @@ Socket::~Socket() {
 }
 
 bool Socket::isValid() const {
-    return _fd > 0;
+    if (_fd < 0) {
+        Console::getConsole().Error("Socket::isValid(): Invalid socket file descriptor: " + std::to_string(_fd));
+        return false;
+    }
+    int result = fcntl(_fd, F_GETFD);
+    if (result == -1) {
+        return errno != EBADF;  // EBADF means bad file descriptor
+    }
+    return true;
 }
 
 std::vector<Byte> Socket::receivePacket() {
@@ -60,6 +72,10 @@ std::vector<Byte> Socket::receivePacket() {
     // Deserialize packet size then
     // fetch the packet into vector
     int size = fetchVarInt();
+    if (size < 0) {
+        Console::getConsole().Error("Socket::receivePacket(): Invalid packet size: " + std::to_string(size));
+        return std::vector<Byte>();
+    }
     std::vector<Byte> buffer(size);
     // Unsure if I want to enforce blocking while receiving data
     ssize_t rec;
@@ -144,6 +160,10 @@ void Socket::setBlocking(bool block) {
 
 bool Socket::isBlocking() const {
     return _blocking;
+}
+
+bool isValidFD(int fd) {
+    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 #endif
 

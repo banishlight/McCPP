@@ -267,7 +267,7 @@ void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext
 }
 
 void Login_Plugin_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    Console::getConsole().Error("Login_Plugin_Response_p::deserialize(): Not implemented yet.");
 }
 
 // Transition to Config state
@@ -278,7 +278,7 @@ void Login_Acknowledge_p::deserialize(std::vector<Byte> in_buff, PacketContext& 
 }
 
 void Cookie_Response_login_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    Console::getConsole().Error("Cookie_Response_login_p::deserialize(): Not implemented yet.");
 }
 
 std::vector<Byte> Cookie_Request_config_p::serialize() const {
