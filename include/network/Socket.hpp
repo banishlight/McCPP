@@ -21,7 +21,7 @@ class Socket {
 		void sendPacket(std::vector<Byte> data);
 		void setBlocking(bool blocking);
 		bool isBlocking() const;
-
+		
     protected:
 		// Independent variables per OS
 		#ifdef LINUX

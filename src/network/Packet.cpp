@@ -12,6 +12,9 @@ using json = nlohmann::json;
 
 // Serverbound Handshake packet 0x00
 void Handshake_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Handshake_p::deserialize(): Received.");
+    #endif
     int protocolVersion = varIntDeserialize(in_buff);
     in_buff.erase(in_buff.begin(), in_buff.begin() + getVarIntSize(protocolVersion));
 
@@ -49,6 +52,9 @@ Status_Response_p::Status_Response_p(int threshold) {
 
 // Clientbound Status packet 0x00
 std::vector<Byte> Status_Response_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Status_Response_p::serialize(): Sending.");
+    #endif
     std::vector<Byte> packet;
     // Create the JSON response with server status information
     json status_json = {
@@ -81,6 +87,9 @@ Pong_Response_p::Pong_Response_p(int threshold, long timestamp) {
 
 // Clientbound Status packet 0x01
 std::vector<Byte> Pong_Response_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Pong_Response_p::serialize(): Sending.");
+    #endif
     std::vector<Byte> packet;
     std::vector<Byte> packetID = varIntSerialize(getID());
     std::vector<Byte> timestampBytes;
@@ -100,6 +109,9 @@ std::vector<Byte> Pong_Response_p::serialize() const {
 
 // Serverbound Status packet 0x00
 void Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Status_Request_p::deserialize(): Received.");
+    #endif
     // No Data to deserialize
     // TODO: NEED TO PASS THE PROPER PACKET COMPRESSION
     std::shared_ptr<Outgoing_Packet> responsePacket = std::make_shared<Status_Response_p>(cont.connection.getCompressionThreshold());
@@ -107,6 +119,9 @@ void Status_Request_p::deserialize(std::vector<Byte> in_buff, PacketContext& con
 }
 
 void Ping_Request_status_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Ping_Request_status_p::deserialize(): Received.");
+    #endif
     long timestamp = in_buff[0] | 
                     (static_cast<long>(in_buff[1]) << 8) |
                     (static_cast<long>(in_buff[2]) << 16) | 
@@ -131,6 +146,9 @@ Disconnect_login_p::Disconnect_login_p(int threshold, const std::string& reason)
 }
 
 std::vector<Byte> Disconnect_login_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Disconnect_login_p::serialize(): Sending.");
+    #endif
     std::vector<Byte> packet;
     // Create JSON text component for the disconnect reason
     json reason_json = {
@@ -148,6 +166,9 @@ Encryption_Request_p::Encryption_Request_p(int threshold) {
 }
 
 std::vector<Byte> Encryption_Request_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Encryption_Request_p::serialize(): Sending.");
+    #endif
     std::vector<Byte> packet;
     // Server ID (string 20)
     // Public key (Prefixed array of byte)
@@ -174,6 +195,9 @@ Login_Success_p::Login_Success_p(int threshold, const std::vector<long>& uuid, c
 }
 
 std::vector<Byte> Login_Success_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Login_Success_p::serialize(): Sending.");
+    #endif
     // UUID
     // String (16)
     // Properties array (16)
@@ -219,6 +243,9 @@ Set_Compression_p::Set_Compression_p(int threshold, std::shared_ptr<Connection> 
 }
 
 std::vector<Byte> Set_Compression_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Handshake_p::deserialize(): Received.");
+    #endif
     // WARNING, ACCESSES PROPERTIES
     std::vector<Byte> packet;
     // Compression threshold (VarInt)
@@ -229,11 +256,17 @@ std::vector<Byte> Set_Compression_p::serialize() const {
 }
 
 std::vector<Byte> Login_Plugin_Request_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Login_Plugin_Request_p::serialize(): Not Implemented.");
+    #endif
     // TODO Implementation here
     return std::vector<Byte>();
 }
 
 std::vector<Byte> Cookie_Request_login_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Cookie_Request_login_p::serialize(): Not Implemented.");
+    #endif
     // TODO Implementation here
     return std::vector<Byte>();
 }

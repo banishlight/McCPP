@@ -65,11 +65,15 @@ std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> p
 
 void Connection::receivePacket() {
     if (_socket->isValid()) {
+        if (!_socket->packetAvailable()) return;
+        #ifdef LINUX
+            Console::getConsole().Entry("Connection::receivePacket(): Packet ready to be received.");
+        #endif
         std::vector<Byte> packet = _socket->receivePacket();
         if (packet.size() > 0) {
             deserializePacket(packet);
         } else {
-            // Console::getConsole().Error("Connection::receivePacket(): Cannot receieve empty packets?.");
+            Console::getConsole().Error("Connection::receivePacket(): Packet Receive error.");
         }
     }
     else {
