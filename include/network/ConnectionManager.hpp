@@ -16,10 +16,10 @@ class ConnectionManager {
     private:
         ConnectionManager();
         ~ConnectionManager();
-        void processConnection(Connection conn);
+        void processConnection(std::shared_ptr<Connection> conn);
         void serverThreadLoop();
         std::unique_ptr<ServerSocket> _serverSocket;
-        std::vector<Connection> _connections;
+        // std::vector<Connection> _connections;
         std::thread _serverConThread;
         std::unique_ptr<ThreadPool> _conThreads;
         bool _initialized = false;

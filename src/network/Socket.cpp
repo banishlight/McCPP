@@ -54,20 +54,23 @@ Socket::~Socket() {
 }
 
 bool Socket::isValid() const {
+    return _fd > -1;
     if (_fd < 0) {
         Console::getConsole().Error("Socket::isValid(): Invalid socket file descriptor: " + std::to_string(_fd));
         return false;
     }
     int result = fcntl(_fd, F_GETFD);
     if (result == -1) {
-        return errno != EBADF;  // EBADF means bad file descriptor
+        return false; 
     }
     return true;
 }
 
+// Assume: Check was already done, and something is available to be recieved
+// Assume: Socket is valid
 std::vector<Byte> Socket::receivePacket() {
-    if (_fd < 0) return std::vector<Byte>();
-    if (!packetAvailable()) return std::vector<Byte>();
+    // if (_fd < 0) return std::vector<Byte>();
+    // if (!packetAvailable()) return std::vector<Byte>();
 
     // Deserialize packet size then
     // fetch the packet into vector
@@ -153,7 +156,7 @@ void Socket::setBlocking(bool block) {
     if (_fd < 0) return;
     int flags = fcntl(_fd, F_GETFL, 0);
     if (flags == -1) return;
-    flags = _blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+    flags = block ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
     fcntl(_fd, F_SETFL, flags);
     _blocking = block;
 }

@@ -3,6 +3,7 @@
 #include <network/Connection.hpp>
 #include <network/Socket.hpp>
 #include <network/ServerSocket.hpp>
+#include <Console.hpp>
 #include <Properties.hpp>
 #include <ThreadPool.hpp>
 #include <network/Crypto.hpp>
@@ -50,10 +51,13 @@ void ConnectionManager::close() {
     _initialized = false;
 }
 
-void ConnectionManager::processConnection(Connection conn) {
-    if (!conn.isValid()) return;
-    conn.receivePacket();
-    conn.sendPackets();
+void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
+    if (!conn->isValid()) return;
+    #ifdef DEBUG
+        Console::getConsole().Entry("ConnectionManager::processConnection(): valid connection!");
+    #endif
+    conn->receivePacket();
+    conn->sendPackets();
     _conThreads->enqueue([this,conn]() mutable {
             processConnection(conn);
     });
@@ -63,8 +67,8 @@ void ConnectionManager::serverThreadLoop() {
     while (running) {
         Socket newSock = _serverSocket->Accept();
         if (newSock.isValid()) {
-            // Connection newConn(std::make_unique<Socket>(std::move(newSock)));
-            Connection newConn(std::make_shared<Socket>(std::move(newSock)));
+            // This is kind of gross...
+            std::shared_ptr<Connection> newConn = std::make_shared<Connection>(std::make_shared<Socket>(std::move(newSock)));
             _conThreads->enqueue([this, newConn]() mutable {
                     processConnection(newConn);
             });

@@ -18,7 +18,9 @@ Connection::Connection(std::shared_ptr<Socket> socket) {
 }
 
 Connection::~Connection() {
-
+    #ifdef DEBUG
+    Console::getConsole().Entry("Connection::~Connection(): Closing Connection");
+    #endif
 }
 
 void Connection::deserializePacket(std::vector<Byte> packet) {
@@ -64,9 +66,21 @@ std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> p
 }
 
 void Connection::receivePacket() {
+    #ifdef DEBUG
+    Console::getConsole().Entry("Connection::receivePacket(): Attempting to receive packet.");
+    #endif
     if (_socket->isValid()) {
-        if (!_socket->packetAvailable()) return;
-        #ifdef LINUX
+        #ifdef DEBUG
+        Console::getConsole().Entry("Connection::receivePacket(): Socket is valid, checking for packet availability.");
+        #endif
+        if (!_socket->packetAvailable())  {
+            #ifdef DEBUG
+                Console::getConsole().Entry("Connection::receivePacket(): No packet available.");
+            #endif
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            return;
+        }
+        #ifdef DEBUG
             Console::getConsole().Entry("Connection::receivePacket(): Packet ready to be received.");
         #endif
         std::vector<Byte> packet = _socket->receivePacket();
@@ -97,6 +111,7 @@ void Connection::sendPackets() {
 }
 
 bool Connection::isValid() const {
+    // TODO: Check Connection class is valid here
     return _socket->isValid();
 }
 

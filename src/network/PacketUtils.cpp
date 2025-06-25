@@ -152,7 +152,7 @@ std::vector<Byte> deserializePrefixedArray(std::vector<Byte>& data) {
 
 std::vector<Byte> serializePrefixedArray(const std::vector<Byte>& data) {
     std::vector<Byte> result = varIntSerialize(data.size());
-    result.insert(result.end(), data.begin(), data.begin());
+    result.insert(result.end(), data.begin(), data.end());
     return result;
 }
 
