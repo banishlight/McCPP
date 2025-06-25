@@ -41,7 +41,7 @@ int Socket::fetchVarInt() {
     return value;
 }
 
-// sock_fd is the file descriptor accepted from the server socket
+// fd is the file descriptor accepted from the server socket
 Socket::Socket(int fd) {
     _fd = fd;
     if (isValid()) setBlocking(true);
@@ -49,20 +49,23 @@ Socket::Socket(int fd) {
 }
 
 Socket::~Socket() {
-    // If socket close fails, might cause a memory leak?
-    close(_fd);
+    // This was causing connections to close unintentionally
+    // close(_fd);
 }
 
 bool Socket::isValid() const {
-    return _fd > -1;
     if (_fd < 0) {
         Console::getConsole().Error("Socket::isValid(): Invalid socket file descriptor: " + std::to_string(_fd));
         return false;
     }
     int result = fcntl(_fd, F_GETFD);
     if (result == -1) {
+        Console::getConsole().Error("Socket::isValid(): Failed to get file descriptor flags: " + std::string(strerror(errno)));
         return false; 
     }
+    #ifdef DEBUG
+    Console::getConsole().Entry("Socket::isValid(): Socket file descriptor is valid: " + std::to_string(_fd));
+    #endif
     return true;
 }
 
@@ -163,6 +166,14 @@ void Socket::setBlocking(bool block) {
 
 bool Socket::isBlocking() const {
     return _blocking;
+}
+
+void Socket::close() {
+    if (_fd < 0) return;
+    if (::close(_fd) < 0) {
+        Console::getConsole().Error("Socket::close(): Failed to close socket: " + std::string(strerror(errno)));
+    }
+    _fd = -1; // Mark as invalid
 }
 
 bool isValidFD(int fd) {
