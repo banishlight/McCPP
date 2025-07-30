@@ -44,8 +44,8 @@ int Socket::fetchVarInt() {
 // fd is the file descriptor accepted from the server socket
 Socket::Socket(int fd) {
     _fd = fd;
-    if (isValid()) setBlocking(true);
-    else Console::getConsole().Error("Socket::Socket(): Invalid socket file descriptor: " + std::to_string(fd));
+    // if (isValid()) setBlocking(true);
+    // else Console::getConsole().Error("Socket::Socket(): Invalid socket file descriptor: " + std::to_string(fd));
 }
 
 Socket::~Socket() {
@@ -72,16 +72,13 @@ bool Socket::isValid() const {
 // Assume: Check was already done, and something is available to be recieved
 // Assume: Socket is valid
 std::vector<Byte> Socket::receivePacket() {
-    // if (_fd < 0) return std::vector<Byte>();
-    // if (!packetAvailable()) return std::vector<Byte>();
-
-    // Deserialize packet size then
-    // fetch the packet into vector
+    // Deserialize packet size
     int size = fetchVarInt();
     if (size < 0) {
         Console::getConsole().Error("Socket::receivePacket(): Invalid packet size: " + std::to_string(size));
         return std::vector<Byte>();
     }
+    // fetch the packet into vector
     std::vector<Byte> buffer(size);
     // Unsure if I want to enforce blocking while receiving data
     ssize_t rec;
@@ -105,8 +102,14 @@ std::vector<Byte> Socket::receivePacket() {
 }
 
 bool Socket::packetAvailable() {
-    char buff[8];  // Unsure if size is correct
+    char buff[1024];  // Unsure if size is correct
+    #ifdef DEBUG
+    Console::getConsole().Entry("Socket::packetAvailable(): Checking if packet is available on socket with file descriptor: " + std::to_string(_fd));
+    #endif
     ssize_t rec = recv(_fd, buff, sizeof(buff), MSG_PEEK);
+    #ifdef DEBUG
+    Console::getConsole().Entry("Socket::packetAvailable(): Received " + std::to_string(rec) + " bytes from socket with file descriptor: " + std::to_string(_fd));
+    #endif
     return rec > 0;
 }
 

@@ -7,6 +7,7 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <array>
 
 class Console {
     public:

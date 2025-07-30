@@ -6,6 +6,8 @@
 #include <sstream>
 #include <iomanip> 
 
+// Needs to be OS specific
+
 Console::Console() {
     createLog();    
     startThread();
