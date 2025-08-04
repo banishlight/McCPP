@@ -102,15 +102,19 @@ std::vector<Byte> Socket::receivePacket() {
 }
 
 bool Socket::packetAvailable() {
-    char buff[1024];  // Unsure if size is correct
     #ifdef DEBUG
     Console::getConsole().Entry("Socket::packetAvailable(): Checking if packet is available on socket with file descriptor: " + std::to_string(_fd));
     #endif
-    ssize_t rec = recv(_fd, buff, sizeof(buff), MSG_PEEK);
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(_fd, &readfds);
+    
+    struct timeval timeout = {0, 0}; // Non-blocking check
+    int result = select(_fd + 1, &readfds, nullptr, nullptr, &timeout);
     #ifdef DEBUG
-    Console::getConsole().Entry("Socket::packetAvailable(): Received " + std::to_string(rec) + " bytes from socket with file descriptor: " + std::to_string(_fd));
+    Console::getConsole().Entry("Socket::packetAvailable(): Received " + std::to_string(result) + " bytes from socket with file descriptor: " + std::to_string(_fd));
     #endif
-    return rec > 0;
+    return result > 0;
 }
 
 void Socket::sendPacket(std::vector<Byte> data) {

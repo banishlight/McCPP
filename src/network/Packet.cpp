@@ -462,32 +462,32 @@ void Packet_Registry::initializeRegistry() {
     // TODO PlayVec.resize(PLAY_SIZE);
     // Build vectors of vectors for each state
     // All packets must be pushed in the correct order
-    HandshakeVec.push_back(std::make_shared<Handshake_p>());
+    HandshakeVec[0] = std::make_shared<Handshake_p>();
 
-    StatusVec.push_back(std::make_shared<Status_Request_p>());
-    StatusVec.push_back(std::make_shared<Ping_Request_status_p>());
-    
-    LoginVec.push_back(std::make_shared<Login_Start_p>());
-    LoginVec.push_back(std::make_shared<Encryption_Response_p>());
-    LoginVec.push_back(std::make_shared<Login_Plugin_Response_p>());
-    LoginVec.push_back(std::make_shared<Login_Acknowledge_p>());
-    LoginVec.push_back(std::make_shared<Cookie_Response_login_p>());
+    StatusVec[0] = std::make_shared<Status_Request_p>();
+    StatusVec[1] = std::make_shared<Ping_Request_status_p>();
 
-    ConfigVec.push_back(std::make_shared<Client_Information_config_p>());
-    ConfigVec.push_back(std::make_shared<Cookie_Response_config_p>());
-    ConfigVec.push_back(std::make_shared<Serverbound_Plugin_Message_config_p>());
-    ConfigVec.push_back(std::make_shared<Acknowledge_Finish_Config_p>());
-    ConfigVec.push_back(std::make_shared<Serverbound_Keep_Alive_config_p>());
-    ConfigVec.push_back(std::make_shared<Pong_config_p>());
-    ConfigVec.push_back(std::make_shared<Resource_Pack_Response_config_p>());
-    ConfigVec.push_back(std::make_shared<Serverbound_Known_Packs_p>());
+    LoginVec[0] = std::make_shared<Login_Start_p>();
+    LoginVec[1] = std::make_shared<Encryption_Response_p>();
+    LoginVec[2] = std::make_shared<Login_Plugin_Response_p>();
+    LoginVec[3] = std::make_shared<Login_Acknowledge_p>();
+    LoginVec[4] = std::make_shared<Cookie_Response_login_p>();
+
+    ConfigVec[0] = std::make_shared<Client_Information_config_p>();
+    ConfigVec[1] = std::make_shared<Cookie_Response_config_p>();
+    ConfigVec[2] = std::make_shared<Serverbound_Plugin_Message_config_p>();
+    ConfigVec[3] = std::make_shared<Acknowledge_Finish_Config_p>();
+    ConfigVec[4] = std::make_shared<Serverbound_Keep_Alive_config_p>();
+    ConfigVec[5] = std::make_shared<Pong_config_p>();
+    ConfigVec[6] = std::make_shared<Resource_Pack_Response_config_p>();
+    ConfigVec[7] = std::make_shared<Serverbound_Known_Packs_p>();
 
     // Initialize the registry with packet instances
-    Incoming_Registry.push_back(HandshakeVec);
-    Incoming_Registry.push_back(StatusVec);
-    Incoming_Registry.push_back(LoginVec);
-    Incoming_Registry.push_back(ConfigVec);
-    Incoming_Registry.push_back(PlayVec);
+    Incoming_Registry[0] = HandshakeVec;
+    Incoming_Registry[1] = StatusVec;
+    Incoming_Registry[2] = LoginVec;
+    Incoming_Registry[3] = ConfigVec;
+    // Incoming_Registry[4] = PlayVec;
     #ifdef DEBUG
         Console::getConsole().Entry("Packet_Registry::initializeRegistry(): Packet registry initialized successfully.");
     #endif
