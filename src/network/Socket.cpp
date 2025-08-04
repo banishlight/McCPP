@@ -21,10 +21,13 @@ int Socket::fetchVarInt() {
         // Read 1 byte
         int bytesRead = recv(_fd, &currentByte, 1, 0);
         if (bytesRead != 1) {
-            // throw std::runtime_error("Failed to read VarInt byte");
+            // If we return 0, then the socket must be closed client side so we should close it server side
+            close();
+            #ifdef DEBUG
             Console::getConsole().Error("Socket::fetchVarInt(): Failed to read VarInt byte: " + std::string(strerror(errno)));
             Console::getConsole().Error("Bytes read: " + std::to_string(bytesRead));
             Console::getConsole().Error("Socket::fetchVarInt(): Socket file descriptor: " + std::to_string(_fd));
+            #endif
             return -1;
         }
         
