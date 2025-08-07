@@ -36,8 +36,8 @@ enum ConnectionState {
     Closed
 };
 
-const string PROTOCOL_VERSION = "764";
-const string SERVER_VERSION = "1.20.2";
+const string PROTOCOL_VERSION = "767";
+const string SERVER_VERSION = "1.21";
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
