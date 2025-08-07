@@ -93,16 +93,17 @@ std::vector<Byte> Pong_Response_p::serialize() const {
     std::vector<Byte> packet;
     std::vector<Byte> packetID = varIntSerialize(getID());
     std::vector<Byte> timestampBytes;
-    timestampBytes.reserve(8);
+    timestampBytes.resize(8);
+    // Timestamp is formatted Big-endian byte order (MSB first)
     // Faster than a for loop
-    timestampBytes[0] = static_cast<Byte>(_timestamp & 0xFF);
-    timestampBytes[1] = static_cast<Byte>((_timestamp >> 8) & 0xFF);
-    timestampBytes[2] = static_cast<Byte>((_timestamp >> 16) & 0xFF);
-    timestampBytes[3] = static_cast<Byte>((_timestamp >> 24) & 0xFF);
-    timestampBytes[4] = static_cast<Byte>((_timestamp >> 32) & 0xFF);
-    timestampBytes[5] = static_cast<Byte>((_timestamp >> 40) & 0xFF);
-    timestampBytes[6] = static_cast<Byte>((_timestamp >> 48) & 0xFF);
-    timestampBytes[7] = static_cast<Byte>((_timestamp >> 56) & 0xFF);
+    timestampBytes[0] = static_cast<Byte>((_timestamp >> 56) & 0xFF);
+    timestampBytes[1] = static_cast<Byte>((_timestamp >> 48) & 0xFF);
+    timestampBytes[2] = static_cast<Byte>((_timestamp >> 40) & 0xFF);
+    timestampBytes[3] = static_cast<Byte>((_timestamp >> 32) & 0xFF);
+    timestampBytes[4] = static_cast<Byte>((_timestamp >> 24) & 0xFF);
+    timestampBytes[5] = static_cast<Byte>((_timestamp >> 16) & 0xFF);
+    timestampBytes[6] = static_cast<Byte>((_timestamp >> 8) & 0xFF);
+    timestampBytes[7] = static_cast<Byte>(_timestamp & 0xFF);
     packet = assemblePacket(getID(), _threshold, timestampBytes);
     return packet;
 }
