@@ -24,9 +24,9 @@ int Socket::fetchVarInt() {
             // If we return 0, then the socket must be closed client side so we should close it server side
             close();
             #ifdef DEBUG
-            Console::getConsole().Error("Socket::fetchVarInt(): Failed to read VarInt byte: " + std::string(strerror(errno)));
-            Console::getConsole().Error("Bytes read: " + std::to_string(bytesRead));
-            Console::getConsole().Error("Socket::fetchVarInt(): Socket file descriptor: " + std::to_string(_fd));
+                Console::getConsole().Error("Socket::fetchVarInt(): Failed to read VarInt byte: " + std::string(strerror(errno)));
+                Console::getConsole().Error("Bytes read: " + std::to_string(bytesRead));
+                Console::getConsole().Error("Socket::fetchVarInt(): Socket file descriptor: " + std::to_string(_fd));
             #endif
             return -1;
         }
@@ -58,7 +58,9 @@ Socket::~Socket() {
 
 bool Socket::isValid() const {
     if (_fd < 0) {
-        Console::getConsole().Error("Socket::isValid(): Invalid socket file descriptor: " + std::to_string(_fd));
+        #ifdef DEBUG
+            Console::getConsole().Error("Socket::isValid(): Invalid socket file descriptor: " + std::to_string(_fd));
+        #endif
         return false;
     }
     int result = fcntl(_fd, F_GETFD);
@@ -78,7 +80,9 @@ std::vector<Byte> Socket::receivePacket() {
     // Deserialize packet size
     int size = fetchVarInt();
     if (size < 0) {
-        Console::getConsole().Error("Socket::receivePacket(): Invalid packet size: " + std::to_string(size));
+        #ifdef DEBUG
+            Console::getConsole().Error("Socket::receivePacket(): Invalid packet size: " + std::to_string(size));
+        #endif
         return std::vector<Byte>();
     }
     // fetch the packet into vector
@@ -93,14 +97,16 @@ std::vector<Byte> Socket::receivePacket() {
     else {
         rec = recv(_fd, buffer.data(), size, 0);
     }
-    if (rec < 0) {
-        Console::getConsole().Error("Socket::receivePacket(): Failed to receive packet: " + std::string(strerror(errno)));
-    } else if (rec == 0) {
-        Console::getConsole().Error("Socket::receivePacket(): Connection closed by peer");
-    }
-    if (rec != size) {
-        Console::getConsole().Error("Socket::receivePacket(): Incomplete packet received, expected " + std::to_string(size) + " bytes, got " + std::to_string(rec) + " bytes");
-    }
+    #ifdef DEBUG
+        if (rec < 0) {
+            Console::getConsole().Error("Socket::receivePacket(): Failed to receive packet: " + std::string(strerror(errno)));
+        } else if (rec == 0) {
+            Console::getConsole().Error("Socket::receivePacket(): Connection closed by peer");
+        }
+        if (rec != size) {
+            Console::getConsole().Error("Socket::receivePacket(): Incomplete packet received, expected " + std::to_string(size) + " bytes, got " + std::to_string(rec) + " bytes");
+        }
+    #endif
     return buffer;
 }
 

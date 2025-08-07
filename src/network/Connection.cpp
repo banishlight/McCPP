@@ -11,7 +11,7 @@
 Connection::Connection(std::shared_ptr<Socket> socket) {
     _socket = socket;
     _state = ConnectionState::Handshake;
-    _playerUUID.reserve(2);
+    _playerUUID.resize(2);
     #ifdef DEBUG
     Console::getConsole().Entry("Connection::Connection(): Created new connection");
     #endif
@@ -67,11 +67,11 @@ std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> p
 
 void Connection::receivePacket() {
     #ifdef DEBUG
-    Console::getConsole().Entry("Connection::receivePacket(): Attempting to receive packet.");
+        Console::getConsole().Entry("Connection::receivePacket(): Attempting to receive packet.");
     #endif
     if (_socket->isValid()) {
         #ifdef DEBUG
-        Console::getConsole().Entry("Connection::receivePacket(): Socket is valid, checking for packet availability.");
+            Console::getConsole().Entry("Connection::receivePacket(): Socket is valid, checking for packet availability.");
         #endif
         if (!_socket->packetAvailable())  {
             #ifdef DEBUG
@@ -87,7 +87,9 @@ void Connection::receivePacket() {
         if (packet.size() > 0) {
             deserializePacket(packet);
         } else {
-            Console::getConsole().Error("Connection::receivePacket(): Packet Receive error.");
+            #ifdef DEBUG
+                Console::getConsole().Error("Connection::receivePacket(): Packet Receive error.");
+            #endif
         }
     }
     else {
