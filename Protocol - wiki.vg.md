@@ -1,4 +1,4 @@
-This page presents a dissection of the current **[Minecraft](https://minecraft.net/) protocol**.
+This page presents a dissection of version 1.21 of the **[Minecraft](https://minecraft.net/) protocol**.
 
 If you're having trouble, check out the [FAQ](https://wiki.vg/Protocol_FAQ "Protocol FAQ") or ask for help in the IRC channel [#mcdevs on irc.libera.chat](ircs://irc.libera.chat:6697) ([More Information](https://wiki.vg/MCDevs)).
 

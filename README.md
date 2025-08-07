@@ -5,7 +5,7 @@ By Cuba Giesbrecht and Aiden Waring
 The goal of this project is to write a minecraft server client focused around being high performance and multithreaded.  The server will be written in C++ to give the performance of a compiled language while also utilizing the performance of explicit memory management (no garbage collection).  The server client will allow vanilla java edition player clients to connect to the server seamlessly.
 
 ## Feature Goals
-(We will be targeting Minecraft Java version 1.20.2 as our working version to start.)
+(We will be targeting Minecraft Java version 1.21 as our working version to start.)
 1. Handle Java edition TCP handshakes.
 2. Recreate all Vanilla gameplay mechanics.
 3. Multithread common performance issues in the vanilla Minecraft server client (Multithreading certain tasks may cause vanilla gameplay interactions to not perform as they usually do, we will decide which interactions can be preserved versus performance).
