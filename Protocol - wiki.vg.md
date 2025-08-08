@@ -260,7 +260,7 @@ The changes between versions may be viewed at [Protocol History](https://wiki.vg
         -   [7.2.56 Teleport To Entity](#teleport-to-entity)
         -   [7.2.57 Use Item On](#use-item-on)
         -   [7.2.58 Use Item](#use-item)
-        
+
 ## Definitions
 
 The Minecraft server accepts connections from TCP clients and communicates with them using _packets_. A packet is a sequence of bytes sent over the TCP connection. The meaning of a packet depends both on its packet ID and the current state of the connection. The initial state of each connection is [Handshaking](https://wiki.vg/Protocol#Handshaking), and state is switched using the packets [Handshake](https://wiki.vg/Protocol#Handshake) and [Login Success](https://wiki.vg/Protocol#Login_Success).
@@ -271,20 +271,20 @@ All data sent over the network (except for VarInt and VarLong) is [big-endian](h
 
 | Name | Size (bytes) | Encodes | Notes |
 | --- | --- | --- | --- |
-| [Boolean](https://wiki.vg/Protocol#Type:Boolean) | 1 | Either false or true | True is encoded as `0x01`, false as `0x00`. |
-| [Byte](https://wiki.vg/Protocol#Type:Byte) | 1 | An integer between -128 and 127 | Signed 8-bit integer, [two's complement](http://en.wikipedia.org/wiki/Two%27s_complement "wikipedia:Two's complement") |
-| [Unsigned Byte](https://wiki.vg/Protocol#Type:Unsigned_Byte) | 1 | An integer between 0 and 255 | Unsigned 8-bit integer |
-| [Short](https://wiki.vg/Protocol#Type:Short) | 2 | An integer between -32768 and 32767 | Signed 16-bit integer, two's complement |
-| [Unsigned Short](https://wiki.vg/Protocol#Type:Unsigned_Short) | 2 | An integer between 0 and 65535 | Unsigned 16-bit integer |
-| [Int](https://wiki.vg/Protocol#Type:Int) | 4 | An integer between -2147483648 and 2147483647 | Signed 32-bit integer, two's complement |
-| [Long](https://wiki.vg/Protocol#Type:Long) | 8 | An integer between -9223372036854775808 and 9223372036854775807 | Signed 64-bit integer, two's complement |
-| [Float](https://wiki.vg/Protocol#Type:Float) | 4 | A [single-precision 32-bit IEEE 754 floating point number](http://en.wikipedia.org/wiki/Single-precision_floating-point_format "wikipedia:Single-precision floating-point format") |  |
-| [Double](https://wiki.vg/Protocol#Type:Double) | 8 | A [double-precision 64-bit IEEE 754 floating point number](http://en.wikipedia.org/wiki/Double-precision_floating-point_format "wikipedia:Double-precision floating-point format") |  |
-| [String](https://wiki.vg/Protocol#Type:String) (n) | ≥ 1  
+| [Boolean](#type-boolean) | 1 | Either false or true | True is encoded as `0x01`, false as `0x00`. |
+| [Byte](#type-byte) | 1 | An integer between -128 and 127 | Signed 8-bit integer, [two's complement](http://en.wikipedia.org/wiki/Two%27s_complement "wikipedia:Two's complement") |
+| [Unsigned Byte](#type-unsigned-byte) | 1 | An integer between 0 and 255 | Unsigned 8-bit integer |
+| [Short](#type-short) | 2 | An integer between -32768 and 32767 | Signed 16-bit integer, two's complement |
+| [Unsigned Short](#type-unsigned-short) | 2 | An integer between 0 and 65535 | Unsigned 16-bit integer |
+| [Int](#type-int) | 4 | An integer between -2147483648 and 2147483647 | Signed 32-bit integer, two's complement |
+| [Long](#type-long) | 8 | An integer between -9223372036854775808 and 9223372036854775807 | Signed 64-bit integer, two's complement |
+| [Float](#type-float) | 4 | A [single-precision 32-bit IEEE 754 floating point number](http://en.wikipedia.org/wiki/Single-precision_floating-point_format "wikipedia:Single-precision floating-point format") |  |
+| [Double](#type-double) | 8 | A [double-precision 64-bit IEEE 754 floating point number](http://en.wikipedia.org/wiki/Double-precision_floating-point_format "wikipedia:Double-precision floating-point format") |  |
+| [String](#type-string) (n) | ≥ 1  
 ≤ (n×3) + 3 | A sequence of [Unicode](http://en.wikipedia.org/wiki/Unicode "wikipedia:Unicode") [scalar values](http://unicode.org/glossary/#unicode_scalar_value) | [UTF-8](http://en.wikipedia.org/wiki/UTF-8 "wikipedia:UTF-8") string prefixed with its size in bytes as a VarInt. Maximum length of `n` characters, which varies by context. The encoding used on the wire is regular UTF-8, _not_ [Java's "slight modification"](https://docs.oracle.com/en/java/javase/18/docs/api/java.base/java/io/DataInput.html#modified-utf-8). However, the length of the string for purposes of the length limit is its number of [UTF-16](http://en.wikipedia.org/wiki/UTF-16 "wikipedia:UTF-16") code units, that is, scalar values > U+FFFF are counted as two. Up to `n × 3` bytes can be used to encode a UTF-8 string comprising `n` code units when converted to UTF-16, and both of those limits are checked. Maximum `n` value is 32767. The + 3 is due to the max size of a valid length VarInt. |
-| [Text Component](https://wiki.vg/Protocol#Type:Text_Component) | Varies | See [Text formatting#Text components](https://wiki.vg/Text_formatting#Text_components "Text formatting") | Encoded as a [NBT Tag](https://wiki.vg/NBT "NBT"), with the type of tag used depending on the case:
--   As a [String Tag](https://wiki.vg/NBT#Specification:string_tag "NBT"): For components only containing text (no styling, no events etc.).
--   As a [Compound Tag](https://wiki.vg/NBT#Specification:compound_tag "NBT"): Every other case.
+| [Text Component](#type-text-component) | Varies | See [Text formatting#Text components](#) | Encoded as a [NBT Tag](#), with the type of tag used depending on the case:
+-   As a [String Tag](#): For components only containing text (no styling, no events etc.).
+-   As a [Compound Tag](#): Every other case.
 
  |
 | [JSON Text Component](https://wiki.vg/Protocol#Type:JSON_Text_Component) | ≥ 1  
@@ -385,20 +385,20 @@ public void writeVarInt(int value) {
 }
 ```
 
-```
-<span></span><span>public</span> <span>void</span> <span>writeVarLong</span><span>(</span><span>long</span> <span>value</span><span>)</span> <span>{</span>
-    <span>while</span> <span>(</span><span>true</span><span>)</span> <span>{</span>
-        <span>if</span> <span>((</span><span>value</span> <span>&amp;</span> <span>~((</span><span>long</span><span>)</span> <span>SEGMENT_BITS</span><span>))</span> <span>==</span> <span>0</span><span>)</span> <span>{</span>
-            <span>writeByte</span><span>(</span><span>value</span><span>);</span>
-            <span>return</span><span>;</span>
-        <span>}</span>
+```C++
+public void writeVarLong(long value) {
+    while (true) {
+        if ((value & ~((long) SEGMENT_BITS)) == 0) {
+            writeByte(value);
+            return;
+        }
 
-        <span>writeByte</span><span>((</span><span>value</span> <span>&amp;</span> <span>SEGMENT_BITS</span><span>)</span> <span>|</span> <span>CONTINUE_BIT</span><span>);</span>
+        writeByte((value & SEGMENT_BITS) | CONTINUE_BIT);
 
-        <span>// Note: &gt;&gt;&gt; means that the sign bit is shifted with the rest of the number rather than being left alone</span>
-        <span>value</span> <span>&gt;&gt;&gt;=</span> <span>7</span><span>;</span>
-    <span>}</span>
-<span>}</span>
+        // Note: >>> means that the sign bit is shifted with the rest of the number rather than being left alone
+        value >>>= 7;
+    }
+}
 ```
 
 [![Warning.png](https://wiki.vg/images/c/cb/Warning.png)](https://wiki.vg/File:Warning.png) Note Minecraft's VarInts are identical to [LEB128](https://en.wikipedia.org/wiki/LEB128) with the slight change of throwing a exception if it goes over a set amount of bytes.
