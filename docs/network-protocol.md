@@ -1,5 +1,7 @@
 This page presents a dissection of version 1.21 of the **[Minecraft](https://minecraft.net/) protocol**.
 
+Thank you so much to wiki.vg and all of the contributors for creating this document.  This is a copy of the page for my own use.
+
 If you're having trouble, check out the [FAQ](https://wiki.vg/Protocol_FAQ "Protocol FAQ") or ask for help in the IRC channel [#mcdevs on irc.libera.chat](ircs://irc.libera.chat:6697) ([More Information](https://wiki.vg/MCDevs)).
 
 **Note:** While you may use the contents of this page without restriction to create servers, clients, bots, etc; substantial reproductions of this page must be attributed IAW [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
