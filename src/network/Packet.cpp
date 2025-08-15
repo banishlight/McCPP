@@ -287,6 +287,7 @@ void Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
 
 // Queues set compression packet
 void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    Console::getConsole().Entry("Encryption_Response_p::deserialize(): Received.");
     std::vector<Byte> shared_secret;
     std::vector<Byte> verify_token;
     // Deserialize the shared secret (prefixed byte array)
@@ -294,9 +295,11 @@ void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext
     // Deserialize the verify token (prefixed byte array)
     verify_token = deserializePrefixedArray(in_buff);
     // TODO: Do something with this verification
-    std::shared_ptr<Outgoing_Packet> setCompressionPacket = std::make_shared<Set_Compression_p>(cont.connection.getCompressionThreshold(), std::make_shared<Connection>(cont.connection));
+    int threshold = cont.connection.getCompressionThreshold();
+    std::shared_ptr<Connection> conn = std::make_shared<Connection>(cont.connection);
+    std::shared_ptr<Outgoing_Packet> setCompressionPacket = std::make_shared<Set_Compression_p>(threshold, conn);
     cont.connection.addPacket(setCompressionPacket);
-    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(cont.connection.getCompressionThreshold(), cont.connection.getUUID(), cont.connection.getUsername());
+    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(threshold, cont.connection.getUUID(), cont.connection.getUsername());
     cont.connection.addPacket(login_success);
 }
 
