@@ -107,6 +107,7 @@ std::vector<Byte> Socket::receivePacket() {
             Console::getConsole().Error("Socket::receivePacket(): Incomplete packet received, expected " + std::to_string(size) + " bytes, got " + std::to_string(rec) + " bytes");
         }
     #endif
+    (void)rec; // Silence unused variable warning
     return buffer;
 }
 
