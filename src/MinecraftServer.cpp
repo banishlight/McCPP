@@ -15,13 +15,3 @@ int main() {
     }
     return 0;
 }
-
-
-#ifdef TEST
-// Unit test here.
-int main() {
-
-
-
-}
-#endif
