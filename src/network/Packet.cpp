@@ -230,6 +230,9 @@ std::vector<Byte> Login_Success_p::serialize() const {
             packet_data.push_back(0x00); // Bool false, no signature
         }
     }
+    // Strict Error Handling (Boolean): whether the client should disconnect on a packet
+    // processing error rather than silently ignoring it. Present in 1.20.5+.
+    packet_data.push_back(0x00);
     // Serialize the packet ID and size
     packet = assemblePacket(getID(), _threshold, packet_data);
     return packet;
