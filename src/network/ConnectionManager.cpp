@@ -53,9 +53,6 @@ void ConnectionManager::close() {
 
 void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
     if (!conn->isValid()) return;
-    #ifdef DEBUG
-        Console::getConsole().Entry("ConnectionManager::processConnection(): valid connection!");
-    #endif
     conn->receivePacket();
     conn->sendPackets();
     _conThreads->enqueue([this,conn]() mutable {
