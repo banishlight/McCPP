@@ -11,7 +11,6 @@
 Connection::Connection(std::shared_ptr<Socket> socket) {
     _socket = socket;
     _state = ConnectionState::Handshake;
-    _playerUUID.resize(2);
     #ifdef DEBUG
     Console::getConsole().Entry("Connection::Connection(): Created new connection");
     #endif
@@ -120,18 +119,6 @@ void Connection::addPacket(std::shared_ptr<Outgoing_Packet> packet) {
     _sendQueue.push_back(packet);
 }
 
-void Connection::setUUID(std::vector<long> uuid) {
-    if (uuid.size() != 2) {
-        Console::getConsole().Error("Connection::setUUID(): bad UUID vector size.");
-        return;
-    }
-    _playerUUID = uuid;
-}
-
-std::vector<long> Connection::getUUID() const {
-    return _playerUUID;
-}
-
 int Connection::getCompressionThreshold() const {
     return _threshold;
 }
@@ -144,10 +131,6 @@ void Connection::enableEncryption(const std::vector<Byte>& sharedSecret) {
     _socket->enableEncryption(sharedSecret);
 }
 
-string Connection::getUsername() const {
-    return _username;
-}
-
-void Connection::setUsername(const string& username) {
-    _username = username;
+Player& Connection::getPlayer() {
+    return _player;
 }

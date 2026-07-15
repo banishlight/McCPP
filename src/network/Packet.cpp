@@ -278,8 +278,8 @@ void Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     username = deserializeString(in_buff);
     // Deserialize the UUID (array of 2 long)
     uuid = deserializeUUID(in_buff);
-    cont.connection.setUsername(username);
-    cont.connection.setUUID(uuid);
+    cont.connection.getPlayer().setUsername(username);
+    cont.connection.getPlayer().setUUID(uuid);
     std::shared_ptr<Outgoing_Packet> encryptionRequestPacket = std::make_shared<Encryption_Request_p>(cont.connection.getCompressionThreshold());
     cont.connection.addPacket(encryptionRequestPacket);
 }
@@ -314,7 +314,7 @@ void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext
     // Set_Compression_p above switches the connection to the real compression threshold once it's
     // flushed, and per protocol Login Success must already use compressed framing in that same flush.
     int postCompressionThreshold = Properties::getProperties().getCompressionThreshold();
-    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(postCompressionThreshold, cont.connection.getUUID(), cont.connection.getUsername());
+    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(postCompressionThreshold, cont.connection.getPlayer().getUUID(), cont.connection.getPlayer().getUsername());
     cont.connection.addPacket(login_success);
 }
 
@@ -325,8 +325,10 @@ void Login_Plugin_Response_p::deserialize(std::vector<Byte> in_buff, PacketConte
 // Transition to Config state
 void Login_Acknowledge_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     // No data
-    // Transition to Config state
     cont.connection.setState(ConnectionState::Config);
+    int threshold = cont.connection.getCompressionThreshold();
+    std::shared_ptr<Outgoing_Packet> knownPacks = std::make_shared<Clientbound_Known_Packs_p>(threshold);
+    cont.connection.addPacket(knownPacks);
 }
 
 void Cookie_Response_login_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -403,9 +405,24 @@ std::vector<Byte> Update_Tags_config_p::serialize() const {
     return std::vector<Byte>();
 }
 
+Clientbound_Known_Packs_p::Clientbound_Known_Packs_p(int threshold) {
+    _threshold = threshold;
+}
+
 std::vector<Byte> Clientbound_Known_Packs_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Clientbound_Known_Packs_p::serialize(): Sending.");
+    #endif
+    // We only advertise the vanilla "core" data pack, so the client always
+    // has to accept the Registry Data we send afterward rather than skip it.
+    std::vector<Byte> packet_data = varIntSerialize(1);
+    std::vector<Byte> ns = serializeString("minecraft");
+    std::vector<Byte> id = serializeString("core");
+    std::vector<Byte> version = serializeString(SERVER_VERSION);
+    packet_data.insert(packet_data.end(), ns.begin(), ns.end());
+    packet_data.insert(packet_data.end(), id.begin(), id.end());
+    packet_data.insert(packet_data.end(), version.begin(), version.end());
+    return assemblePacket(getID(), _threshold, packet_data);
 }
 
 std::vector<Byte> Custom_Report_Details_config_p::serialize() const {
@@ -419,7 +436,16 @@ std::vector<Byte> Server_Links_config_p::serialize() const {
 }
 
 void Client_Information_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    #ifdef DEBUG
+        Console::getConsole().Entry("Client_Information_config_p::deserialize(): Received.");
+    #endif
+    // Locale (String): unused for now.
+    deserializeString(in_buff);
+    // View Distance (Byte)
+    Byte viewDistance = in_buff[0];
+    // Remaining fields (chat mode, chat colors, skin parts, main hand, text
+    // filtering, server listings) aren't tracked yet.
+    cont.connection.getPlayer().setViewDistance(static_cast<int>(viewDistance));
 }
 
 void Cookie_Response_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

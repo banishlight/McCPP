@@ -1,6 +1,7 @@
 #pragma once
 #include <Standards.hpp>
 #include <network/PacketContext.hpp>
+#include <network/Nbt.hpp>
 #include <memory>
 #include <vector>
 #include <map>
@@ -247,9 +248,17 @@ class Reset_Chat_p : public Config_Packet, public Outgoing_Packet {
 };
 class Registry_Data_p : public Config_Packet, public Outgoing_Packet {
     public:
+        struct Entry {
+            std::string id;
+            bool hasData;
+            NbtTag data; // only read if hasData is true
+        };
+        Registry_Data_p(int threshold, const std::string& registryId, std::vector<Entry> entries);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
+        std::string _registryId;
+        std::vector<Entry> _entries;
         static int constexpr _PACKET_ID = 0x07;
 };
 class Remove_Resource_Pack_config_p : public Config_Packet, public Outgoing_Packet {
@@ -296,6 +305,7 @@ class Update_Tags_config_p : public Config_Packet, public Outgoing_Packet {
 };
 class Clientbound_Known_Packs_p : public Config_Packet, public Outgoing_Packet {
     public:
+        Clientbound_Known_Packs_p(int threshold);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
