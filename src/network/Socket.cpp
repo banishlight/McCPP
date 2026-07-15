@@ -30,7 +30,15 @@ int Socket::fetchVarInt() {
             #endif
             return -1;
         }
-        
+        if (_encrypted) {
+            std::vector<Byte> decrypted = _decryptCipher->process({currentByte});
+            if (decrypted.empty()) {
+                close();
+                return -1;
+            }
+            currentByte = decrypted[0];
+        }
+
         // Add the 7 bits to our value
         value |= (currentByte & 0x7F) << position;
         position += 7;
@@ -108,6 +116,9 @@ std::vector<Byte> Socket::receivePacket() {
         }
     #endif
     (void)rec; // Silence unused variable warning
+    if (_encrypted) {
+        buffer = _decryptCipher->process(buffer);
+    }
     return buffer;
 }
 
@@ -131,11 +142,15 @@ void Socket::sendPacket(std::vector<Byte> data) {
     if (_fd < 0) {
         throw std::runtime_error("Invalid socket file descriptor");
     }
-    
+
     if (data.empty()) {
         return; // Nothing to send
     }
-    
+
+    if (_encrypted) {
+        data = _encryptCipher->process(data);
+    }
+
     // Temporarily set to blocking for sending to ensure all data is sent
     bool wasBlocking = _blocking;
     if (!wasBlocking) {
@@ -193,6 +208,19 @@ void Socket::close() {
     _fd = -1; // Mark as invalid
 }
 
+void Socket::enableEncryption(const std::vector<Byte>& sharedSecret) {
+    _encryptCipher = std::make_unique<StreamCipher>(sharedSecret, true);
+    _decryptCipher = std::make_unique<StreamCipher>(sharedSecret, false);
+    _encrypted = true;
+    #ifdef DEBUG
+        Console::getConsole().Entry("Socket::enableEncryption(): Encryption enabled for socket with file descriptor: " + std::to_string(_fd));
+    #endif
+}
+
+bool Socket::isEncrypted() const {
+    return _encrypted;
+}
+
 bool isValidFD(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
@@ -215,6 +243,14 @@ int Socket::getSocketFD() const {
 
 void Socket::setSocketFD(int sock_fd) {
 
+}
+
+void Socket::enableEncryption(const std::vector<Byte>& sharedSecret) {
+
+}
+
+bool Socket::isEncrypted() const {
+    return false;
 }
 
 bool Socket::isValid() const {

@@ -130,6 +130,53 @@ std::vector<Byte> generateVerifyToken() {
     }
     return current_verify_token;
 }
+
+bool verifyToken(const std::vector<Byte>& token) {
+    return !current_verify_token.empty() && token == current_verify_token;
+}
+
+StreamCipher::StreamCipher(const std::vector<Byte>& sharedSecret, bool encrypting) {
+    _encrypting = encrypting;
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        Console::getConsole().Error("StreamCipher: Failed to create cipher context");
+        return;
+    }
+    // Minecraft's protocol uses the shared secret as both the AES key and the IV
+    int rc = encrypting
+        ? EVP_EncryptInit_ex(ctx, EVP_aes_128_cfb8(), nullptr, sharedSecret.data(), sharedSecret.data())
+        : EVP_DecryptInit_ex(ctx, EVP_aes_128_cfb8(), nullptr, sharedSecret.data(), sharedSecret.data());
+    if (rc != 1) {
+        Console::getConsole().Error("StreamCipher: Failed to initialize cipher");
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+    _ctx = ctx;
+}
+
+StreamCipher::~StreamCipher() {
+    if (_ctx) {
+        EVP_CIPHER_CTX_free(static_cast<EVP_CIPHER_CTX*>(_ctx));
+    }
+}
+
+std::vector<Byte> StreamCipher::process(const std::vector<Byte>& data) {
+    if (!_ctx || data.empty()) {
+        return data;
+    }
+    EVP_CIPHER_CTX* ctx = static_cast<EVP_CIPHER_CTX*>(_ctx);
+    std::vector<Byte> out(data.size());
+    int outlen = 0;
+    int rc = _encrypting
+        ? EVP_EncryptUpdate(ctx, out.data(), &outlen, data.data(), static_cast<int>(data.size()))
+        : EVP_DecryptUpdate(ctx, out.data(), &outlen, data.data(), static_cast<int>(data.size()));
+    if (rc != 1) {
+        Console::getConsole().Error("StreamCipher::process(): Cipher update failed");
+        return std::vector<Byte>();
+    }
+    out.resize(outlen);
+    return out;
+}
 #endif
 
 #ifdef WINDOWS

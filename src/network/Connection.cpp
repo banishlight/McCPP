@@ -149,6 +149,10 @@ void Connection::enableCompression() {
     _enableCompression = true;
 }
 
+void Connection::enableEncryption(const std::vector<Byte>& sharedSecret) {
+    _socket->enableEncryption(sharedSecret);
+}
+
 string Connection::getUsername() const {
     return _username;
 }

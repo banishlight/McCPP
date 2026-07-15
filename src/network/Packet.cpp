@@ -235,23 +235,19 @@ std::vector<Byte> Login_Success_p::serialize() const {
     return packet;
 }
 
-Set_Compression_p::Set_Compression_p(int threshold, std::shared_ptr<Connection> conn) {
+Set_Compression_p::Set_Compression_p(int threshold, Connection& conn) : _my_conn(conn) {
     _threshold = threshold;
-    // Set the connection compression threshold
-    if (conn) {
-        _my_conn = conn;
-    }
 }
 
 std::vector<Byte> Set_Compression_p::serialize() const {
     #ifdef DEBUG
-        Console::getConsole().Entry("Handshake_p::deserialize(): Received.");
+        Console::getConsole().Entry("Set_Compression_p::serialize(): Sending.");
     #endif
     // WARNING, ACCESSES PROPERTIES
     std::vector<Byte> packet;
     // Compression threshold (VarInt)
     std::vector<Byte> threshold_bytes = varIntSerialize(Properties::getProperties().getCompressionThreshold());
-    _my_conn->enableCompression();
+    _my_conn.enableCompression();
     packet = assemblePacket(getID(), _threshold, threshold_bytes);
     return packet;
 }
@@ -288,18 +284,34 @@ void Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
 // Queues set compression packet
 void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     Console::getConsole().Entry("Encryption_Response_p::deserialize(): Received.");
-    std::vector<Byte> shared_secret;
-    std::vector<Byte> verify_token;
+    std::vector<Byte> encrypted_shared_secret;
+    std::vector<Byte> encrypted_verify_token;
     // Deserialize the shared secret (prefixed byte array)
-    shared_secret = deserializePrefixedArray(in_buff);
+    encrypted_shared_secret = deserializePrefixedArray(in_buff);
     // Deserialize the verify token (prefixed byte array)
-    verify_token = deserializePrefixedArray(in_buff);
-    // TODO: Do something with this verification
+    encrypted_verify_token = deserializePrefixedArray(in_buff);
+
+    std::vector<Byte> decrypted_verify_token = decryptWithPrivateKey(encrypted_verify_token);
+    if (!verifyToken(decrypted_verify_token)) {
+        Console::getConsole().Error("Encryption_Response_p::deserialize(): Verify token mismatch, disconnecting client.");
+        int threshold = cont.connection.getCompressionThreshold();
+        std::shared_ptr<Outgoing_Packet> disconnect = std::make_shared<Disconnect_login_p>(threshold, "Invalid verify token.");
+        cont.connection.addPacket(disconnect);
+        return;
+    }
+
+    // From here on, every byte on the wire (including the length prefix) is AES/CFB-8 encrypted,
+    // so this must happen before any further packets are read from or written to the connection.
+    std::vector<Byte> shared_secret = decryptWithPrivateKey(encrypted_shared_secret);
+    cont.connection.enableEncryption(shared_secret);
+
     int threshold = cont.connection.getCompressionThreshold();
-    std::shared_ptr<Connection> conn = std::make_shared<Connection>(cont.connection);
-    std::shared_ptr<Outgoing_Packet> setCompressionPacket = std::make_shared<Set_Compression_p>(threshold, conn);
+    std::shared_ptr<Outgoing_Packet> setCompressionPacket = std::make_shared<Set_Compression_p>(threshold, cont.connection);
     cont.connection.addPacket(setCompressionPacket);
-    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(threshold, cont.connection.getUUID(), cont.connection.getUsername());
+    // Set_Compression_p above switches the connection to the real compression threshold once it's
+    // flushed, and per protocol Login Success must already use compressed framing in that same flush.
+    int postCompressionThreshold = Properties::getProperties().getCompressionThreshold();
+    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(postCompressionThreshold, cont.connection.getUUID(), cont.connection.getUsername());
     cont.connection.addPacket(login_success);
 }
 

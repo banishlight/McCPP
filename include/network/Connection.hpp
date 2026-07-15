@@ -18,6 +18,7 @@ class Connection {
         std::vector<long> getUUID() const;
         int getCompressionThreshold() const;
         void enableCompression();
+        void enableEncryption(const std::vector<Byte>& sharedSecret);
         string getUsername() const;
         void setUsername(const string& username);
     private:
