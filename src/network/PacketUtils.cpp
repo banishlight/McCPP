@@ -180,8 +180,8 @@ std::vector<long> deserializeUUID(std::vector<Byte>& data) {
 
 std::vector<Byte> serializeUUID(const std::vector<long>& data) {
     std::vector<Byte> result;
-    if (data.size() < 16) {
-        // Console::getConsole().Error("Not enough bytes to deserialize UUID");
+    if (data.size() < 2) {
+        // Console::getConsole().Error("Not enough longs to serialize UUID");
         return result; // Return empty vector
     }
     // UUID is stored as two 64-bit values in big-endian format

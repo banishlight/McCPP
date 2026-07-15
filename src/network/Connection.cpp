@@ -66,17 +66,8 @@ std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> p
 }
 
 void Connection::receivePacket() {
-    #ifdef DEBUG
-        Console::getConsole().Entry("Connection::receivePacket(): Attempting to receive packet.");
-    #endif
     if (_socket->isValid()) {
-        #ifdef DEBUG
-            Console::getConsole().Entry("Connection::receivePacket(): Socket is valid, checking for packet availability.");
-        #endif
         if (!_socket->packetAvailable())  {
-            #ifdef DEBUG
-                Console::getConsole().Entry("Connection::receivePacket(): No packet available.");
-            #endif
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             return;
         }
@@ -147,6 +138,10 @@ int Connection::getCompressionThreshold() const {
 
 void Connection::enableCompression() {
     _enableCompression = true;
+}
+
+void Connection::enableEncryption(const std::vector<Byte>& sharedSecret) {
+    _socket->enableEncryption(sharedSecret);
 }
 
 string Connection::getUsername() const {

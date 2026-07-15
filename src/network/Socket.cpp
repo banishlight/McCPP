@@ -30,7 +30,15 @@ int Socket::fetchVarInt() {
             #endif
             return -1;
         }
-        
+        if (_encrypted) {
+            std::vector<Byte> decrypted = _decryptCipher->process({currentByte});
+            if (decrypted.empty()) {
+                close();
+                return -1;
+            }
+            currentByte = decrypted[0];
+        }
+
         // Add the 7 bits to our value
         value |= (currentByte & 0x7F) << position;
         position += 7;
@@ -66,11 +74,8 @@ bool Socket::isValid() const {
     int result = fcntl(_fd, F_GETFD);
     if (result == -1) {
         Console::getConsole().Error("Socket::isValid(): Failed to get file descriptor flags: " + std::string(strerror(errno)));
-        return false; 
+        return false;
     }
-    #ifdef DEBUG
-    Console::getConsole().Entry("Socket::isValid(): Socket file descriptor is valid: " + std::to_string(_fd));
-    #endif
     return true;
 }
 
@@ -108,22 +113,19 @@ std::vector<Byte> Socket::receivePacket() {
         }
     #endif
     (void)rec; // Silence unused variable warning
+    if (_encrypted) {
+        buffer = _decryptCipher->process(buffer);
+    }
     return buffer;
 }
 
 bool Socket::packetAvailable() {
-    #ifdef DEBUG
-    Console::getConsole().Entry("Socket::packetAvailable(): Checking if packet is available on socket with file descriptor: " + std::to_string(_fd));
-    #endif
     fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(_fd, &readfds);
-    
+
     struct timeval timeout = {0, 0}; // Non-blocking check
     int result = select(_fd + 1, &readfds, nullptr, nullptr, &timeout);
-    #ifdef DEBUG
-    Console::getConsole().Entry("Socket::packetAvailable(): Received " + std::to_string(result) + " bytes from socket with file descriptor: " + std::to_string(_fd));
-    #endif
     return result > 0;
 }
 
@@ -131,11 +133,15 @@ void Socket::sendPacket(std::vector<Byte> data) {
     if (_fd < 0) {
         throw std::runtime_error("Invalid socket file descriptor");
     }
-    
+
     if (data.empty()) {
         return; // Nothing to send
     }
-    
+
+    if (_encrypted) {
+        data = _encryptCipher->process(data);
+    }
+
     // Temporarily set to blocking for sending to ensure all data is sent
     bool wasBlocking = _blocking;
     if (!wasBlocking) {
@@ -193,6 +199,19 @@ void Socket::close() {
     _fd = -1; // Mark as invalid
 }
 
+void Socket::enableEncryption(const std::vector<Byte>& sharedSecret) {
+    _encryptCipher = std::make_unique<StreamCipher>(sharedSecret, true);
+    _decryptCipher = std::make_unique<StreamCipher>(sharedSecret, false);
+    _encrypted = true;
+    #ifdef DEBUG
+        Console::getConsole().Entry("Socket::enableEncryption(): Encryption enabled for socket with file descriptor: " + std::to_string(_fd));
+    #endif
+}
+
+bool Socket::isEncrypted() const {
+    return _encrypted;
+}
+
 bool isValidFD(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
@@ -215,6 +234,14 @@ int Socket::getSocketFD() const {
 
 void Socket::setSocketFD(int sock_fd) {
 
+}
+
+void Socket::enableEncryption(const std::vector<Byte>& sharedSecret) {
+
+}
+
+bool Socket::isEncrypted() const {
+    return false;
 }
 
 bool Socket::isValid() const {
