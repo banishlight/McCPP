@@ -4,9 +4,11 @@
 #include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
 #include <network/Crypto.hpp>
+#include <vanilla/VanillaDataManager.hpp>
 #include <Console.hpp>
 #include <memory>
 #include <vector>
+#include <chrono>
 #include <lib/json.hpp>
 using json = nlohmann::json;
 
@@ -350,19 +352,47 @@ std::vector<Byte> Disconnect_config_p::serialize() const {
     return std::vector<Byte>();
 }
 
+Finish_Config_p::Finish_Config_p(int threshold) {
+    _threshold = threshold;
+}
+
 std::vector<Byte> Finish_Config_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Finish_Config_p::serialize(): Sending.");
+    #endif
+    return assemblePacket(getID(), _threshold, std::vector<Byte>());
+}
+
+Clientbound_Keep_Alive_config_p::Clientbound_Keep_Alive_config_p(int threshold, Int64 keepAliveId) {
+    _threshold = threshold;
+    _keepAliveId = keepAliveId;
 }
 
 std::vector<Byte> Clientbound_Keep_Alive_config_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Clientbound_Keep_Alive_config_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    for (int i = 7; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((_keepAliveId >> (i * 8)) & 0xFF));
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Ping_config_p::Ping_config_p(int threshold, Int32 pingId) {
+    _threshold = threshold;
+    _pingId = pingId;
 }
 
 std::vector<Byte> Ping_config_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Ping_config_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    for (int i = 3; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((_pingId >> (i * 8)) & 0xFF));
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
 }
 
 std::vector<Byte> Reset_Chat_p::serialize() const {
@@ -420,9 +450,17 @@ std::vector<Byte> Feature_Flags_p::serialize() const {
     return std::vector<Byte>();
 }
 
+Update_Tags_config_p::Update_Tags_config_p(int threshold) {
+    _threshold = threshold;
+}
+
 std::vector<Byte> Update_Tags_config_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Update_Tags_config_p::serialize(): Sending.");
+    #endif
+    // No tag registries yet; an empty array is valid and lets the client proceed.
+    std::vector<Byte> packet_data = varIntSerialize(0);
+    return assemblePacket(getID(), _threshold, packet_data);
 }
 
 Clientbound_Known_Packs_p::Clientbound_Known_Packs_p(int threshold) {
@@ -477,15 +515,26 @@ void Serverbound_Plugin_Message_config_p::deserialize(std::vector<Byte> in_buff,
 }
 
 void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    #ifdef DEBUG
+        Console::getConsole().Entry("Acknowledge_Finish_Config_p::deserialize(): Received, switching to Play state.");
+    #endif
+    cont.connection.setState(ConnectionState::Play);
 }
 
 void Serverbound_Keep_Alive_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    #ifdef DEBUG
+        Console::getConsole().Entry("Serverbound_Keep_Alive_config_p::deserialize(): Received.");
+    #endif
+    // TODO: validate against the ID we last sent once Connection proactively
+    // sends Keep Alives on a timer; nothing does yet, so there's nothing to check.
 }
 
 void Pong_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    #ifdef DEBUG
+        Console::getConsole().Entry("Pong_config_p::deserialize(): Received.");
+    #endif
+    // TODO: validate against the ID we last sent once Connection proactively
+    // sends Pings on a timer; nothing does yet, so there's nothing to check.
 }
 
 void Resource_Pack_Response_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -493,7 +542,25 @@ void Resource_Pack_Response_config_p::deserialize(std::vector<Byte> in_buff, Pac
 }
 
 void Serverbound_Known_Packs_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
-    // TODO Implementation here
+    #ifdef DEBUG
+        Console::getConsole().Entry("Serverbound_Known_Packs_p::deserialize(): Received.");
+    #endif
+    // We don't branch on which packs the client already knows; we always send
+    // our full Registry Data regardless, which is always valid per protocol.
+    int threshold = cont.connection.getCompressionThreshold();
+    VanillaDataManager& registries = VanillaDataManager::getInstance();
+    for (const string& registryName : registries.getRegistryNames()) {
+        const std::vector<RegistryEntry>& entries = registries.getEntries(registryName);
+        if (entries.empty()) {
+            continue; // missing/failed-to-load registry; skip rather than send an empty one
+        }
+        std::shared_ptr<Outgoing_Packet> registryPacket = std::make_shared<Registry_Data_p>(threshold, "minecraft:" + registryName, entries);
+        cont.connection.addPacket(registryPacket);
+    }
+    std::shared_ptr<Outgoing_Packet> tagsPacket = std::make_shared<Update_Tags_config_p>(threshold);
+    cont.connection.addPacket(tagsPacket);
+    std::shared_ptr<Outgoing_Packet> finishPacket = std::make_shared<Finish_Config_p>(threshold);
+    cont.connection.addPacket(finishPacket);
 }
 
 Packet_Registry::Packet_Registry() {

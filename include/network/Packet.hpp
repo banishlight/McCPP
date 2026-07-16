@@ -220,6 +220,7 @@ class Disconnect_config_p : public Config_Packet, public Outgoing_Packet {
 };
 class Finish_Config_p : public Config_Packet, public Outgoing_Packet {
     public:
+        Finish_Config_p(int threshold);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -227,16 +228,20 @@ class Finish_Config_p : public Config_Packet, public Outgoing_Packet {
 };
 class Clientbound_Keep_Alive_config_p : public Config_Packet, public Outgoing_Packet {
     public:
+        Clientbound_Keep_Alive_config_p(int threshold, Int64 keepAliveId);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
+        Int64 _keepAliveId;
         static int constexpr _PACKET_ID = 0x04;
 };
 class Ping_config_p : public Config_Packet, public Outgoing_Packet {
     public:
+        Ping_config_p(int threshold, Int32 pingId);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
+        Int32 _pingId;
         static int constexpr _PACKET_ID = 0x05;
 };
 class Reset_Chat_p : public Config_Packet, public Outgoing_Packet {
@@ -293,6 +298,7 @@ class Feature_Flags_p : public Config_Packet, public Outgoing_Packet {
 };
 class Update_Tags_config_p : public Config_Packet, public Outgoing_Packet {
     public:
+        Update_Tags_config_p(int threshold);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
