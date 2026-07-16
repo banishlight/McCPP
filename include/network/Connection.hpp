@@ -1,5 +1,6 @@
 #pragma once
 #include <Standards.hpp>
+#include <Player.hpp>
 
 // Forward declaration
 class Socket;
@@ -14,13 +15,10 @@ class Connection {
         bool isValid() const;
         void setState(ConnectionState state);
         void addPacket(std::shared_ptr<Outgoing_Packet> packet);
-        void setUUID(std::vector<long> uuid);
-        std::vector<long> getUUID() const;
         int getCompressionThreshold() const;
         void enableCompression();
         void enableEncryption(const std::vector<Byte>& sharedSecret);
-        string getUsername() const;
-        void setUsername(const string& username);
+        Player& getPlayer();
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
@@ -29,8 +27,7 @@ class Connection {
         ConnectionState _state = ConnectionState::Handshake;
         int _threshold = -1;
         bool _enableCompression = false;
-        std::vector<long> _playerUUID;
-        string _username;
+        Player _player;
         // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
         // TODO: string disconnectReason;
         // TODO: bool readyToDisconnect = false; // Maybe?

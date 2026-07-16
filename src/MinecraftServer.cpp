@@ -2,11 +2,13 @@
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <network/ConnectionManager.hpp>
+#include <vanilla/VanillaDataManager.hpp>
 
 int main() {
     Console::getConsole().Entry("A C++ Minecraft Server");
     Properties::getProperties().initialize();
     Console::getConsole().Entry("Properties loaded successfully.");
+    VanillaDataManager::getInstance().initialize();
     ConnectionManager::getInstance().initialize();
     while (true) {
         // Main server loop
