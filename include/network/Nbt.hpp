@@ -2,6 +2,7 @@
 #include <Standards.hpp>
 #include <vector>
 #include <utility>
+#include <lib/json.hpp>
 
 enum class NbtTagType : Byte {
     End = 0x00,
@@ -30,6 +31,15 @@ class NbtTag {
         static NbtTag makeList(NbtTagType elementType, std::vector<NbtTag> values);
         static NbtTag makeCompound();
 
+        // Converts an arbitrary JSON value (as parsed by nlohmann::json, e.g. from a
+        // vanilla registry file) into an NBT tag tree. JSON doesn't distinguish
+        // Float/Double/Int/Long the way NBT requires, so this uses "has a decimal
+        // point -> Float" as the default and takes a field-name hint for the rare
+        // fields that are actually Double (currently just dimension_type's
+        // coordinate_scale) or Long. Empty JSON arrays become an empty NBT List
+        // tagged TAG_End, matching vanilla's own convention.
+        static NbtTag fromJson(const nlohmann::json& value, const string& fieldName = "");
+
         // Only valid when this tag is a Compound; appends a named child in insertion order.
         void put(const string& name, NbtTag value);
 
@@ -49,4 +59,13 @@ class NbtTag {
 
         void serializePayload(std::vector<Byte>& out) const;
         static void writeNbtString(std::vector<Byte>& out, const string& value);
+};
+
+// A single registry entry (e.g. one biome, one dimension type) ready to hand
+// to Registry_Data_p: its identifier, whether it carries data, and the NBT
+// tag tree if so.
+struct RegistryEntry {
+    string id;
+    bool hasData;
+    NbtTag data; // only read if hasData is true
 };

@@ -1,4 +1,4 @@
-#include <network/Zip.hpp>
+#include <Zip.hpp>
 #include <Console.hpp>
 #include <cstring>
 #include <zlib.h>

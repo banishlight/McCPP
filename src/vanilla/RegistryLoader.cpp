@@ -1,5 +1,5 @@
-#include <network/RegistryLoader.hpp>
-#include <network/Zip.hpp>
+#include <vanilla/RegistryLoader.hpp>
+#include <Zip.hpp>
 #include <Standards.hpp>
 #include <Console.hpp>
 #include <fstream>

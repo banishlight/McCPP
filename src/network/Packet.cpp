@@ -370,9 +370,29 @@ std::vector<Byte> Reset_Chat_p::serialize() const {
     return std::vector<Byte>();
 }
 
+Registry_Data_p::Registry_Data_p(int threshold, const std::string& registryId, std::vector<RegistryEntry> entries) {
+    _threshold = threshold;
+    _registryId = registryId;
+    _entries = std::move(entries);
+}
+
 std::vector<Byte> Registry_Data_p::serialize() const {
-    // TODO Implementation here
-    return std::vector<Byte>();
+    #ifdef DEBUG
+        Console::getConsole().Entry("Registry_Data_p::serialize(): Sending " + _registryId);
+    #endif
+    std::vector<Byte> packet_data = serializeString(_registryId);
+    std::vector<Byte> count = varIntSerialize(static_cast<int>(_entries.size()));
+    packet_data.insert(packet_data.end(), count.begin(), count.end());
+    for (const auto& entry : _entries) {
+        std::vector<Byte> idBytes = serializeString(entry.id);
+        packet_data.insert(packet_data.end(), idBytes.begin(), idBytes.end());
+        packet_data.push_back(entry.hasData ? 0x01 : 0x00);
+        if (entry.hasData) {
+            std::vector<Byte> nbtBytes = entry.data.serializeNetwork();
+            packet_data.insert(packet_data.end(), nbtBytes.begin(), nbtBytes.end());
+        }
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
 }
 
 std::vector<Byte> Remove_Resource_Pack_config_p::serialize() const {

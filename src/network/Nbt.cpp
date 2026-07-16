@@ -64,6 +64,48 @@ NbtTag NbtTag::makeCompound() {
     return t;
 }
 
+NbtTag NbtTag::fromJson(const nlohmann::json& value, const string& fieldName) {
+    if (value.is_object()) {
+        NbtTag compound = makeCompound();
+        for (auto it = value.begin(); it != value.end(); ++it) {
+            compound.put(it.key(), fromJson(it.value(), it.key()));
+        }
+        return compound;
+    }
+    if (value.is_array()) {
+        if (value.empty()) {
+            return makeList(NbtTagType::End, {});
+        }
+        std::vector<NbtTag> elements;
+        elements.reserve(value.size());
+        for (const auto& element : value) {
+            elements.push_back(fromJson(element, fieldName));
+        }
+        NbtTagType elementType = elements.front()._type;
+        return makeList(elementType, std::move(elements));
+    }
+    if (value.is_string()) {
+        return makeString(value.get<string>());
+    }
+    if (value.is_boolean()) {
+        return makeByte(value.get<bool>() ? 1 : 0);
+    }
+    if (value.is_number_float()) {
+        // Only dimension_type's coordinate_scale is actually a Double; every
+        // other fractional field vanilla uses (temperature, downfall, exhaustion,
+        // ambient_light, ...) is a Float.
+        if (fieldName == "coordinate_scale") {
+            return makeDouble(value.get<double>());
+        }
+        return makeFloat(static_cast<float>(value.get<double>()));
+    }
+    if (value.is_number_integer()) {
+        return makeInt(static_cast<Int32>(value.get<Int64>()));
+    }
+    // null or otherwise unhandled JSON value; shouldn't occur in vanilla registry data.
+    return makeString("");
+}
+
 void NbtTag::put(const string& name, NbtTag value) {
     _children.emplace_back(name, std::move(value));
 }
