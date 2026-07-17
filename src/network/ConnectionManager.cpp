@@ -8,6 +8,7 @@
 #include <ThreadPool.hpp>
 #include <network/Crypto.hpp>
 #include <thread>
+#include <algorithm>
 
 
 ConnectionManager::ConnectionManager() {
@@ -72,9 +73,28 @@ void ConnectionManager::serverThreadLoop() {
         if (newSock.isValid()) {
             // This is kind of gross...
             std::shared_ptr<Connection> newConn = std::make_shared<Connection>(std::make_shared<Socket>(std::move(newSock)));
+            {
+                std::lock_guard<std::mutex> lock(_connectionsMutex);
+                _connections.push_back(newConn);
+            }
             _conThreads->enqueue([this, newConn]() mutable {
                     processConnection(newConn);
             });
         }
     }
+}
+
+std::vector<std::shared_ptr<Connection>> ConnectionManager::getActiveConnections() {
+    std::lock_guard<std::mutex> lock(_connectionsMutex);
+    _connections.erase(
+        std::remove_if(_connections.begin(), _connections.end(),
+            [](const std::weak_ptr<Connection>& conn) { return conn.expired(); }),
+        _connections.end()
+    );
+    std::vector<std::shared_ptr<Connection>> active;
+    active.reserve(_connections.size());
+    for (const auto& conn : _connections) {
+        active.push_back(conn.lock());
+    }
+    return active;
 }
