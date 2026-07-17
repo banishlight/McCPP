@@ -1,8 +1,11 @@
 #include <Standards.hpp>
 #include <network/packets/Config.hpp>
+#include <network/packets/Play.hpp>
 #include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
 #include <vanilla/VanillaDataManager.hpp>
+#include <Player.hpp>
+#include <World.hpp>
 #include <Console.hpp>
 #include <memory>
 #include <vector>
@@ -189,6 +192,31 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
         Console::getConsole().Entry("Acknowledge_Finish_Config_p::deserialize(): Received, switching to Play state.");
     #endif
     cont.connection.setState(ConnectionState::Play);
+
+    Player& player = cont.connection.getPlayer();
+    World& world = World::getInstance();
+    player.setPosition(world.getSpawnX(), world.getSpawnY(), world.getSpawnZ());
+    player.setRotation(world.getSpawnYaw(), 0.0f);
+
+    int threshold = cont.connection.getCompressionThreshold();
+    std::shared_ptr<Outgoing_Packet> loginPlay = std::make_shared<Login_Play_p>(threshold, player);
+    cont.connection.addPacket(loginPlay);
+    std::shared_ptr<Outgoing_Packet> defaultSpawn = std::make_shared<Set_Default_Spawn_Position_p>(threshold);
+    cont.connection.addPacket(defaultSpawn);
+    // Only one teleport is ever in flight today, so a fixed ID is enough;
+    // Confirm_Teleportation_p doesn't validate it yet either.
+    std::shared_ptr<Outgoing_Packet> syncPosition = std::make_shared<Synchronize_Player_Position_p>(
+        threshold, player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch(), 0);
+    cont.connection.addPacket(syncPosition);
+
+    // Spawn chunk: only the single (0,0) chunk under the spawn point, since
+    // there's no real world/chunk-provider system yet.
+    std::shared_ptr<Outgoing_Packet> gameEvent = std::make_shared<Game_Event_p>(threshold, 13, 0.0f); // Start waiting for level chunks
+    cont.connection.addPacket(gameEvent);
+    std::shared_ptr<Outgoing_Packet> centerChunk = std::make_shared<Set_Center_Chunk_p>(threshold, 0, 0);
+    cont.connection.addPacket(centerChunk);
+    std::shared_ptr<Outgoing_Packet> chunkData = std::make_shared<Chunk_Data_p>(threshold, 0, 0);
+    cont.connection.addPacket(chunkData);
 }
 
 void Serverbound_Keep_Alive_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

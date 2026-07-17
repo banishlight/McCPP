@@ -60,7 +60,7 @@ So that I can help diagnose the issue.
 
 
 ## Task List
-- [ ] Networking Handles all Packets up to the Play State
-- [ ] Networking Handles all Play State packets
-- [ ] Player can load into void world
+- [x] Networking Handles all Packets up to the Play State
+- [x] Player can load into void world
 - [ ] Player can load into flat world
+- [ ] Networking Handles all Play State packets
