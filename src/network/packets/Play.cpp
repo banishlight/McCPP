@@ -163,6 +163,102 @@ std::vector<Byte> Clientbound_Keep_Alive_play_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Game_Event_p::Game_Event_p(int threshold, Byte event, float value) {
+    _threshold = threshold;
+    _event = event;
+    _value = value;
+}
+
+std::vector<Byte> Game_Event_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Game_Event_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    packet_data.push_back(_event);
+    Int32 valueBits;
+    std::memcpy(&valueBits, &_value, sizeof(Int32));
+    for (int i = 3; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((valueBits >> (i * 8)) & 0xFF));
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Set_Center_Chunk_p::Set_Center_Chunk_p(int threshold, int chunkX, int chunkZ) {
+    _threshold = threshold;
+    _chunkX = chunkX;
+    _chunkZ = chunkZ;
+}
+
+std::vector<Byte> Set_Center_Chunk_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Center_Chunk_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_chunkX);
+    std::vector<Byte> chunkZBytes = varIntSerialize(_chunkZ);
+    packet_data.insert(packet_data.end(), chunkZBytes.begin(), chunkZBytes.end());
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Chunk_Data_p::Chunk_Data_p(int threshold, int chunkX, int chunkZ) {
+    _threshold = threshold;
+    _chunkX = chunkX;
+    _chunkZ = chunkZ;
+}
+
+std::vector<Byte> Chunk_Data_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Chunk_Data_p::serialize(): Sending.");
+    #endif
+    // Void world: every section is uniformly air, so every paletted container
+    // (blocks and biomes) uses the single-valued form (Bits Per Entry = 0, just
+    // a VarInt palette value, no data array at all).
+    const int WORLD_HEIGHT = 384;
+    const int SECTION_COUNT = WORLD_HEIGHT / 16;
+    const Int32 AIR_BLOCK_STATE_ID = 0; // stable across versions since the 1.13 flattening
+    const Int32 BIOME_ID = 0; // index into the worldgen/biome registry we already sent; any valid index renders fine
+
+    std::vector<Byte> packet_data;
+    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((_chunkX >> (i * 8)) & 0xFF));
+    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((_chunkZ >> (i * 8)) & 0xFF));
+
+    // Heightmaps: MOTION_BLOCKING, all-zero (nothing solid anywhere in a void chunk).
+    // 256 columns at 9 bits/entry (ceil(log2(384+1))), 7 entries/long -> 37 longs, all zero.
+    NbtTag heightmaps = NbtTag::makeCompound();
+    heightmaps.put("MOTION_BLOCKING", NbtTag::makeLongArray(std::vector<Int64>(37, 0)));
+    std::vector<Byte> heightmapsBytes = heightmaps.serializeNetwork();
+    packet_data.insert(packet_data.end(), heightmapsBytes.begin(), heightmapsBytes.end());
+
+    std::vector<Byte> sectionData;
+    for (int s = 0; s < SECTION_COUNT; s++) {
+        sectionData.push_back(0x00); sectionData.push_back(0x00); // Block count = 0
+        sectionData.push_back(0x00); sectionData.push_back(0x00); // Fluid count = 0
+        sectionData.push_back(0x00); // Block states: Bits Per Entry = 0
+        std::vector<Byte> airId = varIntSerialize(AIR_BLOCK_STATE_ID);
+        sectionData.insert(sectionData.end(), airId.begin(), airId.end());
+        sectionData.push_back(0x00); // Biomes: Bits Per Entry = 0
+        std::vector<Byte> biomeId = varIntSerialize(BIOME_ID);
+        sectionData.insert(sectionData.end(), biomeId.begin(), biomeId.end());
+    }
+    std::vector<Byte> sizeBytes = varIntSerialize(static_cast<int>(sectionData.size()));
+    packet_data.insert(packet_data.end(), sizeBytes.begin(), sizeBytes.end());
+    packet_data.insert(packet_data.end(), sectionData.begin(), sectionData.end());
+
+    std::vector<Byte> blockEntityCount = varIntSerialize(0);
+    packet_data.insert(packet_data.end(), blockEntityCount.begin(), blockEntityCount.end());
+
+    // No lighting data: all four BitSet masks empty (VarInt 0 = zero-length long array),
+    // and zero light arrays follow.
+    std::vector<Byte> emptyBitSet = varIntSerialize(0);
+    for (int i = 0; i < 4; i++) {
+        packet_data.insert(packet_data.end(), emptyBitSet.begin(), emptyBitSet.end());
+    }
+    std::vector<Byte> zeroArrayCount = varIntSerialize(0);
+    packet_data.insert(packet_data.end(), zeroArrayCount.begin(), zeroArrayCount.end()); // Sky Light array count
+    packet_data.insert(packet_data.end(), zeroArrayCount.begin(), zeroArrayCount.end()); // Block Light array count
+
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
 void Confirm_Teleportation_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     #ifdef DEBUG
         Console::getConsole().Entry("Confirm_Teleportation_p::deserialize(): Received.");

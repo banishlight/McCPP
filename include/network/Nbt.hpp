@@ -15,10 +15,11 @@ enum class NbtTagType : Byte {
     String = 0x08,
     List = 0x09,
     Compound = 0x0A,
+    LongArray = 0x0C,
 };
 
 // Minimal NBT tag builder/serializer, covering just the tag types the
-// Configuration/Play registries and chunk data need (no byte/int/long arrays yet).
+// Configuration/Play registries and chunk data need (no byte/int arrays yet).
 class NbtTag {
     public:
         static NbtTag makeByte(Int8 value);
@@ -29,6 +30,7 @@ class NbtTag {
         static NbtTag makeDouble(double value);
         static NbtTag makeString(const string& value);
         static NbtTag makeList(NbtTagType elementType, std::vector<NbtTag> values);
+        static NbtTag makeLongArray(std::vector<Int64> values);
         static NbtTag makeCompound();
 
         // Converts an arbitrary JSON value (as parsed by nlohmann::json, e.g. from a
@@ -56,6 +58,7 @@ class NbtTag {
         std::vector<std::pair<string, NbtTag>> _children;
         NbtTagType _listElementType = NbtTagType::End;
         std::vector<NbtTag> _listValues;
+        std::vector<Int64> _longArrayValues;
 
         void serializePayload(std::vector<Byte>& out) const;
         static void writeNbtString(std::vector<Byte>& out, const string& value);

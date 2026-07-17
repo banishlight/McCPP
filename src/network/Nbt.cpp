@@ -58,6 +58,13 @@ NbtTag NbtTag::makeList(NbtTagType elementType, std::vector<NbtTag> values) {
     return t;
 }
 
+NbtTag NbtTag::makeLongArray(std::vector<Int64> values) {
+    NbtTag t;
+    t._type = NbtTagType::LongArray;
+    t._longArrayValues = std::move(values);
+    return t;
+}
+
 NbtTag NbtTag::makeCompound() {
     NbtTag t;
     t._type = NbtTagType::Compound;
@@ -176,6 +183,18 @@ void NbtTag::serializePayload(std::vector<Byte>& out) const {
             }
             out.push_back(static_cast<Byte>(NbtTagType::End));
             break;
+        case NbtTagType::LongArray: {
+            Int32 count = static_cast<Int32>(_longArrayValues.size());
+            for (int i = 3; i >= 0; i--) {
+                out.push_back(static_cast<Byte>((count >> (i * 8)) & 0xFF));
+            }
+            for (Int64 value : _longArrayValues) {
+                for (int i = 7; i >= 0; i--) {
+                    out.push_back(static_cast<Byte>((value >> (i * 8)) & 0xFF));
+                }
+            }
+            break;
+        }
         case NbtTagType::End:
             break;
     }
