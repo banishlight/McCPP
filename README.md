@@ -64,3 +64,4 @@ So that I can help diagnose the issue.
 - [x] Player can load into void world
 - [ ] Player can load into flat world
 - [ ] Networking Handles all Play State packets
+- [ ] Commands check for senders permission level (player or console or op)
