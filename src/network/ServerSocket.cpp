@@ -70,6 +70,9 @@ ServerSocket::ServerSocket(const string ip, const string port) {
 }
 
 ServerSocket::~ServerSocket() {
+    // A plain close() doesn't reliably wake a thread blocked inside accept()
+    // on the same fd (Linux won't interrupt it); shutdown() does.
+    shutdown(_fd, SHUT_RDWR);
     close(_fd);
 }
 

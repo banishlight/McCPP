@@ -44,10 +44,12 @@ void ConnectionManager::initialize() {
 void ConnectionManager::close() {
     if (!_initialized) return; // Not initialized
     cleanupCrypto();
-    if (_serverSocket) _serverSocket->~ServerSocket();
     running = false; // Stop the server thread loop
+    // reset() (not a manual destructor call) so these aren't destroyed a second
+    // time when the unique_ptrs themselves are torn down with ConnectionManager.
+    _serverSocket.reset(); // shuts down + closes the listening socket, unblocking Accept()
     if (_serverConThread.joinable()) _serverConThread.join();
-    _conThreads->~ThreadPool();
+    _conThreads.reset();
     _initialized = false;
 }
 
@@ -55,6 +57,10 @@ void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
     if (!conn->isValid()) return;
     conn->receivePacket();
     conn->sendPackets();
+    // An idle connection re-enqueues itself forever; without this check the task
+    // queue never empties, so ThreadPool::~ThreadPool() can never join its workers
+    // while any client is still connected.
+    if (!running) return;
     _conThreads->enqueue([this,conn]() mutable {
             processConnection(conn);
     });

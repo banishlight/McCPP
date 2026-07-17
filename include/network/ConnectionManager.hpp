@@ -4,6 +4,7 @@
 #include <network/Socket.hpp>
 #include <network/ServerSocket.hpp>
 #include <ThreadPool.hpp>
+#include <atomic>
 
 #define THREAD_COUNT 4
 
@@ -23,5 +24,5 @@ class ConnectionManager {
         std::thread _serverConThread;
         std::unique_ptr<ThreadPool> _conThreads;
         bool _initialized = false;
-        bool running = true;
+        std::atomic<bool> running{true};
 };

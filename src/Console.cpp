@@ -4,13 +4,29 @@
 #include <fstream>
 #include <ctime>
 #include <sstream>
-#include <iomanip> 
+#include <iomanip>
+#include <cctype>
+#include <csignal>
+
+#ifdef LINUX
+#include <unistd.h>
+#include <sys/ioctl.h>
+#endif
 
 // Needs to be OS specific
 
+static std::atomic<bool> g_resizePending{false};
+
 Console::Console() {
-    createLog();    
+    createLog();
+    updateTerminalSize();
+    setupScrollRegion();
+    enableRawMode();
+    #ifdef LINUX
+        std::signal(SIGWINCH, Console::onResizeSignal);
+    #endif
     startThread();
+    startInputThread();
 }
 
 Console::~Console() {
@@ -18,6 +34,10 @@ Console::~Console() {
     if (workerThread.joinable()) {
         workerThread.join();
     }
+    // inputThread is detached (it blocks in a raw read() with no clean way to
+    // interrupt it), so just restore the terminal here; the OS reclaims it on exit.
+    disableRawMode();
+    resetScrollRegion();
     logFile.close();
 }
 
@@ -51,13 +71,75 @@ void Console::startThread() {
     workerThread = std::thread(&Console::processBuffers, this);
 }
 
+void Console::startInputThread() {
+    std::thread(&Console::processInput, this).detach();
+}
+
+void Console::onResizeSignal(int) {
+    g_resizePending.store(true);
+}
+
+void Console::updateTerminalSize() {
+    #ifdef LINUX
+        struct winsize w;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_row > 2 && w.ws_col > 0) {
+            termRows = w.ws_row;
+            termCols = w.ws_col;
+        }
+    #endif
+}
+
+void Console::setupScrollRegion() {
+    updateTerminalSize();
+    std::lock_guard<std::mutex> lock(screenMutex);
+    // Scrollable log region is every row except the last, which stays
+    // reserved for the static input line.
+    std::cout << "\033[1;" << (termRows - 1) << "r";
+    redrawInputLine();
+}
+
+void Console::resetScrollRegion() {
+    std::cout << "\033[r"; // full-screen scrolling again
+    std::cout << "\033[" << termRows << ";1H\033[K\n";
+    std::cout.flush();
+}
+
+void Console::enableRawMode() {
+    #ifdef LINUX
+        tcgetattr(STDIN_FILENO, &_originalTermios);
+        struct termios raw = _originalTermios;
+        // Disable line buffering/echo/signal-generating keys so we can render
+        // the input line ourselves and treat Ctrl+C as an ordinary keystroke.
+        raw.c_lflag &= ~(ICANON | ECHO | ISIG);
+        raw.c_cc[VMIN] = 1;
+        raw.c_cc[VTIME] = 0;
+        tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    #endif
+}
+
+void Console::disableRawMode() {
+    #ifdef LINUX
+        tcsetattr(STDIN_FILENO, TCSANOW, &_originalTermios);
+    #endif
+}
+
+void Console::redrawInputLine() {
+    // Caller must hold screenMutex.
+    std::cout << "\033[" << termRows << ";1H" << "\033[K" << prompt << inputBuffer;
+    std::cout.flush();
+}
+
 void Console::processBuffers() {
     while(running) {
+        if (g_resizePending.exchange(false)) {
+            setupScrollRegion();
+        }
+
         bool processedAny = false;
         // Process all buffers
         for (auto& buffer : buffers) {
             std::vector<Message> toProcess;
-            
+
             {
                 std::lock_guard<std::mutex> lock(buffer.mutex);
                 if (!buffer.enteries.empty()) {
@@ -67,10 +149,13 @@ void Console::processBuffers() {
             }
 
             if (!toProcess.empty()) {
-                // Non-Empty buffer
+                std::lock_guard<std::mutex> screenLock(screenMutex);
                 for (const auto& msg : toProcess) {
-                    // Actual output happens here
-                    
+                    // Park the cursor on the bottom row of the scroll region so the
+                    // trailing newline scrolls the log instead of touching the input row.
+                    std::cout << "\033[" << (termRows - 1) << ";1H";
+                    std::cout.flush();
+
                     if (msg.stream == OUT) {
                         setColour(OUT_COLOUR, msg.stream);
                         std::cout << msg.text;
@@ -82,6 +167,7 @@ void Console::processBuffers() {
                     logFile.write(msg.text.c_str(), msg.text.size());
                 }
                 logFile.flush();
+                redrawInputLine();
             }
         }
 
@@ -89,6 +175,48 @@ void Console::processBuffers() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
     }
+}
+
+void Console::processInput() {
+    #ifdef LINUX
+        char c;
+        while (running) {
+            ssize_t n = read(STDIN_FILENO, &c, 1);
+            if (n <= 0) {
+                continue;
+            }
+
+            std::lock_guard<std::mutex> screenLock(screenMutex);
+            if (c == '\r' || c == '\n') {
+                string command = inputBuffer;
+                inputBuffer.clear();
+                redrawInputLine();
+                if (!command.empty()) {
+                    std::lock_guard<std::mutex> cmdLock(commandMutex);
+                    commandQueue.push(std::move(command));
+                }
+            } else if (c == 3) { // Ctrl+C: ISIG is off, so treat it like typing "stop"
+                inputBuffer.clear();
+                redrawInputLine();
+                std::lock_guard<std::mutex> cmdLock(commandMutex);
+                commandQueue.push("stop");
+            } else if (c == 127 || c == 8) { // Backspace/DEL
+                if (!inputBuffer.empty()) {
+                    inputBuffer.pop_back();
+                    redrawInputLine();
+                }
+            } else if (c == 27) { // ESC sequence (arrow keys, etc.) - swallow, no editing yet
+                char seq[2];
+                if (read(STDIN_FILENO, &seq[0], 1) > 0 && seq[0] == '[') {
+                    read(STDIN_FILENO, &seq[1], 1);
+                }
+            } else if (std::isprint(static_cast<unsigned char>(c)) &&
+                       static_cast<int>(prompt.size() + inputBuffer.size()) < termCols - 1) {
+                inputBuffer.push_back(c);
+                redrawInputLine();
+            }
+        }
+    #endif
 }
 
 int Console::Entry(string text) {
@@ -105,23 +233,28 @@ int Console::Error(string text) {
     return addToBuff(msg);
 }
 
-int Console::Post() {
-    // TODO: Something special for input
-    return 0;
+bool Console::Post(string& command) {
+    std::lock_guard<std::mutex> lock(commandMutex);
+    if (commandQueue.empty()) {
+        return false;
+    }
+    command = std::move(commandQueue.front());
+    commandQueue.pop();
+    return true;
 }
 
 int Console::addToBuff(Message msg) {
     // Simple hash of thread ID to select a buffer, distributing threads across buffers
     size_t bufferIndex = std::hash<std::thread::id>{}(std::this_thread::get_id()) % buffers.size();
-    
+
     // Add timestamp in future?
     // string timestampedMessage = addTimestamp(text);
-    
+
     {
         std::lock_guard<std::mutex> lock(buffers[bufferIndex].mutex);
         buffers[bufferIndex].enteries.push_back(std::move(msg));
     }
-    
+
     return 0;
 }
 
@@ -133,7 +266,7 @@ void Console::setColour(int colour, Stream stream) {
                 std::cout << "\033[0m";
             }
             else { std::cout << "\033[" << colour << "m"; }
-            
+
         break;
         case ERR:
             if(colour == 0) {
@@ -148,5 +281,5 @@ void Console::setColour(int colour, Stream stream) {
             }
             else { std::cout << "\033[" << colour << "m"; }
         break;
-    } 
+    }
 }
