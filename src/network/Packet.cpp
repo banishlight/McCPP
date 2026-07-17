@@ -36,7 +36,7 @@ void Packet_Registry::initializeRegistry() {
     StatusVec.resize(STATUS_SIZE);
     LoginVec.resize(LOGIN_SIZE);
     ConfigVec.resize(CONFIG_SIZE);
-    // TODO PlayVec.resize(PLAY_SIZE);
+    PlayVec.resize(PLAY_SIZE);
     // Build vectors of vectors for each state
     // All packets must be pushed in the correct order
     HandshakeVec[0] = std::make_shared<Handshake_p>();
@@ -59,12 +59,17 @@ void Packet_Registry::initializeRegistry() {
     ConfigVec[6] = std::make_shared<Resource_Pack_Response_config_p>();
     ConfigVec[7] = std::make_shared<Serverbound_Known_Packs_p>();
 
+    // Sparse: everything else is unimplemented and left null (Connection::deserializePacket
+    // now checks for null handlers rather than crashing on unimplemented Play packets).
+    PlayVec[0x00] = std::make_shared<Confirm_Teleportation_p>();
+    PlayVec[0x18] = std::make_shared<Serverbound_Keep_Alive_play_p>();
+
     // Initialize the registry with packet instances
     Incoming_Registry[0] = HandshakeVec;
     Incoming_Registry[1] = StatusVec;
     Incoming_Registry[2] = LoginVec;
     Incoming_Registry[3] = ConfigVec;
-    // Incoming_Registry[4] = PlayVec;
+    Incoming_Registry[4] = PlayVec;
     #ifdef DEBUG
         Console::getConsole().Entry("Packet_Registry::initializeRegistry(): Packet registry initialized successfully.");
     #endif

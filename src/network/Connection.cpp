@@ -43,6 +43,12 @@ void Connection::deserializePacket(std::vector<Byte> packet) {
     packet.erase(packet.begin(), packet.begin() + getVarIntSize(packetID));
     Packet_Registry& registry = Packet_Registry::getInstance();
     std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
+    if (!incomingPacket) {
+        #ifdef DEBUG
+            Console::getConsole().Entry("Connection::deserializePacket(): No handler for packet ID " + std::to_string(packetID) + " in state " + std::to_string(_state) + "; ignoring.");
+        #endif
+        return;
+    }
     PacketContext cont(*this);
     // TODO set action processor for context if needed
     incomingPacket->deserialize(packet, cont);
