@@ -314,6 +314,35 @@ namespace {
         }
         return true;
     }
+
+    // MOTION_BLOCKING heightmap: for each of the 256 columns, the highest
+    // non-air block's Y, stored as (y - WORLD_MIN_Y + 1) so 0 means "no
+    // blocking block in this column" -- 9 bits/entry, 7 entries/long (never
+    // straddling), index = z*16+x. Matches vanilla's own packing scheme.
+    std::vector<Int64> computeMotionBlockingHeightmap(const Chunk& chunk) {
+        constexpr int BITS = 9;
+        constexpr int ENTRIES_PER_LONG = 64 / BITS;
+        constexpr int LONG_COUNT = (256 + ENTRIES_PER_LONG - 1) / ENTRIES_PER_LONG;
+        const Int32 AIR_BLOCK_STATE_ID = 0;
+        std::vector<Int64> data(LONG_COUNT, 0);
+        for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16; x++) {
+                int height = Chunk::WORLD_MIN_Y - 1;
+                for (int worldY = Chunk::WORLD_MIN_Y + Chunk::WORLD_HEIGHT - 1; worldY >= Chunk::WORLD_MIN_Y; worldY--) {
+                    if (chunk.getBlock(x, worldY, z) != AIR_BLOCK_STATE_ID) {
+                        height = worldY;
+                        break;
+                    }
+                }
+                UInt64 value = static_cast<UInt64>(height - Chunk::WORLD_MIN_Y + 1) & 0x1FF;
+                int columnIdx = z * 16 + x;
+                int longIdx = columnIdx / ENTRIES_PER_LONG;
+                int shift = (columnIdx % ENTRIES_PER_LONG) * BITS;
+                data[longIdx] |= static_cast<Int64>(value << shift);
+            }
+        }
+        return data;
+    }
 }
 
 Chunk_Data_p::Chunk_Data_p(int threshold, std::shared_ptr<Chunk> chunk) {
@@ -334,12 +363,8 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((chunkX >> (i * 8)) & 0xFF));
     for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((chunkZ >> (i * 8)) & 0xFF));
 
-    // Heightmaps: MOTION_BLOCKING, all-zero. Not yet computed from the chunk's
-    // actual solid blocks (TODO once heightmaps matter for anything client-side
-    // beyond rendering, e.g. random tick placement).
-    // 256 columns at 9 bits/entry (ceil(log2(384+1))), 7 entries/long -> 37 longs, all zero.
     NbtTag heightmaps = NbtTag::makeCompound();
-    heightmaps.put("MOTION_BLOCKING", NbtTag::makeLongArray(std::vector<Int64>(37, 0)));
+    heightmaps.put("MOTION_BLOCKING", NbtTag::makeLongArray(computeMotionBlockingHeightmap(*_chunk)));
     std::vector<Byte> heightmapsBytes = heightmaps.serializeNetwork();
     packet_data.insert(packet_data.end(), heightmapsBytes.begin(), heightmapsBytes.end());
 

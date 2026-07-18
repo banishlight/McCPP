@@ -146,6 +146,9 @@ Seeding is done in two passes for performance: the first pass walks each column 
 ### Chunk dispatch/delivery ordering
 `UpdateLoadedChunks` (in `Play.cpp`) dispatches and delivers chunks nearest-to-center first, not in raster/`std::set` order. `Connection::sendPackets()` serializes and writes queued packets to the socket strictly in order, one at a time — so if a whole ring's worth of chunks becomes ready at once (e.g. all cache hits on reconnecting to an already-explored area), the chunk directly under the player's own feet could end up serialized behind ~200 others. The client's "waiting for chunks" gate (which holds off gravity until its own chunk arrives) would then release too late, and the player free-falls into the ground before their own chunk shows up. This was found from a real "stuck underground on reconnect" bug report and confirmed via the client's F3 debug screen, not assumed from reading the code.
 
+### Heightmap encoding
+`Chunk_Data_p` sends a `MOTION_BLOCKING` heightmap: for each of a chunk's 256 columns, the Y of the highest non-air block, packed as `(y - WORLD_MIN_Y + 1)` (0 meaning "nothing blocking in this column") at 9 bits/entry, 7 entries per long (never straddling a long boundary), column index `z*16 + x`. This is vanilla's own encoding scheme, not something Pumpkin invented — cross-checked against Pumpkin's `ChunkHeightmaps`/packing code for the exact bit layout, same facts-not-code caveat as the Licensing note below. Its practical effect today is minimal: it's mainly used client-side for weather-particle rendering (rain/snow stop at the heightmap surface instead of an assumed y=0), and there's no weather yet.
+
 ### Performance history
 Two performance passes, both 2026-07-18:
 
