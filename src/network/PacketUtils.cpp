@@ -2,6 +2,7 @@
 #include <network/Compression.hpp>
 #include <Standards.hpp>
 #include <vector>
+#include <cstring>
 
 std::vector<Byte> varIntSerialize(int num){ 
     std::vector<Byte> result;
@@ -135,6 +136,28 @@ string deserializeString(std::vector<Byte>& data) {
 std::vector<Byte> serializeString(const string& str) {
     std::vector<Byte> result = varIntSerialize(static_cast<int>(str.size()));
     result.insert(result.end(), str.begin(), str.end());
+    return result;
+}
+
+double deserializeDouble(std::vector<Byte>& data) {
+    Int64 bits = 0;
+    for (int i = 0; i < 8; i++) {
+        bits = (bits << 8) | static_cast<Int64>(static_cast<unsigned char>(data[i]));
+    }
+    double result;
+    std::memcpy(&result, &bits, sizeof(double));
+    data.erase(data.begin(), data.begin() + 8);
+    return result;
+}
+
+float deserializeFloat(std::vector<Byte>& data) {
+    Int32 bits = 0;
+    for (int i = 0; i < 4; i++) {
+        bits = (bits << 8) | static_cast<Int32>(static_cast<unsigned char>(data[i]));
+    }
+    float result;
+    std::memcpy(&result, &bits, sizeof(float));
+    data.erase(data.begin(), data.begin() + 4);
     return result;
 }
 

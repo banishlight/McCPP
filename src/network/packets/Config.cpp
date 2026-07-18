@@ -210,21 +210,11 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     cont.connection.addPacket(syncPosition);
 
     // Send every chunk within the player's view distance around the spawn
-    // chunk (0,0). Fixed for the whole session -- there's no movement-triggered
-    // loading/unloading yet, since serverbound player-position packets aren't
-    // handled at all yet either.
+    // chunk (0,0). Movement-triggered updates (Set_Player_Position_p etc. in
+    // Play.cpp) diff against whatever UpdateLoadedChunks records here.
     std::shared_ptr<Outgoing_Packet> gameEvent = std::make_shared<Game_Event_p>(threshold, 13, 0.0f); // Start waiting for level chunks
     cont.connection.addPacket(gameEvent);
-    std::shared_ptr<Outgoing_Packet> centerChunk = std::make_shared<Set_Center_Chunk_p>(threshold, 0, 0);
-    cont.connection.addPacket(centerChunk);
-    int viewDistance = player.getViewDistance();
-    for (int x = -viewDistance; x <= viewDistance; x++) {
-        for (int z = -viewDistance; z <= viewDistance; z++) {
-            std::shared_ptr<Chunk> chunk = world.getChunk(x, z);
-            std::shared_ptr<Outgoing_Packet> chunkData = std::make_shared<Chunk_Data_p>(threshold, chunk);
-            cont.connection.addPacket(chunkData);
-        }
-    }
+    UpdateLoadedChunks(cont, threshold, player, 0, 0);
 }
 
 void Serverbound_Keep_Alive_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

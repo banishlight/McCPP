@@ -9,6 +9,9 @@
 #include <World.hpp>
 #include <Console.hpp>
 #include <cstring>
+#include <cmath>
+#include <set>
+#include <utility>
 
 Login_Play_p::Login_Play_p(int threshold, const Player& player) {
     _threshold = threshold;
@@ -278,12 +281,108 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Unload_Chunk_p::Unload_Chunk_p(int threshold, int chunkX, int chunkZ) {
+    _threshold = threshold;
+    _chunkX = chunkX;
+    _chunkZ = chunkZ;
+}
+
+std::vector<Byte> Unload_Chunk_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Unload_Chunk_p::serialize(): Sending.");
+    #endif
+    // Field order is Z then X -- the client reads this as one big-endian Long
+    // with Z in the upper 32 bits, per docs/network-protocol.md.
+    std::vector<Byte> packet_data;
+    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((_chunkZ >> (i * 8)) & 0xFF));
+    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((_chunkX >> (i * 8)) & 0xFF));
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int newCenterX, int newCenterZ) {
+    // Cheap bail for the common case: a movement packet that hasn't crossed a
+    // chunk boundary. getLoadedChunks().empty() lets the very first call
+    // through even though the default center already matches (0,0).
+    if (newCenterX == player.getCenterChunkX() && newCenterZ == player.getCenterChunkZ() && !player.getLoadedChunks().empty()) {
+        return;
+    }
+
+    World& world = World::getInstance();
+    int viewDistance = player.getViewDistance();
+
+    cont.connection.addPacket(std::make_shared<Set_Center_Chunk_p>(threshold, newCenterX, newCenterZ));
+
+    std::set<std::pair<int, int>> newChunks;
+    for (int x = newCenterX - viewDistance; x <= newCenterX + viewDistance; x++) {
+        for (int z = newCenterZ - viewDistance; z <= newCenterZ + viewDistance; z++) {
+            newChunks.insert({x, z});
+        }
+    }
+
+    for (const auto& [x, z] : newChunks) {
+        if (!player.hasChunkLoaded(x, z)) {
+            std::shared_ptr<Chunk> chunk = world.getChunk(x, z);
+            cont.connection.addPacket(std::make_shared<Chunk_Data_p>(threshold, chunk));
+            player.markChunkLoaded(x, z);
+        }
+    }
+
+    std::set<std::pair<int, int>> previouslyLoaded = player.getLoadedChunks();
+    for (const auto& [x, z] : previouslyLoaded) {
+        if (!newChunks.count({x, z})) {
+            cont.connection.addPacket(std::make_shared<Unload_Chunk_p>(threshold, x, z));
+            player.markChunkUnloaded(x, z);
+        }
+    }
+
+    player.setCenterChunk(newCenterX, newCenterZ);
+}
+
 void Confirm_Teleportation_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     #ifdef DEBUG
         Console::getConsole().Entry("Confirm_Teleportation_p::deserialize(): Received.");
     #endif
     // TODO: validate against the teleport ID we last sent once multiple
     // in-flight teleports need disambiguating; only one is ever sent today.
+}
+
+void Set_Player_Position_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Player_Position_p::deserialize(): Received.");
+    #endif
+    double x = deserializeDouble(in_buff);
+    double y = deserializeDouble(in_buff);
+    double z = deserializeDouble(in_buff);
+    // On Ground (Boolean) follows; unused, no movement validation yet.
+
+    Player& player = cont.connection.getPlayer();
+    player.setPosition(x, y, z);
+
+    int threshold = cont.connection.getCompressionThreshold();
+    int newCenterX = static_cast<int>(std::floor(x / 16.0));
+    int newCenterZ = static_cast<int>(std::floor(z / 16.0));
+    UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
+}
+
+void Set_Player_Position_and_Rotation_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Player_Position_and_Rotation_p::deserialize(): Received.");
+    #endif
+    double x = deserializeDouble(in_buff);
+    double y = deserializeDouble(in_buff);
+    double z = deserializeDouble(in_buff);
+    float yaw = deserializeFloat(in_buff);
+    float pitch = deserializeFloat(in_buff);
+    // On Ground (Boolean) follows; unused, no movement validation yet.
+
+    Player& player = cont.connection.getPlayer();
+    player.setPosition(x, y, z);
+    player.setRotation(yaw, pitch);
+
+    int threshold = cont.connection.getCompressionThreshold();
+    int newCenterX = static_cast<int>(std::floor(x / 16.0));
+    int newCenterZ = static_cast<int>(std::floor(z / 16.0));
+    UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
 }
 
 void Serverbound_Keep_Alive_play_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

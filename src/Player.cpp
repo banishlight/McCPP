@@ -77,3 +77,32 @@ void Player::setRotation(float yaw, float pitch) {
     _yaw = yaw;
     _pitch = pitch;
 }
+
+bool Player::hasChunkLoaded(int chunkX, int chunkZ) const {
+    return _loadedChunks.count({chunkX, chunkZ}) > 0;
+}
+
+void Player::markChunkLoaded(int chunkX, int chunkZ) {
+    _loadedChunks.insert({chunkX, chunkZ});
+}
+
+void Player::markChunkUnloaded(int chunkX, int chunkZ) {
+    _loadedChunks.erase({chunkX, chunkZ});
+}
+
+const std::set<std::pair<int, int>>& Player::getLoadedChunks() const {
+    return _loadedChunks;
+}
+
+int Player::getCenterChunkX() const {
+    return _centerChunkX;
+}
+
+int Player::getCenterChunkZ() const {
+    return _centerChunkZ;
+}
+
+void Player::setCenterChunk(int chunkX, int chunkZ) {
+    _centerChunkX = chunkX;
+    _centerChunkZ = chunkZ;
+}

@@ -62,6 +62,8 @@ void Packet_Registry::initializeRegistry() {
     // Sparse: everything else is unimplemented and left null (Connection::deserializePacket
     // now checks for null handlers rather than crashing on unimplemented Play packets).
     PlayVec[0x00] = std::make_shared<Confirm_Teleportation_p>();
+    PlayVec[0x1A] = std::make_shared<Set_Player_Position_p>();
+    PlayVec[0x1B] = std::make_shared<Set_Player_Position_and_Rotation_p>();
     PlayVec[0x18] = std::make_shared<Serverbound_Keep_Alive_play_p>();
 
     // Initialize the registry with packet instances

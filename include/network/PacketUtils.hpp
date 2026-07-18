@@ -11,10 +11,13 @@ long varLongDeserialize(std::vector<Byte> buff);
 int getVarIntSize(int num);
 int getVarLongSize(long num);
 
-// All of the deserialize methods below modify the given byte array of data to 
+// All of the deserialize methods below modify the given byte array of data to
 // automate iteration through the array
 string deserializeString(std::vector<Byte>& data);
 std::vector<Byte> serializeString(const string& str);
+
+double deserializeDouble(std::vector<Byte>& data);
+float deserializeFloat(std::vector<Byte>& data);
 
 std::vector<Byte> deserializePrefixedArray(std::vector<Byte>& data);
 std::vector<Byte> serializePrefixedArray(const std::vector<Byte>& data);
