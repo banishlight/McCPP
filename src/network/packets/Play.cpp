@@ -10,8 +10,11 @@
 #include <Console.hpp>
 #include <cstring>
 #include <cmath>
+#include <cstdlib>
+#include <algorithm>
 #include <set>
 #include <utility>
+#include <vector>
 
 Login_Play_p::Login_Play_p(int threshold, const Player& player) {
     _threshold = threshold;
@@ -398,12 +401,27 @@ void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int 
         }
     }
 
+    // Dispatch (and, in practice, deliver -- Connection::sendPackets() writes
+    // each queued packet to the socket in order, one at a time, not batched)
+    // nearest-to-center first. Otherwise, whenever a whole ring's worth of
+    // chunks is ready simultaneously (e.g. all cache hits on a rejoin after
+    // already exploring the area), the chunk directly under the player's own
+    // feet -- needed before the client's "waiting for chunks" gate releases
+    // gravity -- can end up serialized behind ~200 others, giving the client
+    // long enough to free-fall before its own chunk ever arrives.
+    std::vector<std::pair<int, int>> dispatchOrder(newChunks.begin(), newChunks.end());
+    std::sort(dispatchOrder.begin(), dispatchOrder.end(), [newCenterX, newCenterZ](const auto& a, const auto& b) {
+        int da = std::abs(a.first - newCenterX) + std::abs(a.second - newCenterZ);
+        int db = std::abs(b.first - newCenterX) + std::abs(b.second - newCenterZ);
+        return da < db;
+    });
+
     // Generation happens on WorldWorkerPool and is delivered back through
     // Connection::addGeneratedChunk -- player.markChunkLoaded() happens later,
     // in Connection::deliverGeneratedChunks() on this connection's own thread,
     // once generation actually completes (not here, and not on a pool thread).
     std::shared_ptr<Connection> connPtr = cont.connection.shared_from_this();
-    for (const auto& [x, z] : newChunks) {
+    for (const auto& [x, z] : dispatchOrder) {
         if (!player.hasChunkLoaded(x, z)) {
             world.getChunkAsync(x, z, [connPtr](std::shared_ptr<Chunk> chunk) {
                 connPtr->addGeneratedChunk(chunk);
