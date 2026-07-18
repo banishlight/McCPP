@@ -22,11 +22,20 @@ class Chunk {
         void setBlock(int localX, int worldY, int localZ, Int32 blockStateId);
         Int32 getBlock(int localX, int worldY, int localZ) const;
 
+        // Light levels 0-15. Only ever meaningful once LightEngine::computeLighting
+        // has run -- see World's "a chunk only enters the cache once lit" invariant.
+        void setSkyLight(int localX, int worldY, int localZ, int level);
+        int getSkyLight(int localX, int worldY, int localZ) const;
+        void setBlockLight(int localX, int worldY, int localZ, int level);
+        int getBlockLight(int localX, int worldY, int localZ) const;
+
         Int32 getBiomeId() const;
     private:
         int index(int localX, int worldY, int localZ) const;
         int _chunkX;
         int _chunkZ;
         std::array<Int32, SECTION_COUNT * 4096> _blocks{}; // defaults to 0 (air)
+        std::array<uint8_t, SECTION_COUNT * 4096> _skyLight{};
+        std::array<uint8_t, SECTION_COUNT * 4096> _blockLight{};
         Int32 _biomeId = 0;
 };

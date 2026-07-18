@@ -15,6 +15,7 @@
 #include <set>
 #include <utility>
 #include <vector>
+#include <functional>
 
 Login_Play_p::Login_Play_p(int threshold, const Player& player) {
     _threshold = threshold;
@@ -278,6 +279,52 @@ namespace {
             }
         }
     }
+
+    // BitSet: VarInt count of longs, then that many big-endian longs, LSB of
+    // the first long = bit 0 (docs/network-protocol.md).
+    std::vector<Byte> makeBitSet(const std::vector<int>& setBits, int totalBits) {
+        int longCount = (totalBits + 63) / 64;
+        std::vector<UInt64> longs(longCount, 0);
+        for (int bit : setBits) {
+            longs[bit / 64] |= (1ULL << (bit % 64));
+        }
+        std::vector<Byte> result = varIntSerialize(longCount);
+        for (UInt64 l : longs) {
+            for (int i = 7; i >= 0; i--) {
+                result.push_back(static_cast<Byte>((l >> (i * 8)) & 0xFF));
+            }
+        }
+        return result;
+    }
+
+    // Packs 4096 light values (0-15) into a 2048-byte nibble array, indexed
+    // ((y<<8)|(z<<4)|x)/2 -- low nibble on even index, high nibble on odd
+    // (docs/network-protocol.md).
+    std::vector<Byte> packLightSection(const std::function<int(int, int, int)>& getLevel) {
+        std::vector<Byte> out(2048, 0);
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    int i = (y << 8) | (z << 4) | x;
+                    int level = getLevel(x, y, z) & 0x0F;
+                    int byteIndex = i / 2;
+                    if (i % 2 == 0) {
+                        out[byteIndex] = static_cast<Byte>((out[byteIndex] & 0xF0) | level);
+                    } else {
+                        out[byteIndex] = static_cast<Byte>((out[byteIndex] & 0x0F) | (level << 4));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    bool isAllZero(const std::vector<Byte>& packed) {
+        for (Byte b : packed) {
+            if (b != 0) return false;
+        }
+        return true;
+    }
 }
 
 Chunk_Data_p::Chunk_Data_p(int threshold, std::shared_ptr<Chunk> chunk) {
@@ -350,15 +397,76 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     std::vector<Byte> blockEntityCount = varIntSerialize(0);
     packet_data.insert(packet_data.end(), blockEntityCount.begin(), blockEntityCount.end());
 
-    // No lighting data: all four BitSet masks empty (VarInt 0 = zero-length long array),
-    // and zero light arrays follow.
-    std::vector<Byte> emptyBitSet = varIntSerialize(0);
-    for (int i = 0; i < 4; i++) {
-        packet_data.insert(packet_data.end(), emptyBitSet.begin(), emptyBitSet.end());
+    // Lighting: 26 total light sections (Chunk::SECTION_COUNT real sections
+    // plus one below-world and one above-world sentinel). Bit 0 = below-world,
+    // bits 1..SECTION_COUNT = real sections in order, last bit = above-world
+    // (docs/network-protocol.md). A section with all-zero light goes in the
+    // "empty" mask (no array sent); anything else goes in the regular mask
+    // with its packed array included, in ascending bit order.
+    const int LIGHT_SECTION_COUNT = Chunk::SECTION_COUNT + 2;
+    const std::vector<Byte> allZeroLight(2048, 0);
+    const std::vector<Byte> allFullSky(2048, 0xFF); // every nibble = 15
+
+    std::vector<int> skyDataBits, skyEmptyBits, blockDataBits, blockEmptyBits;
+    std::vector<std::vector<Byte>> skyArrays, blockArrays;
+
+    for (int lightIndex = 0; lightIndex < LIGHT_SECTION_COUNT; lightIndex++) {
+        std::vector<Byte> skyPacked;
+        std::vector<Byte> blockPacked;
+        if (lightIndex == 0) {
+            skyPacked = allZeroLight; // below-world: nothing is ever generated there
+            blockPacked = allZeroLight;
+        } else if (lightIndex == LIGHT_SECTION_COUNT - 1) {
+            skyPacked = allFullSky; // above-world: always open sky
+            blockPacked = allZeroLight;
+        } else {
+            int sectionWorldYBase = Chunk::WORLD_MIN_Y + (lightIndex - 1) * 16;
+            skyPacked = packLightSection([&](int x, int y, int z) {
+                return _chunk->getSkyLight(x, sectionWorldYBase + y, z);
+            });
+            blockPacked = packLightSection([&](int x, int y, int z) {
+                return _chunk->getBlockLight(x, sectionWorldYBase + y, z);
+            });
+        }
+
+        if (isAllZero(skyPacked)) {
+            skyEmptyBits.push_back(lightIndex);
+        } else {
+            skyDataBits.push_back(lightIndex);
+            skyArrays.push_back(skyPacked);
+        }
+        if (isAllZero(blockPacked)) {
+            blockEmptyBits.push_back(lightIndex);
+        } else {
+            blockDataBits.push_back(lightIndex);
+            blockArrays.push_back(blockPacked);
+        }
     }
-    std::vector<Byte> zeroArrayCount = varIntSerialize(0);
-    packet_data.insert(packet_data.end(), zeroArrayCount.begin(), zeroArrayCount.end()); // Sky Light array count
-    packet_data.insert(packet_data.end(), zeroArrayCount.begin(), zeroArrayCount.end()); // Block Light array count
+
+    std::vector<Byte> skyMask = makeBitSet(skyDataBits, LIGHT_SECTION_COUNT);
+    std::vector<Byte> blockMask = makeBitSet(blockDataBits, LIGHT_SECTION_COUNT);
+    std::vector<Byte> emptySkyMask = makeBitSet(skyEmptyBits, LIGHT_SECTION_COUNT);
+    std::vector<Byte> emptyBlockMask = makeBitSet(blockEmptyBits, LIGHT_SECTION_COUNT);
+    packet_data.insert(packet_data.end(), skyMask.begin(), skyMask.end());
+    packet_data.insert(packet_data.end(), blockMask.begin(), blockMask.end());
+    packet_data.insert(packet_data.end(), emptySkyMask.begin(), emptySkyMask.end());
+    packet_data.insert(packet_data.end(), emptyBlockMask.begin(), emptyBlockMask.end());
+
+    std::vector<Byte> skyArrayCount = varIntSerialize(static_cast<int>(skyArrays.size()));
+    packet_data.insert(packet_data.end(), skyArrayCount.begin(), skyArrayCount.end());
+    for (const auto& arr : skyArrays) {
+        std::vector<Byte> lenBytes = varIntSerialize(static_cast<int>(arr.size()));
+        packet_data.insert(packet_data.end(), lenBytes.begin(), lenBytes.end());
+        packet_data.insert(packet_data.end(), arr.begin(), arr.end());
+    }
+
+    std::vector<Byte> blockArrayCount = varIntSerialize(static_cast<int>(blockArrays.size()));
+    packet_data.insert(packet_data.end(), blockArrayCount.begin(), blockArrayCount.end());
+    for (const auto& arr : blockArrays) {
+        std::vector<Byte> lenBytes = varIntSerialize(static_cast<int>(arr.size()));
+        packet_data.insert(packet_data.end(), lenBytes.begin(), lenBytes.end());
+        packet_data.insert(packet_data.end(), arr.begin(), arr.end());
+    }
 
     return assemblePacket(getID(), _threshold, packet_data);
 }

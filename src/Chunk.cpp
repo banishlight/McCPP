@@ -27,6 +27,22 @@ Int32 Chunk::getBlock(int localX, int worldY, int localZ) const {
     return _blocks[index(localX, worldY, localZ)];
 }
 
+void Chunk::setSkyLight(int localX, int worldY, int localZ, int level) {
+    _skyLight[index(localX, worldY, localZ)] = static_cast<uint8_t>(level);
+}
+
+int Chunk::getSkyLight(int localX, int worldY, int localZ) const {
+    return _skyLight[index(localX, worldY, localZ)];
+}
+
+void Chunk::setBlockLight(int localX, int worldY, int localZ, int level) {
+    _blockLight[index(localX, worldY, localZ)] = static_cast<uint8_t>(level);
+}
+
+int Chunk::getBlockLight(int localX, int worldY, int localZ) const {
+    return _blockLight[index(localX, worldY, localZ)];
+}
+
 Int32 Chunk::getBiomeId() const {
     return _biomeId;
 }

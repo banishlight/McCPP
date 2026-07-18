@@ -24,6 +24,12 @@ class World {
         // WorldWorkerPool and invokes callback from a pool thread once ready.
         // Safe to call from any thread.
         void getChunkAsync(int chunkX, int chunkZ, std::function<void(std::shared_ptr<Chunk>)> callback);
+        // Terrain-only, cached, safe for concurrent reads (a chunk's block
+        // data is never mutated after generation). Used both by LightEngine's
+        // neighbor queries and internally by getChunkAsync, so a chunk's
+        // terrain is only ever generated once no matter how many nearby
+        // chunks need it purely for lighting occlusion. Safe from any thread.
+        std::shared_ptr<Chunk> getOrGenerateTerrain(int chunkX, int chunkZ);
     private:
         World();
         string _dimensionName = "minecraft:overworld";
@@ -34,6 +40,8 @@ class World {
         Int64 _hashedSeed = 0;
         bool _isFlat = false;
         std::unique_ptr<ChunkGenerator> _generator;
-        std::map<std::pair<int,int>, std::shared_ptr<Chunk>> _chunkCache;
+        std::map<std::pair<int,int>, std::shared_ptr<Chunk>> _chunkCache; // fully lit, delivered to players
         std::mutex _chunkCacheMutex;
+        std::map<std::pair<int,int>, std::shared_ptr<Chunk>> _terrainCache; // block data only, no light
+        std::mutex _terrainCacheMutex;
 };

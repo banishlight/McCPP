@@ -24,9 +24,11 @@ bool NoiseChunkGenerator::isSolid(int worldX, int worldY, int worldZ) const {
     return true;
 }
 
-Int32 NoiseChunkGenerator::pickBlock(int worldX, int worldY, int worldZ) const {
+Int32 NoiseChunkGenerator::pickBlockFromColumn(const std::array<bool, Chunk::WORLD_HEIGHT>& column, int y) const {
     for (int depth = 1; depth <= DIRT_DEPTH + 1; depth++) {
-        if (!isSolid(worldX, worldY + depth, worldZ)) {
+        int ny = y + depth;
+        bool solidAbove = (ny < Chunk::WORLD_HEIGHT) && column[ny]; // above world = air
+        if (!solidAbove) {
             return depth == 1 ? GRASS_BLOCK_STATE_ID : DIRT_BLOCK_STATE_ID;
         }
     }
@@ -37,14 +39,22 @@ std::shared_ptr<Chunk> NoiseChunkGenerator::generate(int chunkX, int chunkZ) {
     auto chunk = std::make_shared<Chunk>(chunkX, chunkZ);
     int baseX = chunkX * 16;
     int baseZ = chunkZ * 16;
+    // Compute isSolid() once per (x,y,z) into a per-column buffer, then reuse
+    // it for both this block's own placement and any other block's upward
+    // exposure check (pickBlockFromColumn) -- avoids up to DIRT_DEPTH+1
+    // redundant noise evaluations per solid block, which dominated generation
+    // time (each isSolid() call is several fbm octave evaluations).
+    std::array<bool, Chunk::WORLD_HEIGHT> column{};
     for (int x = 0; x < 16; x++) {
         for (int z = 0; z < 16; z++) {
             int worldX = baseX + x;
             int worldZ = baseZ + z;
             for (int y = 0; y < Chunk::WORLD_HEIGHT; y++) {
-                int worldY = Chunk::WORLD_MIN_Y + y;
-                if (isSolid(worldX, worldY, worldZ)) {
-                    chunk->setBlock(x, worldY, z, pickBlock(worldX, worldY, worldZ));
+                column[y] = isSolid(worldX, Chunk::WORLD_MIN_Y + y, worldZ);
+            }
+            for (int y = 0; y < Chunk::WORLD_HEIGHT; y++) {
+                if (column[y]) {
+                    chunk->setBlock(x, Chunk::WORLD_MIN_Y + y, z, pickBlockFromColumn(column, y));
                 }
                 // else leave as air (Chunk's default).
             }

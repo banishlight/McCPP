@@ -1,6 +1,7 @@
 #pragma once
 #include <ChunkGenerator.hpp>
 #include <PerlinNoise.hpp>
+#include <array>
 
 // Real terrain: a 3D density field (terrain noise minus a height bias, so the
 // world trends solid low / air high, crossing zero in a rolling "surface
@@ -15,7 +16,11 @@ class NoiseChunkGenerator : public ChunkGenerator {
     private:
         bool isSolid(int worldX, int worldY, int worldZ) const;
         bool isCave(int worldX, int worldY, int worldZ) const;
-        Int32 pickBlock(int worldX, int worldY, int worldZ) const;
+        // `column[y]` is the already-computed isSolid() result for this
+        // (x,z) at local height `y` -- reused here instead of recomputing
+        // (this is called for every solid block, so recomputation would mean
+        // up to DIRT_DEPTH+1 redundant noise evaluations per solid block).
+        Int32 pickBlockFromColumn(const std::array<bool, Chunk::WORLD_HEIGHT>& column, int y) const;
 
         PerlinNoise _terrainNoise;
         PerlinNoise _caveNoise;

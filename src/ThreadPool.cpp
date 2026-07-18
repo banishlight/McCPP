@@ -13,6 +13,13 @@ ThreadPool::~ThreadPool() {
     {
         std::unique_lock<std::mutex> lock(queueMutex);
         stop = true;
+        // Drop any not-yet-started work -- only let already-running tasks
+        // finish. Without this, a large backlog (e.g. WorldWorkerPool with a
+        // whole ring of queued chunk-gen+lighting tasks from a player
+        // actively exploring) makes shutdown wait for the entire backlog
+        // instead of just whatever's already in flight.
+        std::queue<std::function<void()>> empty;
+        std::swap(taskQ, empty);
     }
     #ifdef DEBUG
         // Console::getConsole().Entry("notifying all workers on network");
