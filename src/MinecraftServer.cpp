@@ -7,6 +7,7 @@
 #include <ServerControl.hpp>
 #include <TickLoop.hpp>
 #include <WorldWorkerPool.hpp>
+#include <World.hpp>
 #include <sstream>
 
 int main() {
@@ -14,6 +15,16 @@ int main() {
     Properties::getProperties().initialize();
     Console::getConsole().Entry("Properties loaded successfully.");
     VanillaDataManager::getInstance().initialize();
+    // Must be constructed before WorldWorkerPool: singletons are torn down in
+    // reverse construction order at exit. WorldWorkerPool's queued chunk-gen
+    // tasks capture `this` (a World*) and touch World's members directly, so
+    // World must outlive WorldWorkerPool -- otherwise queued tasks still
+    // draining at shutdown run against an already-destroyed World (confirmed
+    // via an isolated repro: this exact ordering bug reliably crashes/hangs
+    // with tasks still queued when WorldWorkerPool starts destructing).
+    // World would otherwise construct lazily on the first player connection,
+    // which happens after WorldWorkerPool -- forcing it here fixes the order.
+    World::getInstance();
     // Must be initialized before ConnectionManager: singletons are torn down
     // in reverse construction order at exit, and WorldWorkerPool's queued
     // chunk-generation tasks hold shared_ptr<Connection> captures that must
