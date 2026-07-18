@@ -54,6 +54,18 @@ void VanillaDataManager::initialize() {
                 Console::getConsole().Error("VanillaDataManager::initialize(): Failed to parse " + fileEntry.path().string() + ": " + e.what());
                 continue;
             }
+            if (registryName == "worldgen/biome") {
+                // These are pure server-side world-generation instructions (which
+                // carver digs caves, which features/spawners/spawn rates apply) --
+                // the client never generates its own terrain, so it has no use for
+                // them. Sending the full raw datapack JSON (with these fields'
+                // often-huge nested feature lists) bloats the registry sync and
+                // risks the client's biome codec choking on structure it doesn't
+                // expect once it actually needs biome data for real terrain.
+                for (const char* genOnlyField : {"carvers", "features", "spawners", "spawn_costs", "creature_spawn_probability"}) {
+                    parsed.erase(genOnlyField);
+                }
+            }
             string id = "minecraft:" + fileEntry.path().stem().string();
             entries.push_back(RegistryEntry{id, true, NbtTag::fromJson(parsed)});
         }

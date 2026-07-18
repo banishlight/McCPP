@@ -199,45 +199,64 @@ std::vector<Byte> Set_Center_Chunk_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Chunk_Data_p::Chunk_Data_p(int threshold, int chunkX, int chunkZ) {
+Chunk_Data_p::Chunk_Data_p(int threshold, std::shared_ptr<Chunk> chunk) {
     _threshold = threshold;
-    _chunkX = chunkX;
-    _chunkZ = chunkZ;
+    _chunk = chunk;
 }
 
 std::vector<Byte> Chunk_Data_p::serialize() const {
     #ifdef DEBUG
         Console::getConsole().Entry("Chunk_Data_p::serialize(): Sending.");
     #endif
-    // Void world: every section is uniformly air, so every paletted container
-    // (blocks and biomes) uses the single-valued form (Bits Per Entry = 0, just
-    // a VarInt palette value, no data array at all).
-    const int WORLD_HEIGHT = 384;
-    const int SECTION_COUNT = WORLD_HEIGHT / 16;
+    // Every section is uniform (single block-state ID for the whole section),
+    // so every paletted container (blocks and biomes) uses the single-valued
+    // form (Bits Per Entry = 0, just a VarInt palette value, no data array).
     const Int32 AIR_BLOCK_STATE_ID = 0; // stable across versions since the 1.13 flattening
-    const Int32 BIOME_ID = 0; // index into the worldgen/biome registry we already sent; any valid index renders fine
+    const int SECTION_VOLUME = 16 * 16 * 16;
+
+    int chunkX = _chunk->getChunkX();
+    int chunkZ = _chunk->getChunkZ();
 
     std::vector<Byte> packet_data;
-    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((_chunkX >> (i * 8)) & 0xFF));
-    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((_chunkZ >> (i * 8)) & 0xFF));
+    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((chunkX >> (i * 8)) & 0xFF));
+    for (int i = 3; i >= 0; i--) packet_data.push_back(static_cast<Byte>((chunkZ >> (i * 8)) & 0xFF));
 
-    // Heightmaps: MOTION_BLOCKING, all-zero (nothing solid anywhere in a void chunk).
+    // Heightmaps: MOTION_BLOCKING, all-zero. Not yet computed from the chunk's
+    // actual solid blocks (TODO once heightmaps matter for anything client-side
+    // beyond rendering, e.g. random tick placement).
     // 256 columns at 9 bits/entry (ceil(log2(384+1))), 7 entries/long -> 37 longs, all zero.
     NbtTag heightmaps = NbtTag::makeCompound();
     heightmaps.put("MOTION_BLOCKING", NbtTag::makeLongArray(std::vector<Int64>(37, 0)));
     std::vector<Byte> heightmapsBytes = heightmaps.serializeNetwork();
     packet_data.insert(packet_data.end(), heightmapsBytes.begin(), heightmapsBytes.end());
 
+    // Even a single-valued (Bits Per Entry = 0) paletted container is still
+    // followed by a Data Array Length VarInt -- always 0 here, since a single
+    // value needs no per-block indices -- not omitted entirely. Verified against
+    // decompiled 1.21 client bytecode: FriendlyByteBuf's long-array reader
+    // unconditionally reads a VarInt length before reading any longs, and against
+    // Pumpkin's (github.com/Pumpkin-MC/Pumpkin) working server implementation.
+    const std::vector<Byte> ZERO_DATA_ARRAY_LENGTH = varIntSerialize(0);
+
     std::vector<Byte> sectionData;
-    for (int s = 0; s < SECTION_COUNT; s++) {
-        sectionData.push_back(0x00); sectionData.push_back(0x00); // Block count = 0
-        sectionData.push_back(0x00); sectionData.push_back(0x00); // Fluid count = 0
+    for (int s = 0; s < Chunk::SECTION_COUNT; s++) {
+        Int32 blockStateId = _chunk->getSectionBlock(s);
+        // A single count of non-empty blocks (blocks and fluids combined) --
+        // there is only one count short on the wire, not separate block/fluid
+        // counts (verified directly against decompiled 1.21 client bytecode,
+        // LevelChunkSection's network read method: one readShort() then
+        // straight into the block states container, no second short).
+        Int16 count = (blockStateId == AIR_BLOCK_STATE_ID) ? 0 : SECTION_VOLUME;
+        sectionData.push_back(static_cast<Byte>((count >> 8) & 0xFF));
+        sectionData.push_back(static_cast<Byte>(count & 0xFF));
         sectionData.push_back(0x00); // Block states: Bits Per Entry = 0
-        std::vector<Byte> airId = varIntSerialize(AIR_BLOCK_STATE_ID);
-        sectionData.insert(sectionData.end(), airId.begin(), airId.end());
+        std::vector<Byte> blockIdBytes = varIntSerialize(blockStateId);
+        sectionData.insert(sectionData.end(), blockIdBytes.begin(), blockIdBytes.end());
+        sectionData.insert(sectionData.end(), ZERO_DATA_ARRAY_LENGTH.begin(), ZERO_DATA_ARRAY_LENGTH.end());
         sectionData.push_back(0x00); // Biomes: Bits Per Entry = 0
-        std::vector<Byte> biomeId = varIntSerialize(BIOME_ID);
+        std::vector<Byte> biomeId = varIntSerialize(_chunk->getBiomeId());
         sectionData.insert(sectionData.end(), biomeId.begin(), biomeId.end());
+        sectionData.insert(sectionData.end(), ZERO_DATA_ARRAY_LENGTH.begin(), ZERO_DATA_ARRAY_LENGTH.end());
     }
     std::vector<Byte> sizeBytes = varIntSerialize(static_cast<int>(sectionData.size()));
     packet_data.insert(packet_data.end(), sizeBytes.begin(), sizeBytes.end());

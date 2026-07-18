@@ -1,9 +1,11 @@
 #pragma once
 #include <Standards.hpp>
 #include <network/Packet.hpp>
+#include <memory>
 
 // Forward declaration
 class Player;
+class Chunk;
 
 // **Play Packets**
 
@@ -71,12 +73,11 @@ class Set_Center_Chunk_p : public Play_Packet, public Outgoing_Packet {
 };
 class Chunk_Data_p : public Play_Packet, public Outgoing_Packet {
     public:
-        Chunk_Data_p(int threshold, int chunkX, int chunkZ);
+        Chunk_Data_p(int threshold, std::shared_ptr<Chunk> chunk);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
-        int _chunkX;
-        int _chunkZ;
+        std::shared_ptr<Chunk> _chunk;
         static int constexpr _PACKET_ID = 0x27;
 };
 
