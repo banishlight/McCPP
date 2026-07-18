@@ -1,6 +1,8 @@
 #pragma once
 #include <Standards.hpp>
 #include <Player.hpp>
+#include <atomic>
+#include <mutex>
 
 // Forward declaration
 class Socket;
@@ -14,6 +16,7 @@ class Connection {
         void sendPackets();
         bool isValid() const;
         void setState(ConnectionState state);
+        ConnectionState getState() const;
         void addPacket(std::shared_ptr<Outgoing_Packet> packet);
         int getCompressionThreshold() const;
         void enableCompression();
@@ -24,7 +27,10 @@ class Connection {
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
         std::shared_ptr<Socket> _socket;
         std::vector<std::shared_ptr<Outgoing_Packet>> _sendQueue;
-        ConnectionState _state = ConnectionState::Handshake;
+        std::mutex _sendQueueMutex;
+        // atomic: read from the tick thread (getState(), Keep Alive) while
+        // written from this connection's own worker thread (setState()).
+        std::atomic<ConnectionState> _state{ConnectionState::Handshake};
         int _threshold = -1;
         bool _enableCompression = false;
         Player _player;

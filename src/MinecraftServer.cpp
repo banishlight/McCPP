@@ -5,6 +5,7 @@
 #include <vanilla/VanillaDataManager.hpp>
 #include <CommandRegistry.hpp>
 #include <ServerControl.hpp>
+#include <TickLoop.hpp>
 #include <sstream>
 
 int main() {
@@ -13,6 +14,10 @@ int main() {
     Console::getConsole().Entry("Properties loaded successfully.");
     VanillaDataManager::getInstance().initialize();
     ConnectionManager::getInstance().initialize();
+    // Must be initialized after ConnectionManager: singletons are torn down in
+    // reverse construction order at exit, so TickLoop's thread (which reaches
+    // into ConnectionManager every tick) needs to stop before ConnectionManager does.
+    TickLoop::getInstance().initialize();
     CommandRegistry::getInstance().initialize();
     while (!ServerControl::isShutdownRequested()) {
         // Main server loop

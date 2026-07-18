@@ -42,10 +42,10 @@ void Connection::deserializePacket(std::vector<Byte> packet) {
     // Remove packet ID from packet
     packet.erase(packet.begin(), packet.begin() + getVarIntSize(packetID));
     Packet_Registry& registry = Packet_Registry::getInstance();
-    std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state, packetID);
+    std::shared_ptr<Incoming_Packet> incomingPacket = registry.fetchIncomingPacket(_state.load(), packetID);
     if (!incomingPacket) {
         #ifdef DEBUG
-            Console::getConsole().Entry("Connection::deserializePacket(): No handler for packet ID " + std::to_string(packetID) + " in state " + std::to_string(_state) + "; ignoring.");
+            Console::getConsole().Entry("Connection::deserializePacket(): No handler for packet ID " + std::to_string(packetID) + " in state " + std::to_string(_state.load()) + "; ignoring.");
         #endif
         return;
     }
@@ -94,8 +94,15 @@ void Connection::receivePacket() {
 }
 
 void Connection::sendPackets() {
-    // Send all packets from queue
-    for(auto& packet : _sendQueue) {
+    // Swap the queue out under the lock, then serialize/send the local copy
+    // lock-free so addPacket() (called from other threads, e.g. the tick
+    // thread) never blocks on a socket send().
+    std::vector<std::shared_ptr<Outgoing_Packet>> toSend;
+    {
+        std::lock_guard<std::mutex> lock(_sendQueueMutex);
+        toSend.swap(_sendQueue);
+    }
+    for(auto& packet : toSend) {
         std::vector<Byte> serializedPacket = serializePacket(packet);
         _socket->sendPacket(serializedPacket);
         // Set to true in Set_Compression_p, once sent, all future packets will be using compression threshold
@@ -104,8 +111,6 @@ void Connection::sendPackets() {
             _enableCompression = false;
         }
     }
-    // Clear the queue
-    _sendQueue.clear();
 }
 
 bool Connection::isValid() const {
@@ -117,11 +122,16 @@ void Connection::setState(ConnectionState state) {
     _state = state;
 }
 
+ConnectionState Connection::getState() const {
+    return _state.load();
+}
+
 void Connection::addPacket(std::shared_ptr<Outgoing_Packet> packet) {
     if (packet == nullptr) {
         Console::getConsole().Error("Connection::addPacket(): Cannot add a null packet to the send queue.");
         return;
     }
+    std::lock_guard<std::mutex> lock(_sendQueueMutex);
     _sendQueue.push_back(packet);
 }
 
