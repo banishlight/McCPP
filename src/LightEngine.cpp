@@ -45,8 +45,8 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
     int baseX = tcx * 16 - 16; // buffer-local x=0 maps to this world X
     int baseZ = tcz * 16 - 16;
 
-    // Pre-fetch the 3x3 neighborhood's terrain once. Never inserted into
-    // World's cache -- see World::getTerrainForLighting.
+    // Pre-fetch the 3x3 neighborhood's terrain once (never cached itself --
+    // see World::getOrGenerateTerrain).
     std::shared_ptr<Chunk> neighbors[3][3];
     for (int dz = -1; dz <= 1; dz++) {
         for (int dx = -1; dx <= 1; dx++) {
@@ -79,9 +79,7 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
     std::queue<QueueEntry> queue;
 
     // Seed sky light: walk each column top-down, full strength until the
-    // first opaque block -- everything below starts at 0 and is only filled
-    // in by BFS propagation reaching around/into it (or stays 0 if enclosed).
-    // This alone gets every open-sky value correct; nothing here needs BFS.
+    // first opaque block. Gets every open-sky value correct with no BFS.
     for (int bz = 0; bz < BUF_SIZE; bz++) {
         for (int bx = 0; bx < BUF_SIZE; bx++) {
             bool blocked = false;
@@ -96,17 +94,10 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
         }
     }
 
-    // Only enqueue seeded positions that sit at an actual light/dark boundary
-    // (a horizontal neighbor not already at max light, or the buffer edge).
-    // A wide-open sky column can be a couple hundred blocks of uniform
-    // max-light air above the terrain -- enqueueing every one of those cells
-    // (hundreds of thousands across the 48x48 buffer) makes the BFS pop/check
-    // millions of neighbors that can never produce a new result, since
-    // interior cells' neighbors are already at the same value. This is safe
-    // because within a single column the top-down scan above is contiguous
-    // (it only stops at an opaque block), so a "hidden" unlit position can
-    // only ever be reached by a *horizontal* step from a boundary cell --
-    // never by skipping straight past an already-seeded interior cell.
+    // Only enqueue seeded positions at an actual light/dark boundary (a
+    // horizontal neighbor not already at max light, or the buffer edge) --
+    // a perf-critical optimization, see docs/general-documentation.md,
+    // "LightEngine".
     for (int bz = 0; bz < BUF_SIZE; bz++) {
         for (int bx = 0; bx < BUF_SIZE; bx++) {
             for (int by = 0; by < BUF_HEIGHT; by++) {
@@ -162,8 +153,7 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
             int destOpacity = isOpaque(destBlock) ? MAX_LIGHT : 0;
             int newLevel;
             // Sky light propagating straight down through a transparent block
-            // doesn't attenuate, unlike every other direction (verified
-            // against Pumpkin's SkyLightProvider::propagate_level).
+            // doesn't attenuate, unlike every other direction.
             if (e.sky && DY[d] == -1 && e.level == MAX_LIGHT && destOpacity == 0) {
                 newLevel = MAX_LIGHT;
             } else {

@@ -25,14 +25,9 @@ World::World() {
                 break;
             }
         }
-        // A chunk only ever enters _chunkCache once its lighting is fully
-        // computed -- see getOrGenerateTerrain/getChunkAsync. Easy to miss
-        // for this one since it's cached directly here rather than through
-        // getChunkAsync, but skipping it would leave the single most-visited
-        // chunk in the game permanently dark. Lighting is computed into a
-        // private copy, never into the shared terrain-cache object itself
-        // (that object may be concurrently read by other threads as a
-        // lighting neighbor and must never be mutated after generation).
+        // Light into a private copy, never the shared terrain-cache object
+        // itself (other threads may be concurrently reading it as a lighting
+        // neighbor) -- see docs/general-documentation.md, "Terrain cache vs. lit cache".
         std::shared_ptr<Chunk> spawnChunk = std::make_shared<Chunk>(*spawnTerrain);
         LightEngine::computeLighting(*spawnChunk, *this);
         _chunkCache[{0, 0}] = spawnChunk;
@@ -87,16 +82,14 @@ void World::getChunkAsync(int chunkX, int chunkZ, std::function<void(std::shared
     }
     WorldWorkerPool::getInstance().submit([this, chunkX, chunkZ, callback]() {
         std::shared_ptr<Chunk> terrain = getOrGenerateTerrain(chunkX, chunkZ);
-        // Copy before lighting: `terrain` may be concurrently shared with
-        // other threads reading it as a lighting neighbor and must never be
-        // mutated after generation.
+        // Copy before lighting -- `terrain` may be concurrently shared as a
+        // lighting neighbor and must never be mutated after generation.
         std::shared_ptr<Chunk> chunk = std::make_shared<Chunk>(*terrain);
         LightEngine::computeLighting(*chunk, *this);
         {
             std::lock_guard<std::mutex> lock(_chunkCacheMutex);
-            // Last-write-wins if two requests raced to light the same
-            // never-before-cached column concurrently -- harmless, since
-            // lighting is a pure function of the (already-cached) terrain.
+            // Last-write-wins on a race is harmless: lighting is a pure
+            // function of the (already-cached) terrain.
             _chunkCache[{chunkX, chunkZ}] = chunk;
         }
         callback(chunk);
@@ -114,9 +107,8 @@ std::shared_ptr<Chunk> World::getOrGenerateTerrain(int chunkX, int chunkZ) {
     std::shared_ptr<Chunk> chunk = _generator->generate(chunkX, chunkZ);
     {
         std::lock_guard<std::mutex> lock(_terrainCacheMutex);
-        // Last-write-wins if two threads raced to generate the same
-        // never-before-cached column concurrently -- harmless (deterministic,
-        // pure function of chunkX/chunkZ/seed), and rare in practice.
+        // Last-write-wins on a race is harmless: generation is a pure
+        // function of chunkX/chunkZ/seed.
         _terrainCache[{chunkX, chunkZ}] = chunk;
     }
     return chunk;

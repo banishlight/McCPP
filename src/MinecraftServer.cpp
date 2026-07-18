@@ -15,26 +15,12 @@ int main() {
     Properties::getProperties().initialize();
     Console::getConsole().Entry("Properties loaded successfully.");
     VanillaDataManager::getInstance().initialize();
-    // Must be constructed before WorldWorkerPool: singletons are torn down in
-    // reverse construction order at exit. WorldWorkerPool's queued chunk-gen
-    // tasks capture `this` (a World*) and touch World's members directly, so
-    // World must outlive WorldWorkerPool -- otherwise queued tasks still
-    // draining at shutdown run against an already-destroyed World (confirmed
-    // via an isolated repro: this exact ordering bug reliably crashes/hangs
-    // with tasks still queued when WorldWorkerPool starts destructing).
-    // World would otherwise construct lazily on the first player connection,
-    // which happens after WorldWorkerPool -- forcing it here fixes the order.
+    // Construction order matters here (reverse-destruction hazard for pool
+    // tasks capturing raw pointers) -- see docs/general-documentation.md,
+    // "Singleton construction/destruction order".
     World::getInstance();
-    // Must be initialized before ConnectionManager: singletons are torn down
-    // in reverse construction order at exit, and WorldWorkerPool's queued
-    // chunk-generation tasks hold shared_ptr<Connection> captures that must
-    // stay safe to run even after ConnectionManager itself is gone (they only
-    // touch the Connection object directly, kept alive by that shared_ptr).
     WorldWorkerPool::getInstance().initialize();
     ConnectionManager::getInstance().initialize();
-    // Must be initialized after ConnectionManager: singletons are torn down in
-    // reverse construction order at exit, so TickLoop's thread (which reaches
-    // into ConnectionManager every tick) needs to stop before ConnectionManager does.
     TickLoop::getInstance().initialize();
     CommandRegistry::getInstance().initialize();
     while (!ServerControl::isShutdownRequested()) {

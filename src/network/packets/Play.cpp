@@ -207,15 +207,8 @@ std::vector<Byte> Set_Center_Chunk_p::serialize() const {
 }
 
 namespace {
-    // Encodes one section's Paletted Container. Builds a local palette by
-    // first-seen order over the section's 4096 entries; a palette of size 1
-    // (uniform section -- covers both "fully air" and "fully one solid
-    // block") uses the cheap single-valued form (Bits Per Entry = 0). Anything
-    // else uses the indirect palette form: Bits Per Entry = max(4, ceil(log2(paletteSize))),
-    // a VarInt-prefixed palette of VarInt block-state IDs, then the per-block
-    // palette indices packed into longs at that bit width (entriesPerLong =
-    // 64/bits, filled LSB-first, never straddling a long boundary, remaining
-    // high bits of a partially-filled last long left zero).
+    // Encodes one section's Paletted Container (indirect palette, bit-packed
+    // into longs) -- see docs/network-protocol.md for the wire format.
     void encodeSection(std::vector<Byte>& out, const std::vector<Int32>& blockIds) {
         std::vector<Int32> palette;
         std::vector<int> indices(blockIds.size());
@@ -232,12 +225,9 @@ namespace {
             indices[i] = idx;
         }
 
-        // Even a single-valued (Bits Per Entry = 0) paletted container is still
-        // followed by a Data Array Length VarInt -- always 0 here, since a single
-        // value needs no per-block indices -- not omitted entirely. Verified against
-        // decompiled 1.21 client bytecode: FriendlyByteBuf's long-array reader
-        // unconditionally reads a VarInt length before reading any longs, and against
-        // Pumpkin's (github.com/Pumpkin-MC/Pumpkin) working server implementation.
+        // Single-valued (Bits Per Entry = 0) still needs a Data Array Length
+        // VarInt (always 0 here) -- present but zero-length, not omitted. See
+        // docs/general-documentation.md, "Wire format gotchas found the hard way".
         if (palette.size() == 1) {
             out.push_back(0x00);
             std::vector<Byte> valueBytes = varIntSerialize(palette[0]);
@@ -249,9 +239,8 @@ namespace {
 
         int bits = 4;
         while ((1u << bits) < palette.size()) bits++;
-        // This generator's block variety (stone/dirt/grass/air) never comes
-        // close to the 8-bit indirect ceiling, so the direct/global-palette
-        // fallback isn't needed and isn't built.
+        // Block variety never approaches the 8-bit indirect ceiling, so the
+        // direct/global-palette fallback isn't needed and isn't built.
 
         out.push_back(static_cast<Byte>(bits));
         std::vector<Byte> paletteCount = varIntSerialize(static_cast<int>(palette.size()));
@@ -374,11 +363,9 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
                 }
             }
         }
-        // A single count of non-empty blocks (blocks and fluids combined) --
-        // there is only one count short on the wire, not separate block/fluid
-        // counts (verified directly against decompiled 1.21 client bytecode,
-        // LevelChunkSection's network read method: one readShort() then
-        // straight into the block states container, no second short).
+        // One combined non-empty-block count (blocks + fluids), not two
+        // separate counts -- see docs/general-documentation.md, "Wire format
+        // gotchas found the hard way".
         sectionData.push_back(static_cast<Byte>((nonAirCount >> 8) & 0xFF));
         sectionData.push_back(static_cast<Byte>(nonAirCount & 0xFF));
         encodeSection(sectionData, blockIds); // Block states container
@@ -397,12 +384,9 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     std::vector<Byte> blockEntityCount = varIntSerialize(0);
     packet_data.insert(packet_data.end(), blockEntityCount.begin(), blockEntityCount.end());
 
-    // Lighting: 26 total light sections (Chunk::SECTION_COUNT real sections
-    // plus one below-world and one above-world sentinel). Bit 0 = below-world,
-    // bits 1..SECTION_COUNT = real sections in order, last bit = above-world
-    // (docs/network-protocol.md). A section with all-zero light goes in the
-    // "empty" mask (no array sent); anything else goes in the regular mask
-    // with its packed array included, in ascending bit order.
+    // 26 light sections: bit 0 = below-world sentinel, bits 1..SECTION_COUNT
+    // = real sections in order, last bit = above-world sentinel (see
+    // docs/network-protocol.md for the BitSet/empty-mask wire format).
     const int LIGHT_SECTION_COUNT = Chunk::SECTION_COUNT + 2;
     const std::vector<Byte> allZeroLight(2048, 0);
     const std::vector<Byte> allFullSky(2048, 0xFF); // every nibble = 15
@@ -509,14 +493,8 @@ void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int 
         }
     }
 
-    // Dispatch (and, in practice, deliver -- Connection::sendPackets() writes
-    // each queued packet to the socket in order, one at a time, not batched)
-    // nearest-to-center first. Otherwise, whenever a whole ring's worth of
-    // chunks is ready simultaneously (e.g. all cache hits on a rejoin after
-    // already exploring the area), the chunk directly under the player's own
-    // feet -- needed before the client's "waiting for chunks" gate releases
-    // gravity -- can end up serialized behind ~200 others, giving the client
-    // long enough to free-fall before its own chunk ever arrives.
+    // Dispatch nearest-to-center first -- see docs/general-documentation.md,
+    // "Chunk dispatch/delivery ordering".
     std::vector<std::pair<int, int>> dispatchOrder(newChunks.begin(), newChunks.end());
     std::sort(dispatchOrder.begin(), dispatchOrder.end(), [newCenterX, newCenterZ](const auto& a, const auto& b) {
         int da = std::abs(a.first - newCenterX) + std::abs(a.second - newCenterZ);
