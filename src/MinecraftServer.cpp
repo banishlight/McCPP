@@ -6,6 +6,7 @@
 #include <CommandRegistry.hpp>
 #include <ServerControl.hpp>
 #include <TickLoop.hpp>
+#include <WorldWorkerPool.hpp>
 #include <sstream>
 
 int main() {
@@ -13,6 +14,12 @@ int main() {
     Properties::getProperties().initialize();
     Console::getConsole().Entry("Properties loaded successfully.");
     VanillaDataManager::getInstance().initialize();
+    // Must be initialized before ConnectionManager: singletons are torn down
+    // in reverse construction order at exit, and WorldWorkerPool's queued
+    // chunk-generation tasks hold shared_ptr<Connection> captures that must
+    // stay safe to run even after ConnectionManager itself is gone (they only
+    // touch the Connection object directly, kept alive by that shared_ptr).
+    WorldWorkerPool::getInstance().initialize();
     ConnectionManager::getInstance().initialize();
     // Must be initialized after ConnectionManager: singletons are torn down in
     // reverse construction order at exit, so TickLoop's thread (which reaches

@@ -57,6 +57,7 @@ void ConnectionManager::close() {
 void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
     if (!conn->isValid()) return;
     conn->receivePacket();
+    conn->deliverGeneratedChunks();
     conn->sendPackets();
     // An idle connection re-enqueues itself forever; without this check the task
     // queue never empties, so ThreadPool::~ThreadPool() can never join its workers

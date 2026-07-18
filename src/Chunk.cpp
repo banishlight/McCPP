@@ -11,12 +11,20 @@ int Chunk::getChunkZ() const {
     return _chunkZ;
 }
 
-void Chunk::setSectionBlock(int sectionIndex, Int32 blockStateId) {
-    _sectionBlocks[sectionIndex] = blockStateId;
+int Chunk::index(int localX, int worldY, int localZ) const {
+    // (y*256 + z*16 + x) over the full 0-383 local-Y range decomposes exactly
+    // into section*4096 + in-section offset (256 * 16 == 4096), so no separate
+    // section/within-section split is needed here.
+    int localY = worldY - WORLD_MIN_Y;
+    return localY * 256 + localZ * 16 + localX;
 }
 
-Int32 Chunk::getSectionBlock(int sectionIndex) const {
-    return _sectionBlocks[sectionIndex];
+void Chunk::setBlock(int localX, int worldY, int localZ, Int32 blockStateId) {
+    _blocks[index(localX, worldY, localZ)] = blockStateId;
+}
+
+Int32 Chunk::getBlock(int localX, int worldY, int localZ) const {
+    return _blocks[index(localX, worldY, localZ)];
 }
 
 Int32 Chunk::getBiomeId() const {

@@ -202,6 +202,81 @@ std::vector<Byte> Set_Center_Chunk_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+namespace {
+    // Encodes one section's Paletted Container. Builds a local palette by
+    // first-seen order over the section's 4096 entries; a palette of size 1
+    // (uniform section -- covers both "fully air" and "fully one solid
+    // block") uses the cheap single-valued form (Bits Per Entry = 0). Anything
+    // else uses the indirect palette form: Bits Per Entry = max(4, ceil(log2(paletteSize))),
+    // a VarInt-prefixed palette of VarInt block-state IDs, then the per-block
+    // palette indices packed into longs at that bit width (entriesPerLong =
+    // 64/bits, filled LSB-first, never straddling a long boundary, remaining
+    // high bits of a partially-filled last long left zero).
+    void encodeSection(std::vector<Byte>& out, const std::vector<Int32>& blockIds) {
+        std::vector<Int32> palette;
+        std::vector<int> indices(blockIds.size());
+        for (size_t i = 0; i < blockIds.size(); i++) {
+            Int32 id = blockIds[i];
+            int idx = -1;
+            for (size_t p = 0; p < palette.size(); p++) {
+                if (palette[p] == id) { idx = static_cast<int>(p); break; }
+            }
+            if (idx < 0) {
+                idx = static_cast<int>(palette.size());
+                palette.push_back(id);
+            }
+            indices[i] = idx;
+        }
+
+        // Even a single-valued (Bits Per Entry = 0) paletted container is still
+        // followed by a Data Array Length VarInt -- always 0 here, since a single
+        // value needs no per-block indices -- not omitted entirely. Verified against
+        // decompiled 1.21 client bytecode: FriendlyByteBuf's long-array reader
+        // unconditionally reads a VarInt length before reading any longs, and against
+        // Pumpkin's (github.com/Pumpkin-MC/Pumpkin) working server implementation.
+        if (palette.size() == 1) {
+            out.push_back(0x00);
+            std::vector<Byte> valueBytes = varIntSerialize(palette[0]);
+            out.insert(out.end(), valueBytes.begin(), valueBytes.end());
+            std::vector<Byte> zeroLen = varIntSerialize(0);
+            out.insert(out.end(), zeroLen.begin(), zeroLen.end());
+            return;
+        }
+
+        int bits = 4;
+        while ((1u << bits) < palette.size()) bits++;
+        // This generator's block variety (stone/dirt/grass/air) never comes
+        // close to the 8-bit indirect ceiling, so the direct/global-palette
+        // fallback isn't needed and isn't built.
+
+        out.push_back(static_cast<Byte>(bits));
+        std::vector<Byte> paletteCount = varIntSerialize(static_cast<int>(palette.size()));
+        out.insert(out.end(), paletteCount.begin(), paletteCount.end());
+        for (Int32 id : palette) {
+            std::vector<Byte> idBytes = varIntSerialize(id);
+            out.insert(out.end(), idBytes.begin(), idBytes.end());
+        }
+
+        int entriesPerLong = 64 / bits;
+        int longCount = (static_cast<int>(indices.size()) + entriesPerLong - 1) / entriesPerLong;
+        std::vector<Byte> lengthBytes = varIntSerialize(longCount);
+        out.insert(out.end(), lengthBytes.begin(), lengthBytes.end());
+
+        UInt64 mask = (1ULL << bits) - 1;
+        for (int l = 0; l < longCount; l++) {
+            UInt64 word = 0;
+            for (int e = 0; e < entriesPerLong; e++) {
+                size_t entryIndex = static_cast<size_t>(l) * entriesPerLong + e;
+                if (entryIndex >= indices.size()) break;
+                word |= (static_cast<UInt64>(indices[entryIndex]) & mask) << (e * bits);
+            }
+            for (int i = 7; i >= 0; i--) {
+                out.push_back(static_cast<Byte>((word >> (i * 8)) & 0xFF));
+            }
+        }
+    }
+}
+
 Chunk_Data_p::Chunk_Data_p(int threshold, std::shared_ptr<Chunk> chunk) {
     _threshold = threshold;
     _chunk = chunk;
@@ -211,11 +286,7 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     #ifdef DEBUG
         Console::getConsole().Entry("Chunk_Data_p::serialize(): Sending.");
     #endif
-    // Every section is uniform (single block-state ID for the whole section),
-    // so every paletted container (blocks and biomes) uses the single-valued
-    // form (Bits Per Entry = 0, just a VarInt palette value, no data array).
     const Int32 AIR_BLOCK_STATE_ID = 0; // stable across versions since the 1.13 flattening
-    const int SECTION_VOLUME = 16 * 16 * 16;
 
     int chunkX = _chunk->getChunkX();
     int chunkZ = _chunk->getChunkZ();
@@ -233,30 +304,38 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     std::vector<Byte> heightmapsBytes = heightmaps.serializeNetwork();
     packet_data.insert(packet_data.end(), heightmapsBytes.begin(), heightmapsBytes.end());
 
-    // Even a single-valued (Bits Per Entry = 0) paletted container is still
-    // followed by a Data Array Length VarInt -- always 0 here, since a single
-    // value needs no per-block indices -- not omitted entirely. Verified against
-    // decompiled 1.21 client bytecode: FriendlyByteBuf's long-array reader
-    // unconditionally reads a VarInt length before reading any longs, and against
-    // Pumpkin's (github.com/Pumpkin-MC/Pumpkin) working server implementation.
     const std::vector<Byte> ZERO_DATA_ARRAY_LENGTH = varIntSerialize(0);
 
     std::vector<Byte> sectionData;
     for (int s = 0; s < Chunk::SECTION_COUNT; s++) {
-        Int32 blockStateId = _chunk->getSectionBlock(s);
+        int sectionWorldYBase = Chunk::WORLD_MIN_Y + s * 16;
+        // Wire iteration order for a section's Paletted Container: Y outer,
+        // then Z, then X (index = y*256 + z*16 + x within the section).
+        std::vector<Int32> blockIds;
+        blockIds.reserve(4096);
+        Int16 nonAirCount = 0;
+        for (int y = 0; y < 16; y++) {
+            int worldY = sectionWorldYBase + y;
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    Int32 id = _chunk->getBlock(x, worldY, z);
+                    blockIds.push_back(id);
+                    if (id != AIR_BLOCK_STATE_ID) nonAirCount++;
+                }
+            }
+        }
         // A single count of non-empty blocks (blocks and fluids combined) --
         // there is only one count short on the wire, not separate block/fluid
         // counts (verified directly against decompiled 1.21 client bytecode,
         // LevelChunkSection's network read method: one readShort() then
         // straight into the block states container, no second short).
-        Int16 count = (blockStateId == AIR_BLOCK_STATE_ID) ? 0 : SECTION_VOLUME;
-        sectionData.push_back(static_cast<Byte>((count >> 8) & 0xFF));
-        sectionData.push_back(static_cast<Byte>(count & 0xFF));
-        sectionData.push_back(0x00); // Block states: Bits Per Entry = 0
-        std::vector<Byte> blockIdBytes = varIntSerialize(blockStateId);
-        sectionData.insert(sectionData.end(), blockIdBytes.begin(), blockIdBytes.end());
-        sectionData.insert(sectionData.end(), ZERO_DATA_ARRAY_LENGTH.begin(), ZERO_DATA_ARRAY_LENGTH.end());
-        sectionData.push_back(0x00); // Biomes: Bits Per Entry = 0
+        sectionData.push_back(static_cast<Byte>((nonAirCount >> 8) & 0xFF));
+        sectionData.push_back(static_cast<Byte>(nonAirCount & 0xFF));
+        encodeSection(sectionData, blockIds); // Block states container
+
+        // Biomes: one global biome for the whole chunk, so this always stays
+        // on the single-valued path regardless of how varied the terrain is.
+        sectionData.push_back(0x00);
         std::vector<Byte> biomeId = varIntSerialize(_chunk->getBiomeId());
         sectionData.insert(sectionData.end(), biomeId.begin(), biomeId.end());
         sectionData.insert(sectionData.end(), ZERO_DATA_ARRAY_LENGTH.begin(), ZERO_DATA_ARRAY_LENGTH.end());
@@ -319,11 +398,16 @@ void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int 
         }
     }
 
+    // Generation happens on WorldWorkerPool and is delivered back through
+    // Connection::addGeneratedChunk -- player.markChunkLoaded() happens later,
+    // in Connection::deliverGeneratedChunks() on this connection's own thread,
+    // once generation actually completes (not here, and not on a pool thread).
+    std::shared_ptr<Connection> connPtr = cont.connection.shared_from_this();
     for (const auto& [x, z] : newChunks) {
         if (!player.hasChunkLoaded(x, z)) {
-            std::shared_ptr<Chunk> chunk = world.getChunk(x, z);
-            cont.connection.addPacket(std::make_shared<Chunk_Data_p>(threshold, chunk));
-            player.markChunkLoaded(x, z);
+            world.getChunkAsync(x, z, [connPtr](std::shared_ptr<Chunk> chunk) {
+                connPtr->addGeneratedChunk(chunk);
+            });
         }
     }
 

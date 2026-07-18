@@ -5,8 +5,11 @@
 #include <network/PacketUtils.hpp>
 #include <network/PacketContext.hpp>
 #include <network/Compression.hpp>
+#include <network/packets/Play.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
+#include <Chunk.hpp>
+#include <cstdlib>
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
     _socket = socket;
@@ -149,4 +152,33 @@ void Connection::enableEncryption(const std::vector<Byte>& sharedSecret) {
 
 Player& Connection::getPlayer() {
     return _player;
+}
+
+void Connection::addGeneratedChunk(std::shared_ptr<Chunk> chunk) {
+    std::lock_guard<std::mutex> lock(_pendingChunksMutex);
+    _pendingChunks.push_back(chunk);
+}
+
+void Connection::deliverGeneratedChunks() {
+    std::vector<std::shared_ptr<Chunk>> ready;
+    {
+        std::lock_guard<std::mutex> lock(_pendingChunksMutex);
+        ready.swap(_pendingChunks);
+    }
+    if (ready.empty()) return;
+    int viewDistance = _player.getViewDistance();
+    int centerX = _player.getCenterChunkX();
+    int centerZ = _player.getCenterChunkZ();
+    int threshold = getCompressionThreshold();
+    for (auto& chunk : ready) {
+        int cx = chunk->getChunkX();
+        int cz = chunk->getChunkZ();
+        // Already delivered (duplicate in-flight request) or no longer within
+        // view (the player moved away again before generation finished) --
+        // either way, silently drop it. Never marked loaded, so no unload is needed.
+        if (_player.hasChunkLoaded(cx, cz)) continue;
+        if (std::abs(cx - centerX) > viewDistance || std::abs(cz - centerZ) > viewDistance) continue;
+        _player.markChunkLoaded(cx, cz);
+        addPacket(std::make_shared<Chunk_Data_p>(threshold, chunk));
+    }
 }
