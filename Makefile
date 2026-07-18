@@ -1,6 +1,6 @@
 # Variables
 CXX := g++
-CXXFLAGS := -Wall -Wextra -std=c++17 -MMD -Wno-unused-parameter
+CXXFLAGS := -Wall -Wextra -std=c++17 -MMD -Wno-unused-parameter -O2
 LDFLAGS := -lz
 SRC_DIR := src
 BUILD_DIR := build
@@ -23,7 +23,7 @@ TEST_OBJ := $(TEST_SRC:$(TEST_DIR)/%.cpp=$(TEST_BUILD_DIR)/%.o)
 TEST_DEPS := $(TEST_OBJ:.o=.d)
 
 # Rules
-.PHONY: default clean directories debug fast clang linux windows test test-directories
+.PHONY: default clean directories debug clang linux windows test test-directories
 
 # Either linux or windows must be defined, but never both
 default: linux
@@ -36,13 +36,10 @@ linux: directories $(TARGET)
 windows: CXXFLAGS += -D WINDOWS
 windows: directories $(TARGET)
 
-# Debug target
-debug: CXXFLAGS += -D DEBUG -g
+# Debug target -- -O0 overrides the default -O2 so stepping/inspecting
+# variables in gdb stays reliable
+debug: CXXFLAGS += -D DEBUG -g -O0
 debug: linux
-
-# Optimizations included
-fast: CXXFLAGS += -Ofast
-fast: linux
 
 # build using clang & llvm
 clang: CXX := clang++ 
