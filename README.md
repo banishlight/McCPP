@@ -62,6 +62,6 @@ So that I can help diagnose the issue.
 ## Task List
 - [x] Networking Handles all Packets up to the Play State
 - [x] Player can load into void world
-- [ ] Player can load into flat world
+- [x] Player can load into flat world
 - [ ] Networking Handles all Play State packets
 - [ ] Commands check for senders permission level (player or console or op)
