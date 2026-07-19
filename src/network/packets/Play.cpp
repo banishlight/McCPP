@@ -726,26 +726,58 @@ std::vector<Byte> Pickup_Item_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Update_Entity_Position_p::Update_Entity_Position_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, bool onGround) {
+Set_Entity_Velocity_p::Set_Entity_Velocity_p(int threshold, int entityId, double vx, double vy, double vz) {
     _threshold = threshold;
     _entityId = entityId;
-    _deltaX = deltaX;
-    _deltaY = deltaY;
-    _deltaZ = deltaZ;
+    _vx = vx;
+    _vy = vy;
+    _vz = vz;
+}
+
+std::vector<Byte> Set_Entity_Velocity_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Entity_Velocity_p::serialize(): Sending.");
+    #endif
+    // 1/8000 of a block per tick, per docs/network-protocol.md.
+    Int16 wireVx = static_cast<Int16>(_vx * 8000.0);
+    Int16 wireVy = static_cast<Int16>(_vy * 8000.0);
+    Int16 wireVz = static_cast<Int16>(_vz * 8000.0);
+
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(static_cast<Byte>((wireVx >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(wireVx & 0xFF));
+    packet_data.push_back(static_cast<Byte>((wireVy >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(wireVy & 0xFF));
+    packet_data.push_back(static_cast<Byte>((wireVz >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(wireVz & 0xFF));
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Teleport_Entity_p::Teleport_Entity_p(int threshold, int entityId, double x, double y, double z, bool onGround) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _x = x;
+    _y = y;
+    _z = z;
     _onGround = onGround;
 }
 
-std::vector<Byte> Update_Entity_Position_p::serialize() const {
+std::vector<Byte> Teleport_Entity_p::serialize() const {
     #ifdef DEBUG
-        Console::getConsole().Entry("Update_Entity_Position_p::serialize(): Sending.");
+        Console::getConsole().Entry("Teleport_Entity_p::serialize(): Sending.");
     #endif
     std::vector<Byte> packet_data = varIntSerialize(_entityId);
-    packet_data.push_back(static_cast<Byte>((_deltaX >> 8) & 0xFF));
-    packet_data.push_back(static_cast<Byte>(_deltaX & 0xFF));
-    packet_data.push_back(static_cast<Byte>((_deltaY >> 8) & 0xFF));
-    packet_data.push_back(static_cast<Byte>(_deltaY & 0xFF));
-    packet_data.push_back(static_cast<Byte>((_deltaZ >> 8) & 0xFF));
-    packet_data.push_back(static_cast<Byte>(_deltaZ & 0xFF));
+
+    Int64 xBits, yBits, zBits;
+    std::memcpy(&xBits, &_x, sizeof(Int64));
+    std::memcpy(&yBits, &_y, sizeof(Int64));
+    std::memcpy(&zBits, &_z, sizeof(Int64));
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((xBits >> (i * 8)) & 0xFF));
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((yBits >> (i * 8)) & 0xFF));
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((zBits >> (i * 8)) & 0xFF));
+
+    packet_data.push_back(0x00); // Yaw (Angle): item entities have no meaningful rotation
+    packet_data.push_back(0x00); // Pitch
     packet_data.push_back(_onGround ? 0x01 : 0x00);
     return assemblePacket(getID(), _threshold, packet_data);
 }
@@ -1006,6 +1038,13 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             Int32 metaItemId = held.itemId;
             BroadcastToChunkViewers(chunkX, chunkZ, [entityId, metaItemId, dropCount](int broadcastThreshold) {
                 return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, metaItemId, dropCount);
+            });
+            // Spawn_Entity_p always encodes zero velocity -- follow up immediately
+            // so the client's own local physics picks up the toss instead of
+            // rendering the item as motionless until ItemPhysicsSystem's next
+            // meaningful correction.
+            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, vx, vy, vz](int broadcastThreshold) {
+                return std::make_shared<Set_Entity_Velocity_p>(broadcastThreshold, entityId, vx, vy, vz);
             });
         }
     }

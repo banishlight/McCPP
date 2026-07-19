@@ -172,18 +172,28 @@ class Pickup_Item_p : public Play_Packet, public Outgoing_Packet {
         int _collectedEntityId, _collectorEntityId, _count;
         static int constexpr _PACKET_ID = 0x6F;
 };
-class Update_Entity_Position_p : public Play_Packet, public Outgoing_Packet {
+class Set_Entity_Velocity_p : public Play_Packet, public Outgoing_Packet {
     public:
-        // deltaX/Y/Z: fixed-point, 4096 units/block (currentPos*4096 - prevPos*4096),
-        // per docs/network-protocol.md -- caller computes these from the physics step.
-        Update_Entity_Position_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, bool onGround);
+        // vx/vy/vz in blocks/tick -- converted internally to the wire's
+        // 1/8000-block-per-tick fixed-point units (docs/network-protocol.md).
+        Set_Entity_Velocity_p(int threshold, int entityId, double vx, double vy, double vz);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
         int _entityId;
-        Int16 _deltaX, _deltaY, _deltaZ;
+        double _vx, _vy, _vz;
+        static int constexpr _PACKET_ID = 0x5A;
+};
+class Teleport_Entity_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Teleport_Entity_p(int threshold, int entityId, double x, double y, double z, bool onGround);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        double _x, _y, _z;
         bool _onGround;
-        static int constexpr _PACKET_ID = 0x2E;
+        static int constexpr _PACKET_ID = 0x70;
 };
 
 // Shared by the initial Configuration->Play chunk send and every subsequent

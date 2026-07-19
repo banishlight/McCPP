@@ -52,15 +52,25 @@ void ItemPhysicsSystem::onTick(Int64 tickCount) {
 
         int newChunkX = floorDiv16(static_cast<int>(std::floor(newX)));
         int newChunkZ = floorDiv16(static_cast<int>(std::floor(newZ)));
+        // Internal bookkeeping (pickup-radius/despawn accuracy) stays authoritative
+        // every tick, independent of whether clients get a correction this tick.
         manager.updatePosition(entity.entityId, newX, newY, newZ, newVx, newVy, newVz, newChunkX, newChunkZ);
 
-        if (newX != entity.x || newY != entity.y || newZ != entity.z) {
-            Int16 deltaX = static_cast<Int16>((newX - entity.x) * 4096.0);
-            Int16 deltaY = static_cast<Int16>((newY - entity.y) * 4096.0);
-            Int16 deltaZ = static_cast<Int16>((newZ - entity.z) * 4096.0);
+        // Broadcasting a position correction every tick fights the client's own
+        // local gravity simulation of this entity (confirmed against Pumpkin's
+        // ItemEntity tick logic: it only re-syncs when velocity changes by more
+        // than 0.1 units squared, trusting the client to extrapolate the rest --
+        // sending every tick caused visible stutter, especially for the larger
+        // per-tick steps of a horizontal toss). Match that threshold here.
+        double dvx = newVx - entity.vx, dvy = newVy - entity.vy, dvz = newVz - entity.vz;
+        bool velocityDirty = (dvx * dvx + dvy * dvy + dvz * dvz) > 0.1;
+        if (velocityDirty) {
             int entityId = entity.entityId;
-            BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, deltaX, deltaY, deltaZ, onGround](int threshold) {
-                return std::make_shared<Update_Entity_Position_p>(threshold, entityId, deltaX, deltaY, deltaZ, onGround);
+            BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newX, newY, newZ, onGround](int threshold) {
+                return std::make_shared<Teleport_Entity_p>(threshold, entityId, newX, newY, newZ, onGround);
+            });
+            BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newVx, newVy, newVz](int threshold) {
+                return std::make_shared<Set_Entity_Velocity_p>(threshold, entityId, newVx, newVy, newVz);
             });
         }
     }
