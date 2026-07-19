@@ -17,11 +17,6 @@ namespace {
         bool sky; // true = sky channel, false = block channel
     };
 
-    // Floor division (toward negative infinity), unlike C++'s truncating /.
-    int floorDiv16(int v) {
-        return (v >= 0) ? (v / 16) : ((v - 15) / 16);
-    }
-
     size_t bufIndex(int bx, int by, int bz) {
         return (static_cast<size_t>(by) * BUF_SIZE + bz) * BUF_SIZE + bx;
     }

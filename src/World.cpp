@@ -68,14 +68,7 @@ bool World::isFlat() const {
 }
 
 void World::getChunkAsync(int chunkX, int chunkZ, std::function<void(std::shared_ptr<Chunk>)> callback) {
-    std::shared_ptr<Chunk> cached;
-    {
-        std::lock_guard<std::mutex> lock(_chunkCacheMutex);
-        auto it = _chunkCache.find({chunkX, chunkZ});
-        if (it != _chunkCache.end()) {
-            cached = it->second;
-        }
-    }
+    std::shared_ptr<Chunk> cached = getCachedChunk(chunkX, chunkZ);
     if (cached) {
         callback(cached);
         return;
@@ -94,6 +87,29 @@ void World::getChunkAsync(int chunkX, int chunkZ, std::function<void(std::shared
         }
         callback(chunk);
     });
+}
+
+std::shared_ptr<Chunk> World::getCachedChunk(int chunkX, int chunkZ) {
+    std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+    auto it = _chunkCache.find({chunkX, chunkZ});
+    return (it != _chunkCache.end()) ? it->second : nullptr;
+}
+
+bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
+    int chunkX = floorDiv16(worldX);
+    int chunkZ = floorDiv16(worldZ);
+    std::shared_ptr<Chunk> cached = getCachedChunk(chunkX, chunkZ);
+    if (!cached) return false;
+
+    int localX = worldX - chunkX * 16;
+    int localZ = worldZ - chunkZ * 16;
+    std::shared_ptr<Chunk> edited = std::make_shared<Chunk>(*cached);
+    edited->setBlock(localX, worldY, localZ, blockStateId);
+    LightEngine::computeLighting(*edited, *this);
+
+    std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+    _chunkCache[{chunkX, chunkZ}] = edited;
+    return true;
 }
 
 std::shared_ptr<Chunk> World::getOrGenerateTerrain(int chunkX, int chunkZ) {

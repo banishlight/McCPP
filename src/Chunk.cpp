@@ -1,5 +1,9 @@
 #include <Chunk.hpp>
 
+int floorDiv16(int v) {
+    return (v >= 0) ? (v / 16) : ((v - 15) / 16);
+}
+
 Chunk::Chunk(int chunkX, int chunkZ) : _chunkX(chunkX), _chunkZ(chunkZ) {
 }
 

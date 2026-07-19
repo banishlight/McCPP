@@ -30,6 +30,18 @@ class World {
         // terrain is only ever generated once no matter how many nearby
         // chunks need it purely for lighting occlusion. Safe from any thread.
         std::shared_ptr<Chunk> getOrGenerateTerrain(int chunkX, int chunkZ);
+        // Synchronous read of an already-cached, fully-lit chunk -- nullptr if
+        // not cached (not loaded/generated yet). Safe from any thread.
+        std::shared_ptr<Chunk> getCachedChunk(int chunkX, int chunkZ);
+        // Applies one block edit at absolute world coordinates. Copy-then-replace
+        // (see docs/general-documentation.md, "Terrain cache vs. lit cache"):
+        // builds a modified copy of the cached chunk, relights just that copy,
+        // then swaps it into _chunkCache -- the previous shared_ptr, if any
+        // other thread is mid-read of it, is left untouched and internally
+        // consistent. _terrainCache is intentionally not updated (accepted
+        // gap: a neighbor chunk relit later than this edit sees stale terrain
+        // for this chunk). Returns false (no-op) if the chunk isn't cached.
+        bool setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId);
     private:
         World();
         string _dimensionName = "minecraft:overworld";

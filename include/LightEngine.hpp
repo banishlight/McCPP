@@ -4,12 +4,11 @@
 class Chunk;
 class World;
 
-// Computes real sky + block light via BFS flood-fill. There's no block
-// placing/breaking yet, so lighting only ever needs to be computed once, at
-// chunk generation time -- never incrementally re-updated. Since max light
-// level (15) is less than chunk width (16), a chunk's lighting is exactly
-// correct using only its own block data plus its 8 immediate neighbors' --
-// no wider propagation is ever possible.
+// Computes real sky + block light via BFS flood-fill, at chunk generation
+// time and again (on a fresh copy) whenever World::setBlock edits a cached
+// chunk. Since max light level (15) is less than chunk width (16), a chunk's
+// lighting is exactly correct using only its own block data plus its 8
+// immediate neighbors' -- no wider propagation is ever possible.
 class LightEngine {
     public:
         // Computes and stores sky + block light directly on `target`, using a

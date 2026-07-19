@@ -6,6 +6,7 @@
 #include <vanilla/VanillaDataManager.hpp>
 #include <Player.hpp>
 #include <World.hpp>
+#include <ItemBlockMapping.hpp>
 #include <Console.hpp>
 #include <memory>
 #include <vector>
@@ -198,6 +199,11 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     player.setPosition(world.getSpawnX(), world.getSpawnY(), world.getSpawnZ());
     player.setRotation(world.getSpawnYaw(), 0.0f);
 
+    // Seed the hotbar with a placeable test stack so breaking/placing is
+    // immediately testable without any survival-mode item pickup (which
+    // isn't implemented -- see docs/general-documentation.md, "Minimal inventory").
+    player.setHotbarSlot(0, STONE_ITEM_ID, 64);
+
     int threshold = cont.connection.getCompressionThreshold();
     std::shared_ptr<Outgoing_Packet> loginPlay = std::make_shared<Login_Play_p>(threshold, player);
     cont.connection.addPacket(loginPlay);
@@ -208,6 +214,7 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     std::shared_ptr<Outgoing_Packet> syncPosition = std::make_shared<Synchronize_Player_Position_p>(
         threshold, player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch(), 0);
     cont.connection.addPacket(syncPosition);
+    cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(threshold, player.getHotbar()));
 
     // Send every chunk within the player's view distance around the spawn
     // chunk (0,0). Movement-triggered updates (Set_Player_Position_p etc. in

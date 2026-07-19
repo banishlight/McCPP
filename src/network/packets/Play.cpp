@@ -3,10 +3,15 @@
 #include <network/packets/Play.hpp>
 #include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
+#include <network/ConnectionManager.hpp>
 #include <network/Position.hpp>
 #include <vanilla/VanillaDataManager.hpp>
 #include <Player.hpp>
 #include <World.hpp>
+#include <BlockIds.hpp>
+#include <ItemBlockMapping.hpp>
+#include <EntityIdAllocator.hpp>
+#include <network/Crypto.hpp>
 #include <Console.hpp>
 #include <cstring>
 #include <cmath>
@@ -315,6 +320,27 @@ namespace {
         return true;
     }
 
+    // Slot (1.20.5+ Data Components format, cross-checked against Pumpkin's
+    // ItemStackSerializer since docs/network-protocol.md only links out to an
+    // external page for this type): empty is a single VarInt(0). Non-empty is
+    // VarInt(count), VarInt(item ID), then VarInt(components-to-add count)
+    // and VarInt(components-to-remove count) -- both 0 here, since nothing
+    // this server places needs a non-default component (custom name, damage,
+    // etc.), so no component entries ever follow.
+    std::vector<Byte> packSlot(Int32 itemId, Int32 count) {
+        if (itemId < 0 || count <= 0) {
+            return varIntSerialize(0);
+        }
+        std::vector<Byte> out = varIntSerialize(count);
+        std::vector<Byte> idBytes = varIntSerialize(itemId);
+        out.insert(out.end(), idBytes.begin(), idBytes.end());
+        std::vector<Byte> addCount = varIntSerialize(0);
+        out.insert(out.end(), addCount.begin(), addCount.end());
+        std::vector<Byte> removeCount = varIntSerialize(0);
+        out.insert(out.end(), removeCount.begin(), removeCount.end());
+        return out;
+    }
+
     // MOTION_BLOCKING heightmap: for each of the 256 columns, the highest
     // non-air block's Y, stored as (y - WORLD_MIN_Y + 1) so 0 means "no
     // blocking block in this column" -- 9 bits/entry, 7 entries/long (never
@@ -323,7 +349,6 @@ namespace {
         constexpr int BITS = 9;
         constexpr int ENTRIES_PER_LONG = 64 / BITS;
         constexpr int LONG_COUNT = (256 + ENTRIES_PER_LONG - 1) / ENTRIES_PER_LONG;
-        const Int32 AIR_BLOCK_STATE_ID = 0;
         std::vector<Int64> data(LONG_COUNT, 0);
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
@@ -354,8 +379,6 @@ std::vector<Byte> Chunk_Data_p::serialize() const {
     #ifdef DEBUG
         Console::getConsole().Entry("Chunk_Data_p::serialize(): Sending.");
     #endif
-    const Int32 AIR_BLOCK_STATE_ID = 0; // stable across versions since the 1.13 flattening
-
     int chunkX = _chunk->getChunkX();
     int chunkZ = _chunk->getChunkZ();
 
@@ -498,6 +521,162 @@ std::vector<Byte> Unload_Chunk_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Block_Update_p::Block_Update_p(int threshold, Int32 x, Int32 y, Int32 z, Int32 blockStateId) {
+    _threshold = threshold;
+    _x = x;
+    _y = y;
+    _z = z;
+    _blockStateId = blockStateId;
+}
+
+std::vector<Byte> Block_Update_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Block_Update_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    Int64 location = EncodePosition(_x, _y, _z);
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((location >> (i * 8)) & 0xFF));
+    std::vector<Byte> blockIdBytes = varIntSerialize(_blockStateId);
+    packet_data.insert(packet_data.end(), blockIdBytes.begin(), blockIdBytes.end());
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Acknowledge_Block_Change_p::Acknowledge_Block_Change_p(int threshold, int sequence) {
+    _threshold = threshold;
+    _sequence = sequence;
+}
+
+std::vector<Byte> Acknowledge_Block_Change_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Acknowledge_Block_Change_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_sequence);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Set_Container_Content_p::Set_Container_Content_p(int threshold, const std::array<HotbarSlot, Player::HOTBAR_SIZE>& hotbar) {
+    _threshold = threshold;
+    _hotbar = hotbar;
+}
+
+std::vector<Byte> Set_Container_Content_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Container_Content_p::serialize(): Sending.");
+    #endif
+    // Player inventory (Window ID 0) container-slot layout: 0 = crafting
+    // result, 1-4 = crafting grid, 5-8 = armor, 9-35 = main inventory,
+    // 36-44 = hotbar, 45 = offhand (cross-checked against Pumpkin's
+    // player_screen_handler.rs). The client maps array index directly to
+    // this absolute slot index, so all 46 must be sent even though only the
+    // hotbar range is ever populated -- sending fewer would misplace the
+    // hotbar's contents into the crafting/armor slots instead.
+    const int TOTAL_SLOTS = 46;
+    const int HOTBAR_START = 36;
+
+    std::vector<Byte> packet_data;
+    packet_data.push_back(0x00); // Window ID: 0 = player inventory
+    std::vector<Byte> stateId = varIntSerialize(0); // no Click Container handling, so state tracking is moot
+    packet_data.insert(packet_data.end(), stateId.begin(), stateId.end());
+    std::vector<Byte> count = varIntSerialize(TOTAL_SLOTS);
+    packet_data.insert(packet_data.end(), count.begin(), count.end());
+    for (int i = 0; i < TOTAL_SLOTS; i++) {
+        std::vector<Byte> slotBytes;
+        if (i >= HOTBAR_START && i < HOTBAR_START + Player::HOTBAR_SIZE) {
+            const HotbarSlot& slot = _hotbar[i - HOTBAR_START];
+            slotBytes = packSlot(slot.itemId, slot.count);
+        } else {
+            slotBytes = packSlot(-1, 0);
+        }
+        packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
+    }
+    std::vector<Byte> carried = packSlot(-1, 0); // nothing dragged with the mouse
+    packet_data.insert(packet_data.end(), carried.begin(), carried.end());
+
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _uuid = uuid;
+    _entityTypeId = entityTypeId;
+    _x = x;
+    _y = y;
+    _z = z;
+}
+
+std::vector<Byte> Spawn_Entity_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Spawn_Entity_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    std::vector<Byte> uuidBytes = serializeUUID(_uuid);
+    packet_data.insert(packet_data.end(), uuidBytes.begin(), uuidBytes.end());
+    std::vector<Byte> typeBytes = varIntSerialize(_entityTypeId);
+    packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
+
+    Int64 xBits, yBits, zBits;
+    std::memcpy(&xBits, &_x, sizeof(Int64));
+    std::memcpy(&yBits, &_y, sizeof(Int64));
+    std::memcpy(&zBits, &_z, sizeof(Int64));
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((xBits >> (i * 8)) & 0xFF));
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((yBits >> (i * 8)) & 0xFF));
+    for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((zBits >> (i * 8)) & 0xFF));
+
+    packet_data.push_back(0x00); // Pitch (Angle): a static drop has no meaningful rotation
+    packet_data.push_back(0x00); // Yaw
+    packet_data.push_back(0x00); // Head Yaw
+
+    std::vector<Byte> dataBytes = varIntSerialize(0); // Object Data: unused for item entities
+    packet_data.insert(packet_data.end(), dataBytes.begin(), dataBytes.end());
+
+    for (int i = 0; i < 3; i++) { // Velocity X/Y/Z: 0 -- no toss/physics on this drop
+        packet_data.push_back(0x00);
+        packet_data.push_back(0x00);
+    }
+
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Set_Entity_Metadata_p::Set_Entity_Metadata_p(int threshold, int entityId, Int32 itemId, Int32 count) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _itemId = itemId;
+    _count = count;
+}
+
+std::vector<Byte> Set_Entity_Metadata_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Entity_Metadata_p::serialize(): Sending.");
+    #endif
+    // ItemEntity's "Item" field sits at metadata index 8, right after
+    // Entity's own 8 base tracked fields (index 0-7); item_stack is metadata
+    // type 7. Both sourced from Pumpkin's version-pinned 1.21 tracked_data/
+    // meta_data_type tables, not guessed -- see docs/general-documentation.md.
+    const Byte ITEM_ENTITY_METADATA_INDEX = 8;
+    const int ITEM_STACK_METADATA_TYPE = 7;
+
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(ITEM_ENTITY_METADATA_INDEX);
+    std::vector<Byte> typeBytes = varIntSerialize(ITEM_STACK_METADATA_TYPE);
+    packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
+    std::vector<Byte> slotBytes = packSlot(_itemId, _count);
+    packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
+    packet_data.push_back(0xFF); // terminator: no more metadata entries
+
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::shared_ptr<Outgoing_Packet>(int threshold)>& makePacket) {
+    std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
+    for (auto& conn : connections) {
+        if (!conn) continue;
+        if (conn->getState() != ConnectionState::Play) continue;
+        if (!conn->getPlayer().hasChunkLoaded(chunkX, chunkZ)) continue;
+        conn->addPacket(makePacket(conn->getCompressionThreshold()));
+    }
+}
+
 void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int newCenterX, int newCenterZ) {
     // Cheap bail for the common case: a movement packet that hasn't crossed a
     // chunk boundary. getLoadedChunks().empty() lets the very first call
@@ -604,4 +783,115 @@ void Serverbound_Keep_Alive_play_p::deserialize(std::vector<Byte> in_buff, Packe
     #endif
     // TODO: validate against the ID we last sent once Connection proactively
     // sends Keep Alives on a timer; nothing does yet, so there's nothing to check.
+}
+
+void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Player_Action_p::deserialize(): Received.");
+    #endif
+    const int CREATIVE_GAMEMODE = 1;
+
+    int status = deserializeVarInt(in_buff);
+    DecodedPosition loc = DecodePosition(deserializeLong(in_buff));
+    deserializeByte(in_buff); // Face: unused for breaking, the clicked block itself is removed.
+    int sequence = deserializeVarInt(in_buff);
+
+    Player& player = cont.connection.getPlayer();
+    // No server-side mining-time/hardness validation (see docs/general-documentation.md,
+    // "Accepted gaps") -- trust status 2 (Finished digging) in any gamemode,
+    // or status 0 (Started digging) in Creative, where the client never sends
+    // a Finished digging follow-up.
+    bool shouldBreak = (status == 2) || (status == 0 && player.getGamemode() == CREATIVE_GAMEMODE);
+    if (shouldBreak) {
+        // minecraft:item entity-type registry ID, sourced from the vanilla
+        // data generator report, not guessed.
+        const int ITEM_ENTITY_TYPE_ID = 58;
+
+        World& world = World::getInstance();
+        int chunkX = floorDiv16(loc.x);
+        int chunkZ = floorDiv16(loc.z);
+
+        // Read the block being broken before it's gone, so its drop can be
+        // resolved -- World::setBlock alone doesn't report what was there.
+        Int32 previousBlock = AIR_BLOCK_STATE_ID;
+        std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+        if (chunk) {
+            previousBlock = chunk->getBlock(loc.x - chunkX * 16, loc.y, loc.z - chunkZ * 16);
+        }
+
+        world.setBlock(loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
+        BroadcastToChunkViewers(chunkX, chunkZ, [loc](int threshold) {
+            return std::make_shared<Block_Update_p>(threshold, loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
+        });
+        int threshold = cont.connection.getCompressionThreshold();
+        cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+
+        // No pickup/despawn logic -- the drop is purely visual, not tracked
+        // once spawned (see docs/general-documentation.md, "Accepted gaps").
+        Int32 dropItemId = blockStateIdToItemId(previousBlock);
+        if (dropItemId >= 0) {
+            int entityId = EntityIdAllocator::next();
+            std::vector<long> uuid = generateRandomUUID();
+            double dropX = loc.x + 0.5, dropY = loc.y + 0.5, dropZ = loc.z + 0.5;
+            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
+                return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, dropX, dropY, dropZ);
+            });
+            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, dropItemId](int broadcastThreshold) {
+                return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, dropItemId, 1);
+            });
+        }
+    }
+}
+
+void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Use_Item_On_p::deserialize(): Received.");
+    #endif
+    deserializeVarInt(in_buff); // Hand: unused until multiple hands matter.
+    DecodedPosition loc = DecodePosition(deserializeLong(in_buff));
+    int face = deserializeVarInt(in_buff);
+    deserializeFloat(in_buff); // Cursor Position X: unused, no sub-block placement logic yet.
+    deserializeFloat(in_buff); // Cursor Position Y
+    deserializeFloat(in_buff); // Cursor Position Z
+    deserializeBool(in_buff);  // Inside block: unused.
+    int sequence = deserializeVarInt(in_buff);
+
+    int threshold = cont.connection.getCompressionThreshold();
+    Player& player = cont.connection.getPlayer();
+    const HotbarSlot& held = player.getHotbar()[player.getSelectedSlot()];
+    Int32 blockStateId = itemIdToBlockStateId(held.itemId);
+    if (blockStateId < 0) {
+        // Unmapped/empty held item -- still ack (the client predicted a
+        // placement that didn't happen), just no-op the world edit.
+        cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+        return;
+    }
+
+    // Face -> outward normal (docs/network-protocol.md, "Player Action").
+    int dx = 0, dy = 0, dz = 0;
+    switch (face) {
+        case 0: dy = -1; break; // Bottom
+        case 1: dy = 1; break;  // Top
+        case 2: dz = -1; break; // North
+        case 3: dz = 1; break;  // South
+        case 4: dx = -1; break; // West
+        case 5: dx = 1; break;  // East
+    }
+    Int32 px = loc.x + dx, py = loc.y + dy, pz = loc.z + dz;
+
+    World::getInstance().setBlock(px, py, pz, blockStateId);
+    int chunkX = floorDiv16(px);
+    int chunkZ = floorDiv16(pz);
+    BroadcastToChunkViewers(chunkX, chunkZ, [px, py, pz, blockStateId](int broadcastThreshold) {
+        return std::make_shared<Block_Update_p>(broadcastThreshold, px, py, pz, blockStateId);
+    });
+    cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+}
+
+void Set_Held_Item_serverbound_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Held_Item_serverbound_p::deserialize(): Received.");
+    #endif
+    Int16 slot = deserializeShort(in_buff);
+    cont.connection.getPlayer().setSelectedSlot(slot);
 }

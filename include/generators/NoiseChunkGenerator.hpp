@@ -1,6 +1,7 @@
 #pragma once
 #include <ChunkGenerator.hpp>
 #include <PerlinNoise.hpp>
+#include <BlockIds.hpp>
 #include <array>
 
 // Real terrain: a 3D density field (terrain noise minus a height bias, so the
@@ -25,10 +26,6 @@ class NoiseChunkGenerator : public ChunkGenerator {
         PerlinNoise _terrainNoise;
         PerlinNoise _caveNoise;
 
-        // Sourced from the vanilla data generator report (server.jar --reports), not guessed.
-        static constexpr Int32 STONE_BLOCK_STATE_ID = 1;
-        static constexpr Int32 DIRT_BLOCK_STATE_ID = 10;
-        static constexpr Int32 GRASS_BLOCK_STATE_ID = 9; // snowy=false (default)
         static constexpr int DIRT_DEPTH = 3;
 
         // Terrain shape (tunable; iterate by playtesting).

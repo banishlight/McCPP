@@ -162,3 +162,12 @@ Two performance passes, both 2026-07-18:
 A couple of `Chunk_Data_p` details that don't match a naive reading of the wiki summary, both confirmed against decompiled 1.21 client bytecode:
 - A single-valued (Bits Per Entry = 0) paletted container is still followed by a Data Array Length VarInt (always 0 in that case) — it's present but zero-length, not omitted entirely.
 - Each chunk section has exactly one non-empty-block-count short on the wire (blocks and fluids combined), not separate block/fluid counts.
+
+## Block breaking and placing
+Breaking (`Player_Action_p`) and placing (`Use_Item_On_p`) edit the world via `World::setBlock`, which copies the target chunk, edits and relights the copy, then swaps it into the cache rather than mutating the shared original in place — `Chunk` has no internal locking, so this avoids racing other threads reading the same cached `shared_ptr`. Edits broadcast a `Block_Update_p` to every player with that chunk loaded, and ack the acting player's client (`Acknowledge_Block_Change_p`) so its local prediction doesn't flicker/revert.
+
+`Player` has a minimal 9-slot hotbar (no full inventory, no Click Container support), seeded with a starting stack at join and sent via `Set_Container_Content_p`. Breaking a known block drops a visible item entity (`Spawn_Entity_p` + `Set_Entity_Metadata_p`) — no pickup or despawn logic.
+
+Wire formats not covered by `docs/network-protocol.md` were cross-checked against Pumpkin rather than guessed: the 1.20.5+ Slot/Data-Components format, the player inventory's 46-slot layout (hotbar at indices 36-44), and the item entity's metadata index/type for its displayed stack (index 8, type 7).
+
+Known gaps: no reach or mining-time validation (breaking is instant), placing never replaces the clicked block itself (can't place into water/tall grass), item drops aren't tracked after spawning, and terrain used for lighting neighbors isn't updated by edits.

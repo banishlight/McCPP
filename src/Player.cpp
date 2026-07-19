@@ -1,9 +1,8 @@
 #include <Player.hpp>
+#include <EntityIdAllocator.hpp>
 #include <Console.hpp>
 
-std::atomic<int> Player::_nextEntityId{1};
-
-Player::Player() : _entityId(_nextEntityId++) {
+Player::Player() : _entityId(EntityIdAllocator::next()) {
     _uuid.resize(2);
 }
 
@@ -105,4 +104,28 @@ int Player::getCenterChunkZ() const {
 void Player::setCenterChunk(int chunkX, int chunkZ) {
     _centerChunkX = chunkX;
     _centerChunkZ = chunkZ;
+}
+
+const std::array<HotbarSlot, Player::HOTBAR_SIZE>& Player::getHotbar() const {
+    return _hotbar;
+}
+
+void Player::setHotbarSlot(int index, Int32 itemId, Int32 count) {
+    if (index < 0 || index >= HOTBAR_SIZE) {
+        Console::getConsole().Error("Player::setHotbarSlot(): index out of range.");
+        return;
+    }
+    _hotbar[index] = {itemId, count};
+}
+
+int Player::getSelectedSlot() const {
+    return _selectedSlot;
+}
+
+void Player::setSelectedSlot(int slot) {
+    if (slot < 0 || slot >= HOTBAR_SIZE) {
+        Console::getConsole().Error("Player::setSelectedSlot(): slot out of range.");
+        return;
+    }
+    _selectedSlot = slot;
 }

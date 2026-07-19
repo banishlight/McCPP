@@ -7,6 +7,11 @@ void cleanupCrypto();
 std::vector<Byte> generatePublicKey();
 std::vector<Byte> decryptWithPrivateKey(const std::vector<Byte>& data);
 std::vector<Byte> generateVerifyToken();
+
+// Random RFC 4122 v4 UUID (2 longs, big-endian, matching deserializeUUID's
+// representation) -- for entities with no client-supplied UUID (unlike
+// players, who arrive with one from Login Start).
+std::vector<long> generateRandomUUID();
 // Compares a decrypted verify token against the one generated for this connection attempt.
 bool verifyToken(const std::vector<Byte>& token);
 

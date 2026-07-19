@@ -19,6 +19,12 @@ std::vector<Byte> serializeString(const string& str);
 double deserializeDouble(std::vector<Byte>& data);
 float deserializeFloat(std::vector<Byte>& data);
 
+int deserializeVarInt(std::vector<Byte>& data);
+Int64 deserializeLong(std::vector<Byte>& data);
+Int16 deserializeShort(std::vector<Byte>& data);
+Byte deserializeByte(std::vector<Byte>& data);
+bool deserializeBool(std::vector<Byte>& data);
+
 std::vector<Byte> deserializePrefixedArray(std::vector<Byte>& data);
 std::vector<Byte> serializePrefixedArray(const std::vector<Byte>& data);
 

@@ -72,7 +72,8 @@ class Packet_Registry {
         int const LOGIN_SIZE = 5;
         int const CONFIG_SIZE = 8;
         // Sparse: only Confirm Teleportation (0x00), Set Player Position (0x1A),
-        // Set Player Position and Rotation (0x1B), and Keep Alive (0x18) are
+        // Set Player Position and Rotation (0x1B), Keep Alive (0x18), Player
+        // Action (0x24), Set Held Item (0x2F), and Use Item On (0x38) are
         // implemented so far, but the vector must be sized to the highest ID used.
-        int const PLAY_SIZE = 0x1C;
+        int const PLAY_SIZE = 0x39;
 };

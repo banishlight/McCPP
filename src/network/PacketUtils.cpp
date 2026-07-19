@@ -161,6 +161,37 @@ float deserializeFloat(std::vector<Byte>& data) {
     return result;
 }
 
+int deserializeVarInt(std::vector<Byte>& data) {
+    int value = varIntDeserialize(data);
+    data.erase(data.begin(), data.begin() + getVarIntSize(value));
+    return value;
+}
+
+Int64 deserializeLong(std::vector<Byte>& data) {
+    Int64 result = 0;
+    for (int i = 0; i < 8; i++) {
+        result = (result << 8) | static_cast<Int64>(static_cast<unsigned char>(data[i]));
+    }
+    data.erase(data.begin(), data.begin() + 8);
+    return result;
+}
+
+Int16 deserializeShort(std::vector<Byte>& data) {
+    Int16 result = static_cast<Int16>((static_cast<unsigned char>(data[0]) << 8) | static_cast<unsigned char>(data[1]));
+    data.erase(data.begin(), data.begin() + 2);
+    return result;
+}
+
+Byte deserializeByte(std::vector<Byte>& data) {
+    Byte result = data[0];
+    data.erase(data.begin(), data.begin() + 1);
+    return result;
+}
+
+bool deserializeBool(std::vector<Byte>& data) {
+    return deserializeByte(data) != 0;
+}
+
 std::vector<Byte> deserializePrefixedArray(std::vector<Byte>& data) {
     int size = varIntDeserialize(data);
     int varIntSize = getVarIntSize(size);

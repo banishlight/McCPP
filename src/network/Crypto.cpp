@@ -135,6 +135,21 @@ bool verifyToken(const std::vector<Byte>& token) {
     return !current_verify_token.empty() && token == current_verify_token;
 }
 
+std::vector<long> generateRandomUUID() {
+    Byte raw[16];
+    if (RAND_bytes(raw, 16) != 1) {
+        Console::getConsole().Error("Failed to generate random UUID");
+        return {0, 0};
+    }
+    raw[6] = (raw[6] & 0x0F) | 0x40; // version 4
+    raw[8] = (raw[8] & 0x3F) | 0x80; // variant RFC 4122
+
+    long mostSignificant = 0, leastSignificant = 0;
+    for (int i = 0; i < 8; i++) mostSignificant = (mostSignificant << 8) | static_cast<long>(raw[i]);
+    for (int i = 8; i < 16; i++) leastSignificant = (leastSignificant << 8) | static_cast<long>(raw[i]);
+    return {mostSignificant, leastSignificant};
+}
+
 StreamCipher::StreamCipher(const std::vector<Byte>& sharedSecret, bool encrypting) {
     _encrypting = encrypting;
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();

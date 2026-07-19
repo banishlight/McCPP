@@ -2,6 +2,10 @@
 #include <Standards.hpp>
 #include <array>
 
+// Floor division by 16 (toward negative infinity), unlike C++'s truncating /
+// -- needed anywhere a world block coordinate maps to a chunk coordinate.
+int floorDiv16(int v);
+
 // One chunk column's data: a real per-block store (not just one ID per
 // section) since terrain height varies per column, so sections are no longer
 // uniform the way they were for the flat world.
