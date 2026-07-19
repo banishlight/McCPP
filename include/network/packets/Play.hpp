@@ -122,6 +122,16 @@ class Set_Container_Content_p : public Play_Packet, public Outgoing_Packet {
         std::array<HotbarSlot, Player::HOTBAR_SIZE> _hotbar; // snapshot, not a Player& -- serialize() may run later, off the caller's thread
         static int constexpr _PACKET_ID = 0x13;
 };
+class Set_Container_Slot_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Set_Container_Slot_p(int threshold, int slotIndex, Int32 itemId, Int32 count);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _slotIndex;
+        Int32 _itemId, _count;
+        static int constexpr _PACKET_ID = 0x15;
+};
 class Spawn_Entity_p : public Play_Packet, public Outgoing_Packet {
     public:
         Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z);

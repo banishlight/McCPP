@@ -595,6 +595,29 @@ std::vector<Byte> Set_Container_Content_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Set_Container_Slot_p::Set_Container_Slot_p(int threshold, int slotIndex, Int32 itemId, Int32 count) {
+    _threshold = threshold;
+    _slotIndex = slotIndex;
+    _itemId = itemId;
+    _count = count;
+}
+
+std::vector<Byte> Set_Container_Slot_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Container_Slot_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    packet_data.push_back(0x00); // Window ID: 0 = player inventory
+    std::vector<Byte> stateId = varIntSerialize(0); // no Click Container handling, so state tracking is moot
+    packet_data.insert(packet_data.end(), stateId.begin(), stateId.end());
+    Int16 slot16 = static_cast<Int16>(_slotIndex);
+    packet_data.push_back(static_cast<Byte>((slot16 >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(slot16 & 0xFF));
+    std::vector<Byte> slotBytes = packSlot(_itemId, _count);
+    packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
 Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z) {
     _threshold = threshold;
     _entityId = entityId;
@@ -858,9 +881,10 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
 
     int threshold = cont.connection.getCompressionThreshold();
     Player& player = cont.connection.getPlayer();
-    const HotbarSlot& held = player.getHotbar()[player.getSelectedSlot()];
+    int selectedSlot = player.getSelectedSlot();
+    HotbarSlot held = player.getHotbar()[selectedSlot]; // copy: mutating the slot below must not alias this read
     Int32 blockStateId = itemIdToBlockStateId(held.itemId);
-    if (blockStateId < 0) {
+    if (blockStateId < 0 || held.count <= 0) {
         // Unmapped/empty held item -- still ack (the client predicted a
         // placement that didn't happen), just no-op the world edit.
         cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
@@ -886,6 +910,15 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
         return std::make_shared<Block_Update_p>(broadcastThreshold, px, py, pz, blockStateId);
     });
     cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+
+    // Consume one from the stack -- empties the slot entirely at 0 rather
+    // than leaving a lingering itemId with a 0 count.
+    Int32 newCount = held.count - 1;
+    Int32 newItemId = (newCount > 0) ? held.itemId : -1;
+    if (newCount <= 0) newCount = 0;
+    player.setHotbarSlot(selectedSlot, newItemId, newCount);
+    int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
+    cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, newItemId, newCount));
 }
 
 void Set_Held_Item_serverbound_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
