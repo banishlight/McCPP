@@ -1,6 +1,7 @@
 #include <Player.hpp>
 #include <EntityIdAllocator.hpp>
 #include <Console.hpp>
+#include <algorithm>
 
 Player::Player() : _entityId(EntityIdAllocator::next()) {
     _uuid.resize(2);
@@ -128,4 +129,36 @@ void Player::setSelectedSlot(int slot) {
         return;
     }
     _selectedSlot = slot;
+}
+
+// Every currently-mapped item (stone, dirt, grass_block) caps at vanilla's
+// standard 64 -- no per-item stack size table exists yet (see ItemBlockMapping.hpp).
+static constexpr Int32 MAX_STACK_SIZE = 64;
+
+bool Player::hasRoomFor(Int32 itemId) const {
+    for (const HotbarSlot& slot : _hotbar) {
+        if (slot.itemId == -1) return true;
+        if (slot.itemId == itemId && slot.count < MAX_STACK_SIZE) return true;
+    }
+    return false;
+}
+
+Int32 Player::addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& changedSlots) {
+    for (int i = 0; i < HOTBAR_SIZE && count > 0; i++) {
+        if (_hotbar[i].itemId != itemId) continue;
+        Int32 room = MAX_STACK_SIZE - _hotbar[i].count;
+        if (room <= 0) continue;
+        Int32 added = std::min(room, count);
+        _hotbar[i].count += added;
+        count -= added;
+        changedSlots.push_back(i);
+    }
+    for (int i = 0; i < HOTBAR_SIZE && count > 0; i++) {
+        if (_hotbar[i].itemId != -1) continue;
+        Int32 added = std::min(MAX_STACK_SIZE, count);
+        _hotbar[i] = {itemId, added};
+        count -= added;
+        changedSlots.push_back(i);
+    }
+    return count;
 }

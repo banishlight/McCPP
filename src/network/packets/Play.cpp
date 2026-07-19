@@ -11,12 +11,14 @@
 #include <BlockIds.hpp>
 #include <ItemBlockMapping.hpp>
 #include <EntityIdAllocator.hpp>
+#include <entities/ItemEntityManager.hpp>
 #include <network/Crypto.hpp>
 #include <Console.hpp>
 #include <cstring>
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <chrono>
 #include <set>
 #include <utility>
 #include <vector>
@@ -690,6 +692,64 @@ std::vector<Byte> Set_Entity_Metadata_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Remove_Entities_p::Remove_Entities_p(int threshold, int entityId) {
+    _threshold = threshold;
+    _entityId = entityId;
+}
+
+std::vector<Byte> Remove_Entities_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Remove_Entities_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(1); // Count: always a single entity here
+    std::vector<Byte> idBytes = varIntSerialize(_entityId);
+    packet_data.insert(packet_data.end(), idBytes.begin(), idBytes.end());
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Pickup_Item_p::Pickup_Item_p(int threshold, int collectedEntityId, int collectorEntityId, int count) {
+    _threshold = threshold;
+    _collectedEntityId = collectedEntityId;
+    _collectorEntityId = collectorEntityId;
+    _count = count;
+}
+
+std::vector<Byte> Pickup_Item_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Pickup_Item_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_collectedEntityId);
+    std::vector<Byte> collectorBytes = varIntSerialize(_collectorEntityId);
+    packet_data.insert(packet_data.end(), collectorBytes.begin(), collectorBytes.end());
+    std::vector<Byte> countBytes = varIntSerialize(_count);
+    packet_data.insert(packet_data.end(), countBytes.begin(), countBytes.end());
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Update_Entity_Position_p::Update_Entity_Position_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, bool onGround) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _deltaX = deltaX;
+    _deltaY = deltaY;
+    _deltaZ = deltaZ;
+    _onGround = onGround;
+}
+
+std::vector<Byte> Update_Entity_Position_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Update_Entity_Position_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(static_cast<Byte>((_deltaX >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaX & 0xFF));
+    packet_data.push_back(static_cast<Byte>((_deltaY >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaY & 0xFF));
+    packet_data.push_back(static_cast<Byte>((_deltaZ >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaZ & 0xFF));
+    packet_data.push_back(_onGround ? 0x01 : 0x00);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
 void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::shared_ptr<Outgoing_Packet>(int threshold)>& makePacket) {
     std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
     for (auto& conn : connections) {
@@ -697,6 +757,45 @@ void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::sh
         if (conn->getState() != ConnectionState::Play) continue;
         if (!conn->getPlayer().hasChunkLoaded(chunkX, chunkZ)) continue;
         conn->addPacket(makePacket(conn->getCompressionThreshold()));
+    }
+}
+
+void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
+    const double PICKUP_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's AABB pickup range
+    const double MIN_PICKUP_AGE_SECONDS = 0.5; // matches vanilla's 10-tick pickup delay
+
+    ItemEntityManager& manager = ItemEntityManager::getInstance();
+    auto now = std::chrono::steady_clock::now();
+    for (const ItemEntity& entity : manager.snapshot()) {
+        double age = std::chrono::duration<double>(now - entity.spawnTime).count();
+        if (age < MIN_PICKUP_AGE_SECONDS) continue;
+
+        double dx = entity.x - player.getX();
+        double dy = entity.y - player.getY();
+        double dz = entity.z - player.getZ();
+        if (dx * dx + dy * dy + dz * dz > PICKUP_RADIUS_SQUARED) continue;
+
+        if (!player.hasRoomFor(entity.itemId)) continue;
+        if (!manager.tryClaim(entity.entityId)) continue; // someone else got it first
+
+        std::vector<int> changedSlots;
+        player.addItemToHotbar(entity.itemId, entity.count, changedSlots); // guaranteed to fit -- hasRoomFor already checked
+
+        int entityId = entity.entityId;
+        int collectorId = player.getEntityId();
+        int count = entity.count;
+        BroadcastToChunkViewers(entity.chunkX, entity.chunkZ, [entityId, collectorId, count](int broadcastThreshold) {
+            return std::make_shared<Pickup_Item_p>(broadcastThreshold, entityId, collectorId, count);
+        });
+        BroadcastToChunkViewers(entity.chunkX, entity.chunkZ, [entityId](int broadcastThreshold) {
+            return std::make_shared<Remove_Entities_p>(broadcastThreshold, entityId);
+        });
+
+        for (int slot : changedSlots) {
+            int containerSlot = 36 + slot; // player inventory: hotbar occupies slots 36-44
+            const HotbarSlot& updated = player.getHotbar()[slot];
+            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, updated.itemId, updated.count));
+        }
     }
 }
 
@@ -774,6 +873,7 @@ void Set_Player_Position_p::deserialize(std::vector<Byte> in_buff, PacketContext
     player.setPosition(x, y, z);
 
     int threshold = cont.connection.getCompressionThreshold();
+    TryPickupNearbyItems(cont, threshold, player);
     int newCenterX = static_cast<int>(std::floor(x / 16.0));
     int newCenterZ = static_cast<int>(std::floor(z / 16.0));
     UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
@@ -795,6 +895,7 @@ void Set_Player_Position_and_Rotation_p::deserialize(std::vector<Byte> in_buff, 
     player.setRotation(yaw, pitch);
 
     int threshold = cont.connection.getCompressionThreshold();
+    TryPickupNearbyItems(cont, threshold, player);
     int newCenterX = static_cast<int>(std::floor(x / 16.0));
     int newCenterZ = static_cast<int>(std::floor(z / 16.0));
     UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
@@ -820,16 +921,17 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
     int sequence = deserializeVarInt(in_buff);
 
     Player& player = cont.connection.getPlayer();
+    // minecraft:item entity-type registry ID, sourced from the vanilla data
+    // generator report, not guessed. Shared by both the break-drop and
+    // Q-drop paths below.
+    const int ITEM_ENTITY_TYPE_ID = 58;
+
     // No server-side mining-time/hardness validation (see docs/general-documentation.md,
     // "Accepted gaps") -- trust status 2 (Finished digging) in any gamemode,
     // or status 0 (Started digging) in Creative, where the client never sends
     // a Finished digging follow-up.
     bool shouldBreak = (status == 2) || (status == 0 && player.getGamemode() == CREATIVE_GAMEMODE);
     if (shouldBreak) {
-        // minecraft:item entity-type registry ID, sourced from the vanilla
-        // data generator report, not guessed.
-        const int ITEM_ENTITY_TYPE_ID = 58;
-
         World& world = World::getInstance();
         int chunkX = floorDiv16(loc.x);
         int chunkZ = floorDiv16(loc.z);
@@ -849,18 +951,61 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         int threshold = cont.connection.getCompressionThreshold();
         cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
 
-        // No pickup/despawn logic -- the drop is purely visual, not tracked
-        // once spawned (see docs/general-documentation.md, "Accepted gaps").
+        // Tracked server-side by ItemEntityManager so it can later be picked
+        // up (TryPickupNearbyItems) or despawned (ItemDespawnSystem) -- the
+        // Spawn_Entity_p/Set_Entity_Metadata_p broadcast below only tells
+        // clients what to render.
         Int32 dropItemId = blockStateIdToItemId(previousBlock);
         if (dropItemId >= 0) {
-            int entityId = EntityIdAllocator::next();
-            std::vector<long> uuid = generateRandomUUID();
             double dropX = loc.x + 0.5, dropY = loc.y + 0.5, dropZ = loc.z + 0.5;
+            ItemEntity dropped = ItemEntityManager::getInstance().spawn(dropItemId, 1, dropX, dropY, dropZ, chunkX, chunkZ);
+            std::vector<long> uuid = generateRandomUUID(); // one-time, not persisted -- only needed for this Spawn_Entity_p
+            int entityId = dropped.entityId;
             BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
                 return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, dropX, dropY, dropZ);
             });
             BroadcastToChunkViewers(chunkX, chunkZ, [entityId, dropItemId](int broadcastThreshold) {
                 return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, dropItemId, 1);
+            });
+        }
+    } else if (status == 3 || status == 4) { // Drop item stack / Drop item (the Q key)
+        int selectedSlot = player.getSelectedSlot();
+        HotbarSlot held = player.getHotbar()[selectedSlot]; // copy: setHotbarSlot below must not alias this read
+        if (held.itemId >= 0 && held.count > 0) {
+            Int32 dropCount = (status == 3) ? held.count : 1;
+            Int32 newCount = held.count - dropCount;
+            Int32 newItemId = (newCount > 0) ? held.itemId : -1;
+            player.setHotbarSlot(selectedSlot, newItemId, newCount);
+            int threshold = cont.connection.getCompressionThreshold();
+            int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
+            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, newItemId, newCount));
+
+            // Standard forward-facing direction vector from yaw/pitch, tossed
+            // with a small upward kick -- an approximation of vanilla's drop
+            // arc, not a wire-format detail, so no decompile verification needed.
+            const double PI = 3.14159265358979323846;
+            const double TOSS_SPEED = 0.3;
+            double yawRad = player.getYaw() * PI / 180.0;
+            double pitchRad = player.getPitch() * PI / 180.0;
+            double dirX = -std::sin(yawRad) * std::cos(pitchRad);
+            double dirY = -std::sin(pitchRad);
+            double dirZ = std::cos(yawRad) * std::cos(pitchRad);
+            double vx = dirX * TOSS_SPEED;
+            double vy = dirY * TOSS_SPEED + 0.1;
+            double vz = dirZ * TOSS_SPEED;
+
+            double dropX = player.getX(), dropY = player.getY() + 1.2, dropZ = player.getZ();
+            int chunkX = floorDiv16(static_cast<int>(std::floor(dropX)));
+            int chunkZ = floorDiv16(static_cast<int>(std::floor(dropZ)));
+            ItemEntity dropped = ItemEntityManager::getInstance().spawn(held.itemId, dropCount, dropX, dropY, dropZ, chunkX, chunkZ, vx, vy, vz);
+            std::vector<long> uuid = generateRandomUUID();
+            int entityId = dropped.entityId;
+            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
+                return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, dropX, dropY, dropZ);
+            });
+            Int32 metaItemId = held.itemId;
+            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, metaItemId, dropCount](int broadcastThreshold) {
+                return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, metaItemId, dropCount);
             });
         }
     }

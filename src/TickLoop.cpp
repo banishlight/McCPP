@@ -1,5 +1,7 @@
 #include <TickLoop.hpp>
 #include <systems/KeepAliveSystem.hpp>
+#include <systems/ItemDespawnSystem.hpp>
+#include <systems/ItemPhysicsSystem.hpp>
 #include <Console.hpp>
 #include <chrono>
 
@@ -15,6 +17,8 @@ TickLoop::~TickLoop() {
 void TickLoop::initialize() {
     if (_initialized) return;
     registerSystem(std::make_shared<KeepAliveSystem>());
+    registerSystem(std::make_shared<ItemPhysicsSystem>());
+    registerSystem(std::make_shared<ItemDespawnSystem>());
     _tickThread = std::thread(&TickLoop::tickThreadLoop, this);
     _initialized = true;
 }

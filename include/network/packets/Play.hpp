@@ -154,6 +154,37 @@ class Set_Entity_Metadata_p : public Play_Packet, public Outgoing_Packet {
         Int32 _itemId, _count;
         static int constexpr _PACKET_ID = 0x58;
 };
+class Remove_Entities_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Remove_Entities_p(int threshold, int entityId);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        static int constexpr _PACKET_ID = 0x42;
+};
+class Pickup_Item_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Pickup_Item_p(int threshold, int collectedEntityId, int collectorEntityId, int count);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _collectedEntityId, _collectorEntityId, _count;
+        static int constexpr _PACKET_ID = 0x6F;
+};
+class Update_Entity_Position_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        // deltaX/Y/Z: fixed-point, 4096 units/block (currentPos*4096 - prevPos*4096),
+        // per docs/network-protocol.md -- caller computes these from the physics step.
+        Update_Entity_Position_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, bool onGround);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        Int16 _deltaX, _deltaY, _deltaZ;
+        bool _onGround;
+        static int constexpr _PACKET_ID = 0x2E;
+};
 
 // Shared by the initial Configuration->Play chunk send and every subsequent
 // movement-triggered update: diffs the player's currently-loaded chunk set
@@ -166,6 +197,12 @@ void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int 
 // currently has (chunkX, chunkZ) loaded -- used for block edits, which must
 // reach every nearby player, not just whoever triggered them.
 void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::shared_ptr<Outgoing_Packet>(int threshold)>& makePacket);
+
+// Called after every position update (matches vanilla: the Notchian server
+// only checks for pickups after Set Player Position/Set Player Position And
+// Rotation). Scans nearby tracked item entities and, for any the player has
+// hotbar room for, claims and collects it.
+void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player);
 
 class Confirm_Teleportation_p : public Play_Packet, public Incoming_Packet {
     public:

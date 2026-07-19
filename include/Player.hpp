@@ -51,6 +51,14 @@ class Player {
         void setHotbarSlot(int index, Int32 itemId, Int32 count);
         int getSelectedSlot() const;
         void setSelectedSlot(int slot);
+        // Read-only capacity check (existing partial stack with room, or an
+        // empty slot) -- callers should check this before claiming a ground
+        // item, so a claim never has to be rolled back for lack of space.
+        bool hasRoomFor(Int32 itemId) const;
+        // Merges into an existing partial stack of itemId first, then the
+        // first empty slot. Returns leftover count that didn't fit (0 on full
+        // success) and appends the index of every slot it changed to changedSlots.
+        Int32 addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& changedSlots);
     private:
         string _username;
         std::vector<long> _uuid;
