@@ -30,7 +30,7 @@ World::World() {
         // neighbor) -- see docs/general-documentation.md, "Terrain cache vs. lit cache".
         std::shared_ptr<Chunk> spawnChunk = std::make_shared<Chunk>(*spawnTerrain);
         LightEngine::computeLighting(*spawnChunk, *this);
-        _chunkCache[{0, 0}] = spawnChunk;
+        cacheAsLit(0, 0, spawnChunk);
     }
 }
 
@@ -79,12 +79,9 @@ void World::getChunkAsync(int chunkX, int chunkZ, std::function<void(std::shared
         // lighting neighbor and must never be mutated after generation.
         std::shared_ptr<Chunk> chunk = std::make_shared<Chunk>(*terrain);
         LightEngine::computeLighting(*chunk, *this);
-        {
-            std::lock_guard<std::mutex> lock(_chunkCacheMutex);
-            // Last-write-wins on a race is harmless: lighting is a pure
-            // function of the (already-cached) terrain.
-            _chunkCache[{chunkX, chunkZ}] = chunk;
-        }
+        // Last-write-wins on a race is harmless: lighting is a pure function
+        // of the (already-cached) terrain.
+        cacheAsLit(chunkX, chunkZ, chunk);
         callback(chunk);
     });
 }
@@ -93,6 +90,15 @@ std::shared_ptr<Chunk> World::getCachedChunk(int chunkX, int chunkZ) {
     std::lock_guard<std::mutex> lock(_chunkCacheMutex);
     auto it = _chunkCache.find({chunkX, chunkZ});
     return (it != _chunkCache.end()) ? it->second : nullptr;
+}
+
+void World::cacheAsLit(int chunkX, int chunkZ, std::shared_ptr<Chunk> chunk) {
+    {
+        std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+        _chunkCache[{chunkX, chunkZ}] = chunk;
+    }
+    std::lock_guard<std::mutex> lock(_terrainCacheMutex);
+    _terrainCache.erase({chunkX, chunkZ});
 }
 
 bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
@@ -106,13 +112,17 @@ bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
     std::shared_ptr<Chunk> edited = std::make_shared<Chunk>(*cached);
     edited->setBlock(localX, worldY, localZ, blockStateId);
     LightEngine::computeLighting(*edited, *this);
-
-    std::lock_guard<std::mutex> lock(_chunkCacheMutex);
-    _chunkCache[{chunkX, chunkZ}] = edited;
+    cacheAsLit(chunkX, chunkZ, edited);
     return true;
 }
 
 std::shared_ptr<Chunk> World::getOrGenerateTerrain(int chunkX, int chunkZ) {
+    // A fully-lit cached chunk already contains everything terrain-only data
+    // would (and is more up to date if it's since been edited) -- check it
+    // first so a chunk's storage is never duplicated across both caches.
+    std::shared_ptr<Chunk> lit = getCachedChunk(chunkX, chunkZ);
+    if (lit) return lit;
+
     {
         std::lock_guard<std::mutex> lock(_terrainCacheMutex);
         auto it = _terrainCache.find({chunkX, chunkZ});

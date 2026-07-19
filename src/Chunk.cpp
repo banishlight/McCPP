@@ -24,11 +24,11 @@ int Chunk::index(int localX, int worldY, int localZ) const {
 }
 
 void Chunk::setBlock(int localX, int worldY, int localZ, Int32 blockStateId) {
-    _blocks[index(localX, worldY, localZ)] = blockStateId;
+    _blocks[index(localX, worldY, localZ)] = static_cast<Int16>(blockStateId);
 }
 
 Int32 Chunk::getBlock(int localX, int worldY, int localZ) const {
-    return _blocks[index(localX, worldY, localZ)];
+    return static_cast<Int32>(_blocks[index(localX, worldY, localZ)]);
 }
 
 void Chunk::setSkyLight(int localX, int worldY, int localZ, int level) {

@@ -25,10 +25,14 @@ class World {
         // Safe to call from any thread.
         void getChunkAsync(int chunkX, int chunkZ, std::function<void(std::shared_ptr<Chunk>)> callback);
         // Terrain-only, cached, safe for concurrent reads (a chunk's block
-        // data is never mutated after generation). Used both by LightEngine's
-        // neighbor queries and internally by getChunkAsync, so a chunk's
-        // terrain is only ever generated once no matter how many nearby
-        // chunks need it purely for lighting occlusion. Safe from any thread.
+        // data is never mutated after generation). Checks _chunkCache first --
+        // a fully-lit chunk already contains everything terrain-only data
+        // would (and is more up to date if it's been edited), so this never
+        // duplicates a chunk's storage across both caches. Falls back to
+        // _terrainCache / generation only for chunks not lit yet. Used both
+        // by LightEngine's neighbor queries and internally by getChunkAsync,
+        // so a chunk's terrain is only ever generated once no matter how many
+        // nearby chunks need it purely for lighting occlusion. Safe from any thread.
         std::shared_ptr<Chunk> getOrGenerateTerrain(int chunkX, int chunkZ);
         // Synchronous read of an already-cached, fully-lit chunk -- nullptr if
         // not cached (not loaded/generated yet). Safe from any thread.
@@ -38,12 +42,14 @@ class World {
         // builds a modified copy of the cached chunk, relights just that copy,
         // then swaps it into _chunkCache -- the previous shared_ptr, if any
         // other thread is mid-read of it, is left untouched and internally
-        // consistent. _terrainCache is intentionally not updated (accepted
-        // gap: a neighbor chunk relit later than this edit sees stale terrain
-        // for this chunk). Returns false (no-op) if the chunk isn't cached.
+        // consistent. Returns false (no-op) if the chunk isn't cached.
         bool setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId);
     private:
         World();
+        // Inserts into _chunkCache and drops the now-redundant _terrainCache
+        // entry for the same coordinate, if any -- called at every point a
+        // chunk becomes fully lit, so a coordinate is never stored twice.
+        void cacheAsLit(int chunkX, int chunkZ, std::shared_ptr<Chunk> chunk);
         string _dimensionName = "minecraft:overworld";
         double _spawnX = 0.5;
         double _spawnY = -48.0; // placeholder; recomputed in the constructor for non-flat generators
