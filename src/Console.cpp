@@ -2,6 +2,7 @@
 #include <Standards.hpp>
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <ctime>
 #include <sstream>
 #include <iomanip>
@@ -42,6 +43,9 @@ Console::~Console() {
 }
 
 void Console::createLog() {
+    const std::string LOG_DIR = "Logs";
+    std::filesystem::create_directories(LOG_DIR);
+
     std::time_t t = std::time(nullptr);
     std::tm* now = std::localtime(&t);
     // Format the time into a string: "Log_YYYYMMDD_HHMMSS.txt"
@@ -55,7 +59,7 @@ void Console::createLog() {
                    << std::setw(2) << now->tm_min   // Minute
                    << std::setw(2) << now->tm_sec   // Second
                    << ".txt";
-    std::string filename = filenameStream.str();
+    std::filesystem::path filename = std::filesystem::path(LOG_DIR) / filenameStream.str();
     this->logFile.open(filename);
     if (!this->logFile) {
         std::cerr << "Failed to open log file: " << filename << std::endl;
