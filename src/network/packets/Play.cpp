@@ -933,6 +933,21 @@ void Set_Player_Position_and_Rotation_p::deserialize(std::vector<Byte> in_buff, 
     UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
 }
 
+void Set_Player_Rotation_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Player_Rotation_p::deserialize(): Received.");
+    #endif
+    float yaw = deserializeFloat(in_buff);
+    float pitch = deserializeFloat(in_buff);
+    // On Ground (Boolean) follows; unused, no movement validation yet.
+
+    // Sent when the client turns without moving its feet, as opposed to
+    // Set_Player_Position_and_Rotation_p which only fires alongside a position
+    // change -- without this, Player's stored yaw/pitch goes stale the moment
+    // someone stands still and just looks around (e.g. aiming a Q-drop).
+    cont.connection.getPlayer().setRotation(yaw, pitch);
+}
+
 void Serverbound_Keep_Alive_play_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     #ifdef DEBUG
         Console::getConsole().Entry("Serverbound_Keep_Alive_play_p::deserialize(): Received.");

@@ -235,6 +235,13 @@ class Set_Player_Position_and_Rotation_p : public Play_Packet, public Incoming_P
     private:
         static int constexpr _PACKET_ID = 0x1B;
 };
+class Set_Player_Rotation_p : public Play_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+    private:
+        static int constexpr _PACKET_ID = 0x1C;
+};
 class Serverbound_Keep_Alive_play_p : public Play_Packet, public Incoming_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
