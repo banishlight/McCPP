@@ -9,6 +9,7 @@
 #include <network/Crypto.hpp>
 #include <network/packets/Play.hpp>
 #include <entities/PlayerVisibilityManager.hpp>
+#include <World.hpp>
 #include <thread>
 #include <algorithm>
 
@@ -71,6 +72,13 @@ void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
                 other->addPacket(std::make_shared<Player_Info_Remove_p>(other->getCompressionThreshold(), leavingUuid));
             }
             PlayerVisibilityManager::getInstance().handleDisconnect(conn);
+            // Nothing else decrements this player's view of their loaded
+            // chunks on disconnect -- without this, every chunk they ever saw
+            // would stay "viewed" forever as far as ChunkUnloadSystem is concerned.
+            World& world = World::getInstance();
+            for (auto& [x, z] : conn->getPlayer().getLoadedChunks()) {
+                world.chunkViewerRemoved(x, z);
+            }
         }
         return;
     }

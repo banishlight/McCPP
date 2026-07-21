@@ -1244,6 +1244,7 @@ void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int 
         if (!newChunks.count({x, z})) {
             cont.connection.addPacket(std::make_shared<Unload_Chunk_p>(threshold, x, z));
             player.markChunkUnloaded(x, z);
+            world.chunkViewerRemoved(x, z);
         }
     }
 

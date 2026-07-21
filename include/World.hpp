@@ -10,6 +10,7 @@
 #include <functional>
 #include <vector>
 #include <utility>
+#include <chrono>
 
 // Exists as the query boundary a real multi-chunk world sits behind, so
 // callers ask "the world" for spawn/chunk data instead of hardcoding it inline.
@@ -61,6 +62,22 @@ class World {
         // shared by AutosaveSystem and the shutdown save hook so neither
         // duplicates the Properties-field mapping.
         LevelData buildLevelData() const;
+        // Reverse index of chunk -> number of players currently holding it
+        // loaded, maintained by Connection::deliverGeneratedChunks (add),
+        // UpdateLoadedChunks's unload loop (remove), and
+        // ConnectionManager::processConnection's disconnect branch (remove
+        // for everything a disconnecting player had). Drives ChunkUnloadSystem's
+        // eviction sweep -- a coordinate becomes eligible once its count drops
+        // to zero and stays that way past a grace period (see evictStaleChunks).
+        void chunkViewerAdded(int chunkX, int chunkZ);
+        void chunkViewerRemoved(int chunkX, int chunkZ);
+        // Evicts (saving first if dirty) every chunk that's had zero viewers
+        // for longer than gracePeriodSeconds. Called periodically by
+        // ChunkUnloadSystem, never held during disk I/O.
+        void evictStaleChunks(double gracePeriodSeconds);
+        // Drops any _terrainCache entry that isn't currently viewed by any
+        // player -- no grace period or save needed, these are never dirty.
+        void evictStaleTerrainCache();
     private:
         World();
         // Inserts into _chunkCache and drops the now-redundant _terrainCache
@@ -70,6 +87,13 @@ class World {
         // unmodified from disk (see getOrGenerateTerrain/_cleanChunks) --
         // an untouched imported chunk shouldn't get rewritten every autosave.
         void cacheAsLit(int chunkX, int chunkZ, std::shared_ptr<Chunk> chunk);
+        // The actual eviction of one chunk, race-safe: re-checks the viewer
+        // count in the same lock acquisition as the cache erase, so a viewer
+        // that returned between the sweep deciding to evict and this running
+        // aborts the eviction instead of silently discarding a stray in-flight
+        // edit. Called by evictStaleChunks, never holds the lock during the
+        // WorldPersistence save that follows.
+        void evictChunk(int chunkX, int chunkZ);
         string _worldDir;
         string _dimensionName = "minecraft:overworld";
         double _spawnX = 0.5;
@@ -90,4 +114,11 @@ class World {
         // setBlock still marks it dirty normally.
         std::set<std::pair<int,int>> _dirtyChunks;
         std::set<std::pair<int,int>> _cleanChunks;
+        // Also guarded by _chunkCacheMutex. A coordinate is in exactly one of
+        // these at a time (or neither, if never viewed -- see the spawn-chunk
+        // note in World.cpp): _chunkViewerCounts holds only >0 entries;
+        // _zeroViewerSince stamps the moment a coordinate's count reached zero,
+        // so evictStaleChunks can tell how long it's been unviewed.
+        std::map<std::pair<int,int>, int> _chunkViewerCounts;
+        std::map<std::pair<int,int>, std::chrono::steady_clock::time_point> _zeroViewerSince;
 };

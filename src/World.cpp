@@ -229,6 +229,73 @@ bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
     return true;
 }
 
+void World::chunkViewerAdded(int chunkX, int chunkZ) {
+    std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+    _chunkViewerCounts[{chunkX, chunkZ}]++;
+    _zeroViewerSince.erase({chunkX, chunkZ});
+}
+
+void World::chunkViewerRemoved(int chunkX, int chunkZ) {
+    std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+    auto it = _chunkViewerCounts.find({chunkX, chunkZ});
+    if (it == _chunkViewerCounts.end()) return; // shouldn't happen, but never let this go negative
+    if (--(it->second) <= 0) {
+        _chunkViewerCounts.erase(it);
+        _zeroViewerSince[{chunkX, chunkZ}] = std::chrono::steady_clock::now();
+    }
+}
+
+void World::evictStaleChunks(double gracePeriodSeconds) {
+    std::vector<std::pair<int,int>> toEvict;
+    {
+        std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+        auto now = std::chrono::steady_clock::now();
+        for (auto it = _zeroViewerSince.begin(); it != _zeroViewerSince.end(); ) {
+            double elapsed = std::chrono::duration<double>(now - it->second).count();
+            if (elapsed >= gracePeriodSeconds) {
+                toEvict.push_back(it->first);
+                it = _zeroViewerSince.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    // Disk I/O never happens while holding _chunkCacheMutex, matching
+    // setBlock/takeDirtyChunksSnapshot's existing convention.
+    for (auto& [chunkX, chunkZ] : toEvict) {
+        evictChunk(chunkX, chunkZ);
+    }
+}
+
+void World::evictChunk(int chunkX, int chunkZ) {
+    std::shared_ptr<Chunk> toSave;
+    {
+        std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+        if (_chunkViewerCounts.count({chunkX, chunkZ})) return; // a viewer returned since the sweep decided to evict
+        auto it = _chunkCache.find({chunkX, chunkZ});
+        if (it == _chunkCache.end()) return;
+        if (_dirtyChunks.count({chunkX, chunkZ})) toSave = it->second;
+        _chunkCache.erase(it);
+        _dirtyChunks.erase({chunkX, chunkZ});
+        _cleanChunks.erase({chunkX, chunkZ});
+    }
+    if (toSave) WorldPersistence::getInstance().saveChunk(chunkX, chunkZ, *toSave);
+}
+
+void World::evictStaleTerrainCache() {
+    std::set<std::pair<int,int>> viewed;
+    {
+        std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+        for (auto& [coord, count] : _chunkViewerCounts) viewed.insert(coord);
+    }
+    // Never held alongside _chunkCacheMutex -- matches cacheAsLit's existing
+    // sequential (never nested) locking of the two mutexes.
+    std::lock_guard<std::mutex> lock(_terrainCacheMutex);
+    for (auto it = _terrainCache.begin(); it != _terrainCache.end(); ) {
+        if (viewed.count(it->first)) ++it; else it = _terrainCache.erase(it);
+    }
+}
+
 std::shared_ptr<Chunk> World::getOrGenerateTerrain(int chunkX, int chunkZ) {
     // A fully-lit cached chunk already contains everything terrain-only data
     // would (and is more up to date if it's since been edited) -- check it

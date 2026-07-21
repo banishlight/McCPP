@@ -11,6 +11,7 @@
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <Chunk.hpp>
+#include <World.hpp>
 #include <cstdlib>
 
 Connection::Connection(std::shared_ptr<Socket> socket) {
@@ -214,6 +215,7 @@ void Connection::deliverGeneratedChunks() {
         if (_player.hasChunkLoaded(cx, cz)) continue;
         if (std::abs(cx - centerX) > viewDistance || std::abs(cz - centerZ) > viewDistance) continue;
         _player.markChunkLoaded(cx, cz);
+        World::getInstance().chunkViewerAdded(cx, cz);
         addPacket(std::make_shared<Chunk_Data_p>(threshold, chunk));
     }
     // This connection's loaded-chunk set just changed -- re-evaluate player
