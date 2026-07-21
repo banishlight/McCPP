@@ -63,5 +63,9 @@ So that I can help diagnose the issue.
 - [x] Networking Handles all Packets up to the Play State
 - [x] Player can load into void world
 - [x] Player can load into flat world
+- [x] Commands check for senders permission level (player or console or op)
 - [ ] Networking Handles all Play State packets
-- [ ] Commands check for senders permission level (player or console or op)
+
+
+## Known Issues
+- Player model hats are not given to player, but seen by other players.
