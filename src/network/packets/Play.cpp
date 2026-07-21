@@ -322,8 +322,8 @@ namespace {
         return true;
     }
 
-    // Slot (1.20.5+ Data Components format, cross-checked against Pumpkin's
-    // ItemStackSerializer since docs/network-protocol.md only links out to an
+    // Slot (1.20.5+ Data Components format, cross-checked against a reference
+    // implementation since docs/network-protocol.md only links out to an
     // external page for this type): empty is a single VarInt(0). Non-empty is
     // VarInt(count), VarInt(item ID), then VarInt(components-to-add count)
     // and VarInt(components-to-remove count) -- both 0 here, since nothing
@@ -567,8 +567,8 @@ std::vector<Byte> Set_Container_Content_p::serialize() const {
     #endif
     // Player inventory (Window ID 0) container-slot layout: 0 = crafting
     // result, 1-4 = crafting grid, 5-8 = armor, 9-35 = main inventory,
-    // 36-44 = hotbar, 45 = offhand (cross-checked against Pumpkin's
-    // player_screen_handler.rs). The client maps array index directly to
+    // 36-44 = hotbar, 45 = offhand (cross-checked against a reference
+    // implementation). The client maps array index directly to
     // this absolute slot index, so all 46 must be sent even though only the
     // hotbar range is ever populated -- sending fewer would misplace the
     // hotbar's contents into the crafting/armor slots instead.
@@ -676,8 +676,7 @@ std::vector<Byte> Set_Entity_Metadata_p::serialize() const {
     #endif
     // ItemEntity's "Item" field sits at metadata index 8, right after
     // Entity's own 8 base tracked fields (index 0-7); item_stack is metadata
-    // type 7. Both sourced from Pumpkin's version-pinned 1.21 tracked_data/
-    // meta_data_type tables, not guessed -- see docs/general-documentation.md.
+    // type 7. -- see docs/general-documentation.md.
     const Byte ITEM_ENTITY_METADATA_INDEX = 8;
     const int ITEM_STACK_METADATA_TYPE = 7;
 
@@ -687,6 +686,34 @@ std::vector<Byte> Set_Entity_Metadata_p::serialize() const {
     packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
     std::vector<Byte> slotBytes = packSlot(_itemId, _count);
     packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
+    packet_data.push_back(0xFF); // terminator: no more metadata entries
+
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Set_Player_Skin_Parts_Metadata_p::Set_Player_Skin_Parts_Metadata_p(int threshold, int entityId, Byte skinParts) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _skinParts = skinParts;
+}
+
+std::vector<Byte> Set_Player_Skin_Parts_Metadata_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Player_Skin_Parts_Metadata_p::serialize(): Sending.");
+    #endif
+    // Displayed Skin Parts bitmask (cape/jacket/sleeves/pants/hat), type 0 =
+    // Byte. Index 17 confirmed against an archived minecraft.wiki revision
+    // explicitly labeled "Java Edition 1.20.2" (this field is stable across
+    // adjacent versions; the *live* wiki page shows 16 instead, but that
+    // reflects a much newer snapshot, not 1.21).
+    const Byte PLAYER_SKIN_PARTS_METADATA_INDEX = 17;
+    const int BYTE_METADATA_TYPE = 0;
+
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(PLAYER_SKIN_PARTS_METADATA_INDEX);
+    std::vector<Byte> typeBytes = varIntSerialize(BYTE_METADATA_TYPE);
+    packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
+    packet_data.push_back(_skinParts);
     packet_data.push_back(0xFF); // terminator: no more metadata entries
 
     return assemblePacket(getID(), _threshold, packet_data);
@@ -798,9 +825,8 @@ std::vector<Byte> Player_Info_Update_p::serialize() const {
     packet_data.insert(packet_data.end(), count.begin(), count.end());
 
     // Interleaved per player (UUID immediately followed by that player's own
-    // action fields), not all UUIDs then all action blocks -- confirmed
-    // against Pumpkin's CPlayerInfoUpdate, the vendored doc's table is
-    // ambiguous on this point.
+    // action fields), not all UUIDs then all action blocks -- the vendored
+    // doc's table is ambiguous on this point, verified rather than guessed.
     for (const auto& entry : _entries) {
         std::vector<Byte> uuidBytes = serializeUUID(entry.uuid);
         packet_data.insert(packet_data.end(), uuidBytes.begin(), uuidBytes.end());

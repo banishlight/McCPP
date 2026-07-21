@@ -38,6 +38,13 @@ class Player {
         // empty until then, which clients render as a default Steve/Alex skin.
         const std::vector<PlayerProfileProperty>& getProfileProperties() const;
         void setProfileProperties(std::vector<PlayerProfileProperty> properties);
+        // "Displayed Skin Parts" bitmask from Client Information (cape/jacket/
+        // sleeves/pants/hat) -- relayed to other players via player-entity
+        // metadata so their client renders the right skin layers for this
+        // player. Defaults to all-enabled (0x7F) since Client Information
+        // always arrives before Play state in practice.
+        Byte getSkinParts() const;
+        void setSkinParts(Byte skinParts);
         int getViewDistance() const;
         void setViewDistance(int viewDistance);
         int getEntityId() const;
@@ -79,6 +86,7 @@ class Player {
         string _username;
         std::vector<long> _uuid;
         std::vector<PlayerProfileProperty> _profileProperties;
+        Byte _skinParts = 0x7F;
         int _viewDistance = 10;
         int _entityId;
         int _gamemode = 0; // 0: Survival, 1: Creative, 2: Adventure, 3: Spectator

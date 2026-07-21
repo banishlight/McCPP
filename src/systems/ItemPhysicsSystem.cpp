@@ -57,11 +57,10 @@ void ItemPhysicsSystem::onTick(Int64 tickCount) {
         manager.updatePosition(entity.entityId, newX, newY, newZ, newVx, newVy, newVz, newChunkX, newChunkZ);
 
         // Broadcasting a position correction every tick fights the client's own
-        // local gravity simulation of this entity (confirmed against Pumpkin's
-        // ItemEntity tick logic: it only re-syncs when velocity changes by more
-        // than 0.1 units squared, trusting the client to extrapolate the rest --
-        // sending every tick caused visible stutter, especially for the larger
-        // per-tick steps of a horizontal toss). Match that threshold here.
+        // local gravity simulation of this entity: only re-sync when velocity
+        // changes by more than 0.1 units squared, trusting the client to
+        // extrapolate the rest -- sending every tick caused visible stutter,
+        // especially for the larger per-tick steps of a horizontal toss.
         double dvx = newVx - entity.vx, dvy = newVy - entity.vy, dvz = newVz - entity.vz;
         bool velocityDirty = (dvx * dvx + dvy * dvy + dvz * dvz) > 0.1;
         if (velocityDirty) {

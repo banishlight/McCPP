@@ -56,6 +56,7 @@ void PlayerVisibilityManager::refresh(std::shared_ptr<Connection> conn) {
         VisibilityChange change = decideChange(playerEntityId, otherEntityId, connSeesOther);
         if (change == VisibilityChange::Spawn) {
             conn->addPacket(std::make_shared<Spawn_Entity_p>(threshold, otherEntityId, otherPlayer.getUUID(), PLAYER_ENTITY_TYPE_ID, otherPlayer.getX(), otherPlayer.getY(), otherPlayer.getZ()));
+            conn->addPacket(std::make_shared<Set_Player_Skin_Parts_Metadata_p>(threshold, otherEntityId, otherPlayer.getSkinParts()));
         } else if (change == VisibilityChange::Despawn) {
             conn->addPacket(std::make_shared<Remove_Entities_p>(threshold, otherEntityId));
         }
@@ -64,6 +65,7 @@ void PlayerVisibilityManager::refresh(std::shared_ptr<Connection> conn) {
         VisibilityChange reverseChange = decideChange(otherEntityId, playerEntityId, otherSeesConn);
         if (reverseChange == VisibilityChange::Spawn) {
             other->addPacket(std::make_shared<Spawn_Entity_p>(otherThreshold, playerEntityId, player.getUUID(), PLAYER_ENTITY_TYPE_ID, player.getX(), player.getY(), player.getZ()));
+            other->addPacket(std::make_shared<Set_Player_Skin_Parts_Metadata_p>(otherThreshold, playerEntityId, player.getSkinParts()));
         } else if (reverseChange == VisibilityChange::Despawn) {
             other->addPacket(std::make_shared<Remove_Entities_p>(otherThreshold, playerEntityId));
         }

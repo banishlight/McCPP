@@ -154,6 +154,16 @@ class Set_Entity_Metadata_p : public Play_Packet, public Outgoing_Packet {
         Int32 _itemId, _count;
         static int constexpr _PACKET_ID = 0x58;
 };
+class Set_Player_Skin_Parts_Metadata_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Set_Player_Skin_Parts_Metadata_p(int threshold, int entityId, Byte skinParts);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        Byte _skinParts;
+        static int constexpr _PACKET_ID = 0x58;
+};
 class Remove_Entities_p : public Play_Packet, public Outgoing_Packet {
     public:
         Remove_Entities_p(int threshold, int entityId);

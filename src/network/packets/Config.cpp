@@ -173,11 +173,14 @@ void Client_Information_config_p::deserialize(std::vector<Byte> in_buff, PacketC
     #endif
     // Locale (String): unused for now.
     deserializeString(in_buff);
-    // View Distance (Byte)
-    Byte viewDistance = in_buff[0];
-    // Remaining fields (chat mode, chat colors, skin parts, main hand, text
-    // filtering, server listings) aren't tracked yet.
+    Byte viewDistance = deserializeByte(in_buff);
+    deserializeVarInt(in_buff); // Chat Mode: unused, no chat implemented yet.
+    deserializeBool(in_buff); // Chat Colors: unused.
+    Byte skinParts = deserializeByte(in_buff);
+    // Main Hand, text filtering, server listings: unused.
+
     cont.connection.getPlayer().setViewDistance(static_cast<int>(viewDistance));
+    cont.connection.getPlayer().setSkinParts(skinParts);
 }
 
 void Cookie_Response_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -209,6 +212,13 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     player.setHotbarSlot(0, STONE_ITEM_ID, 64);
 
     int threshold = cont.connection.getCompressionThreshold();
+    // The client's own third-person model (F5) reads its skin-parts bitmask
+    // from its own entity's tracked metadata too, same as the skin texture
+    // itself needed Player_Info_Update_p sent back to the joiner -- it isn't
+    // purely local rendering the way it might seem. PlayerVisibilityManager
+    // never sends this to a player about themselves (a player's own entity is
+    // never "spawned" to them), so it has to happen here instead.
+    cont.connection.addPacket(std::make_shared<Set_Player_Skin_Parts_Metadata_p>(threshold, player.getEntityId(), player.getSkinParts()));
     std::shared_ptr<Outgoing_Packet> loginPlay = std::make_shared<Login_Play_p>(threshold, player);
     cont.connection.addPacket(loginPlay);
     std::shared_ptr<Outgoing_Packet> defaultSpawn = std::make_shared<Set_Default_Spawn_Position_p>(threshold);

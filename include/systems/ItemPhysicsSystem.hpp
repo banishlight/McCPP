@@ -7,8 +7,8 @@
 // it being current, not just the position an item was spawned at). Position
 // corrections (Teleport_Entity_p + Set_Entity_Velocity_p) are only broadcast
 // when velocity changes meaningfully (see onTick) -- the client runs its own
-// local physics from the last velocity it was told, same as Pumpkin's
-// ItemEntity; correcting every tick fights that prediction and looks jittery.
+// local physics from the last velocity it was told; correcting every tick
+// fights that prediction and looks jittery.
 // Constants below approximate vanilla item-entity physics for plausible-looking
 // motion -- a gameplay-feel choice, not a wire-format detail, so not
 // decompile-verified the way packet layouts are.

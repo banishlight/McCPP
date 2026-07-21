@@ -35,6 +35,14 @@ void Player::setProfileProperties(std::vector<PlayerProfileProperty> properties)
     _profileProperties = std::move(properties);
 }
 
+Byte Player::getSkinParts() const {
+    return _skinParts;
+}
+
+void Player::setSkinParts(Byte skinParts) {
+    _skinParts = skinParts;
+}
+
 int Player::getViewDistance() const {
     return _viewDistance;
 }
