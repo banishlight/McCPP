@@ -4,6 +4,8 @@
 #include <network/ConnectionManager.hpp>
 #include <vanilla/VanillaDataManager.hpp>
 #include <CommandRegistry.hpp>
+#include <ConsoleCommandSender.hpp>
+#include <OpsList.hpp>
 #include <ServerControl.hpp>
 #include <TickLoop.hpp>
 #include <WorldWorkerPool.hpp>
@@ -15,6 +17,7 @@ int main() {
     Properties::getProperties().initialize();
     Console::getConsole().Entry("Properties loaded successfully.");
     VanillaDataManager::getInstance().initialize();
+    OpsList::getInstance().initialize();
     // Construction order matters here (reverse-destruction hazard for pool
     // tasks capturing raw pointers) -- see docs/general-documentation.md,
     // "Singleton construction/destruction order".
@@ -23,6 +26,7 @@ int main() {
     ConnectionManager::getInstance().initialize();
     TickLoop::getInstance().initialize();
     CommandRegistry::getInstance().initialize();
+    ConsoleCommandSender consoleSender;
     while (!ServerControl::isShutdownRequested()) {
         // Main server loop
         // This could be replaced with a more sophisticated event loop
@@ -36,9 +40,7 @@ int main() {
             while (iss >> arg) {
                 args.push_back(arg);
             }
-            if (!CommandRegistry::getInstance().dispatch(name, args)) {
-                Console::getConsole().Entry("Unknown command: " + name);
-            }
+            CommandRegistry::getInstance().dispatch(consoleSender, name, args);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

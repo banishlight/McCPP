@@ -14,7 +14,11 @@
 #include <entities/ItemEntityManager.hpp>
 #include <entities/PlayerVisibilityManager.hpp>
 #include <network/Crypto.hpp>
+#include <network/Nbt.hpp>
+#include <network/PlayerCommandSender.hpp>
+#include <CommandRegistry.hpp>
 #include <Console.hpp>
+#include <sstream>
 #include <cstring>
 #include <cmath>
 #include <cstdlib>
@@ -1024,6 +1028,80 @@ std::vector<Byte> Player_Info_Remove_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+namespace {
+    // {"text": value} as network NBT -- the simplest valid text component,
+    // sufficient since this server never generates colored/translated chat.
+    std::vector<Byte> makeTextComponentNbt(const string& value) {
+        NbtTag comp = NbtTag::makeCompound();
+        comp.put("text", NbtTag::makeString(value));
+        return comp.serializeNetwork();
+    }
+}
+
+Disguised_Chat_Message_p::Disguised_Chat_Message_p(int threshold, const string& message, int chatTypeIndex, const string& senderName) {
+    _threshold = threshold;
+    _message = message;
+    _chatTypeIndex = chatTypeIndex;
+    _senderName = senderName;
+}
+
+std::vector<Byte> Disguised_Chat_Message_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Disguised_Chat_Message_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = makeTextComponentNbt(_message);
+    // Chat Type is a Holder<ChatType>, not a plain registry index: the wire
+    // value is (index + 1), with 0 reserved to mean "an inline value follows"
+    // instead of a registry reference. Not mentioned by the vendored doc's
+    // plain "VarInt" field type -- sending the raw index made the client read
+    // 0 as "inline value" and try to parse Sender Name's NBT as a ChatType
+    // definition, which is what a "Failed to decode disguised_chat" turned
+    // out to be.
+    std::vector<Byte> typeBytes = varIntSerialize(_chatTypeIndex + 1);
+    packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
+    std::vector<Byte> senderBytes = makeTextComponentNbt(_senderName);
+    packet_data.insert(packet_data.end(), senderBytes.begin(), senderBytes.end());
+    packet_data.push_back(0x00); // Has Target Name: always false, no /tell support.
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+System_Chat_Message_p::System_Chat_Message_p(int threshold, const string& message, bool overlay) {
+    _threshold = threshold;
+    _message = message;
+    _overlay = overlay;
+}
+
+std::vector<Byte> System_Chat_Message_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("System_Chat_Message_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = makeTextComponentNbt(_message);
+    packet_data.push_back(_overlay ? 0x01 : 0x00);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+void BroadcastDisguisedChat(const string& senderName, const string& message, const string& chatTypeId) {
+    // chat_type registry send order isn't fixed (directory_iterator order),
+    // so the wire index has to be looked up by id, same pattern Login_Play_p
+    // uses for dimension_type.
+    int chatTypeIndex = 0;
+    const std::vector<RegistryEntry>& chatTypes = VanillaDataManager::getInstance().getEntries("chat_type");
+    for (size_t i = 0; i < chatTypes.size(); i++) {
+        if (chatTypes[i].id == chatTypeId) {
+            chatTypeIndex = static_cast<int>(i);
+            break;
+        }
+    }
+
+    std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
+    for (auto& conn : connections) {
+        if (!conn) continue;
+        if (conn->getState() != ConnectionState::Play) continue;
+        int threshold = conn->getCompressionThreshold();
+        conn->addPacket(std::make_shared<Disguised_Chat_Message_p>(threshold, message, chatTypeIndex, senderName));
+    }
+}
+
 void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer) {
     std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
 
@@ -1372,6 +1450,47 @@ void Player_Command_p::deserialize(std::vector<Byte> in_buff, PacketContext& con
     if (changed) {
         PlayerVisibilityManager::getInstance().broadcastPoseChange(cont.connection.shared_from_this());
     }
+}
+
+void Chat_Message_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Chat_Message_p::deserialize(): Received.");
+    #endif
+    string message = deserializeString(in_buff);
+    deserializeLong(in_buff); // Timestamp: unused, no chat signing.
+    deserializeLong(in_buff); // Salt: unused, no chat signing.
+    bool hasSignature = deserializeBool(in_buff);
+    if (hasSignature) {
+        in_buff.erase(in_buff.begin(), in_buff.begin() + 256); // Signature: never verified.
+    }
+    deserializeVarInt(in_buff); // Message Count: unused, no signature-chain tracking.
+    in_buff.erase(in_buff.begin(), in_buff.begin() + 3); // Acknowledged (Fixed BitSet(20) = 3 bytes): unused.
+
+    Player& player = cont.connection.getPlayer();
+    Console::getConsole().Entry("<" + player.getUsername() + "> " + message);
+    BroadcastDisguisedChat(player.getUsername(), message, "minecraft:chat");
+}
+
+void Chat_Command_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Chat_Command_p::deserialize(): Received.");
+    #endif
+    string commandLine = deserializeString(in_buff);
+    if (!commandLine.empty() && commandLine[0] == '/') {
+        commandLine.erase(commandLine.begin());
+    }
+
+    std::istringstream iss(commandLine);
+    string name;
+    iss >> name;
+    std::vector<string> args;
+    string arg;
+    while (iss >> arg) {
+        args.push_back(arg);
+    }
+
+    PlayerCommandSender sender(cont.connection.shared_from_this());
+    CommandRegistry::getInstance().dispatch(sender, name, args);
 }
 
 void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

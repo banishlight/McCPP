@@ -32,6 +32,9 @@ std::vector<Byte> generateVerifyToken();
 
 std::vector<long> deserializeUUID(std::vector<Byte>& data);
 std::vector<Byte> serializeUUID(const std::vector<long>& data);
+// Dashless 32-hex-char lowercase form, e.g. for keying OpsList entries -- the
+// inverse of Login.cpp's local uuidFromMojangHex.
+string uuidToHexString(const std::vector<long>& uuid);
 
 // Wire "Angle" type: a full rotation (0-360 degrees) packed into a single
 // byte (256 steps/turn). Used by entity rotation fields (Update Entity

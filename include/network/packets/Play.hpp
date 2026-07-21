@@ -311,6 +311,42 @@ class Player_Info_Remove_p : public Play_Packet, public Outgoing_Packet {
         static int constexpr _PACKET_ID = 0x3D;
 };
 
+// A chat message with no signing information -- what vanilla itself sends for
+// console/command-originated chat (/say, /tell, /me), which is exactly this
+// server's use case since it never implements chat signing. chatTypeId is a
+// minecraft:chat_type registry identifier (e.g. "minecraft:chat",
+// "minecraft:say_command"); its wire index is looked up at send time since
+// registry send order isn't fixed (see BroadcastDisguisedChat).
+class Disguised_Chat_Message_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Disguised_Chat_Message_p(int threshold, const string& message, int chatTypeIndex, const string& senderName);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        string _message;
+        int _chatTypeIndex;
+        string _senderName;
+        static int constexpr _PACKET_ID = 0x1E;
+};
+
+// A raw system message (command feedback, errors) -- not associated with any
+// player, so no chat_type/sender is needed.
+class System_Chat_Message_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        System_Chat_Message_p(int threshold, const string& message, bool overlay = false);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        string _message;
+        bool _overlay;
+        static int constexpr _PACKET_ID = 0x6C;
+};
+
+// Sends a Disguised_Chat_Message_p (chatTypeId in the minecraft:chat_type
+// registry, e.g. "minecraft:chat" for player chat, "minecraft:say_command"
+// for /say) to every active Play connection.
+void BroadcastDisguisedChat(const string& senderName, const string& message, const string& chatTypeId);
+
 // Shared by the initial Configuration->Play chunk send and every subsequent
 // movement-triggered update: diffs the player's currently-loaded chunk set
 // against the (2*viewDistance+1) square centered on (newCenterX, newCenterZ),
@@ -383,6 +419,28 @@ class Player_Command_p : public Play_Packet, public Incoming_Packet {
         void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
     private:
         static int constexpr _PACKET_ID = 0x25;
+};
+// Regular chat (no leading "/"). Signature fields are consumed but never
+// verified -- this server never implements chat signing (see
+// Disguised_Chat_Message_p), matching how it already trusts online-mode
+// verification instead of client-side message signatures for authenticity.
+class Chat_Message_p : public Play_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+    private:
+        static int constexpr _PACKET_ID = 0x06;
+};
+// A "/command" typed in chat. Only the unsigned variant (0x04) is handled --
+// the client only sends the signed variant (0x05) for arguments a Declare
+// Commands packet marked as requiring signing, and this server never sends
+// one, so real clients always take this path.
+class Chat_Command_p : public Play_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+    private:
+        static int constexpr _PACKET_ID = 0x04;
 };
 class Use_Item_On_p : public Play_Packet, public Incoming_Packet {
     public:

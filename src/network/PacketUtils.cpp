@@ -3,6 +3,8 @@
 #include <Standards.hpp>
 #include <vector>
 #include <cstring>
+#include <sstream>
+#include <iomanip>
 
 std::vector<Byte> varIntSerialize(int num){ 
     std::vector<Byte> result;
@@ -250,6 +252,15 @@ std::vector<Byte> serializeUUID(const std::vector<long>& data) {
         result.push_back(static_cast<Byte>((leastSignificant >> (i * 8)) & 0xFF));
     }
     return result;
+}
+
+string uuidToHexString(const std::vector<long>& uuid) {
+    if (uuid.size() < 2) return "";
+    std::ostringstream oss;
+    oss << std::hex << std::nouppercase << std::setfill('0')
+        << std::setw(16) << static_cast<UInt64>(uuid[0])
+        << std::setw(16) << static_cast<UInt64>(uuid[1]);
+    return oss.str();
 }
 
 std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>& data) {
