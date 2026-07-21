@@ -8,6 +8,7 @@
 #include <World.hpp>
 #include <ItemBlockMapping.hpp>
 #include <PlayerDataPersistence.hpp>
+#include <OpsList.hpp>
 #include <Console.hpp>
 #include <cmath>
 #include <memory>
@@ -258,6 +259,11 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
         threshold, player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch(), 0);
     cont.connection.addPacket(syncPosition);
     cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(threshold, player.getHotbar()));
+    // Same permission lookup PlayerCommandSender::getPermissionLevel() does --
+    // reused directly rather than constructing a full CommandSender just to
+    // read one int.
+    int permissionLevel = OpsList::getInstance().getOpLevel(uuidToHexString(player.getUUID()));
+    cont.connection.addPacket(std::make_shared<Commands_p>(threshold, permissionLevel));
 
     // Send every chunk within the player's view distance around their own
     // (real, possibly-restored) position, not always spawn -- see homeChunkX/Z

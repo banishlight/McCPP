@@ -46,6 +46,23 @@ class Set_Default_Spawn_Position_p : public Play_Packet, public Outgoing_Packet 
     private:
         static int constexpr _PACKET_ID = 0x56;
 };
+// Advertises every command as a bare executable literal node (root -> one
+// child per command, no argument children) so the client autocompletes/
+// highlights them in the chat box -- see docs/general-documentation.md,
+// "Command autocomplete", for why argument nodes are deliberately out of
+// scope (the Brigadier parser-ID table is version-fragile and unverified).
+class Commands_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        // permissionLevel filters out commands the joining player can't run,
+        // mirroring HelpCommand's own existing filter (same convention, not
+        // a new design decision).
+        Commands_p(int threshold, int permissionLevel);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        std::vector<string> _commandNames; // filtered, in CommandRegistry order
+        static int constexpr _PACKET_ID = 0x11;
+};
 class Clientbound_Keep_Alive_play_p : public Play_Packet, public Outgoing_Packet {
     public:
         Clientbound_Keep_Alive_play_p(int threshold, Int64 keepAliveId);

@@ -4,7 +4,9 @@
 #include <Properties.hpp>
 #include <network/ConnectionManager.hpp>
 #include <network/Connection.hpp>
+#include <network/packets/Play.hpp>
 #include <network/PacketUtils.hpp>
+#include <memory>
 
 void OpCommand::execute(CommandSender& sender, const std::vector<string>& args) {
     if (args.empty()) {
@@ -21,7 +23,12 @@ void OpCommand::execute(CommandSender& sender, const std::vector<string>& args) 
         if (player.getUsername() != targetName) continue;
 
         string uuidHex = uuidToHexString(player.getUUID());
-        OpsList::getInstance().setOpLevel(uuidHex, targetName, Properties::getProperties().op_permission_level);
+        int newLevel = Properties::getProperties().op_permission_level;
+        OpsList::getInstance().setOpLevel(uuidHex, targetName, newLevel);
+        // Commands_p is only ever otherwise sent once, at join -- resend it
+        // now so the target's chat autocomplete reflects newly-granted
+        // commands immediately instead of only after a reconnect.
+        conn->addPacket(std::make_shared<Commands_p>(conn->getCompressionThreshold(), newLevel));
         sender.sendMessage("Made " + targetName + " a server operator.");
         return;
     }
