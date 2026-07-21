@@ -57,6 +57,13 @@ class Player {
         float getPitch() const;
         void setPosition(double x, double y, double z);
         void setRotation(float yaw, float pitch);
+        // From Player_Command_p (start/stop sneaking, start/stop sprinting) --
+        // relayed to other players via entity metadata (Entity Flags bitmask +
+        // Pose) so their client renders the crouch/sprint animation.
+        bool isSneaking() const;
+        void setSneaking(bool sneaking);
+        bool isSprinting() const;
+        void setSprinting(bool sprinting);
         // Chunk columns currently sent to this player's client, and the chunk
         // they were last centered on -- lets movement handling diff against
         // what's actually loaded instead of resending everything every move.
@@ -95,6 +102,8 @@ class Player {
         double _z = 0.0;
         float _yaw = 0.0f;
         float _pitch = 0.0f;
+        bool _sneaking = false;
+        bool _sprinting = false;
         std::set<std::pair<int, int>> _loadedChunks;
         int _centerChunkX = 0; // matches the fixed spawn chunk (0,0)
         int _centerChunkZ = 0;

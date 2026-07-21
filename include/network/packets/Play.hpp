@@ -168,6 +168,34 @@ class Set_Player_Skin_Parts_Metadata_p : public Play_Packet, public Outgoing_Pac
         Byte _skinParts;
         static int constexpr _PACKET_ID = 0x58;
 };
+// Entity Flags, index 0, Byte bitmask (0x02 crouching, 0x08 sprinting) --
+// on the base Entity class, stable across versions (unlike the Player-specific
+// skin-parts field). Sent as its own packet, not combined with Pose below --
+// these must go out as two separate Set Entity Metadata packets, never
+// combined into one, or the pose change silently fails to render.
+class Set_Entity_Flags_Metadata_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Set_Entity_Flags_Metadata_p(int threshold, int entityId, bool sneaking, bool sprinting);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        bool _sneaking, _sprinting;
+        static int constexpr _PACKET_ID = 0x58;
+};
+// Pose, index 6, VarInt enum (STANDING=0, SNEAKING=5) -- also on the base
+// Entity class. Kept as its own packet, sent alongside (not combined with)
+// Set_Entity_Flags_Metadata_p -- see that class's comment.
+class Set_Player_Pose_Metadata_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Set_Player_Pose_Metadata_p(int threshold, int entityId, bool sneaking);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        bool _sneaking;
+        static int constexpr _PACKET_ID = 0x58;
+};
 class Remove_Entities_p : public Play_Packet, public Outgoing_Packet {
     public:
         Remove_Entities_p(int threshold, int entityId);
@@ -348,6 +376,13 @@ class Player_Action_p : public Play_Packet, public Incoming_Packet {
         void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
     private:
         static int constexpr _PACKET_ID = 0x24;
+};
+class Player_Command_p : public Play_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+    private:
+        static int constexpr _PACKET_ID = 0x25;
 };
 class Use_Item_On_p : public Play_Packet, public Incoming_Packet {
     public:

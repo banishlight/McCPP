@@ -94,6 +94,22 @@ void Player::setRotation(float yaw, float pitch) {
     _pitch = pitch;
 }
 
+bool Player::isSneaking() const {
+    return _sneaking;
+}
+
+void Player::setSneaking(bool sneaking) {
+    _sneaking = sneaking;
+}
+
+bool Player::isSprinting() const {
+    return _sprinting;
+}
+
+void Player::setSprinting(bool sprinting) {
+    _sprinting = sprinting;
+}
+
 bool Player::hasChunkLoaded(int chunkX, int chunkZ) const {
     return _loadedChunks.count({chunkX, chunkZ}) > 0;
 }

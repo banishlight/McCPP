@@ -724,6 +724,68 @@ std::vector<Byte> Set_Player_Skin_Parts_Metadata_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Set_Entity_Flags_Metadata_p::Set_Entity_Flags_Metadata_p(int threshold, int entityId, bool sneaking, bool sprinting) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _sneaking = sneaking;
+    _sprinting = sprinting;
+}
+
+std::vector<Byte> Set_Entity_Flags_Metadata_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Entity_Flags_Metadata_p::serialize(): Sending.");
+    #endif
+    // Entity Flags, index 0, type 0/Byte: bit 0x02 crouching, bit 0x08 sprinting.
+    const Byte ENTITY_FLAGS_INDEX = 0;
+    const int BYTE_METADATA_TYPE = 0;
+
+    Byte flags = 0;
+    if (_sneaking) flags |= 0x02;
+    if (_sprinting) flags |= 0x08;
+
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(ENTITY_FLAGS_INDEX);
+    std::vector<Byte> typeBytes = varIntSerialize(BYTE_METADATA_TYPE);
+    packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
+    packet_data.push_back(flags);
+    packet_data.push_back(0xFF); // terminator: no more metadata entries
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Set_Player_Pose_Metadata_p::Set_Player_Pose_Metadata_p(int threshold, int entityId, bool sneaking) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _sneaking = sneaking;
+}
+
+std::vector<Byte> Set_Player_Pose_Metadata_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Player_Pose_Metadata_p::serialize(): Sending.");
+    #endif
+    // Pose, index 6. Its value is wire-identical to a plain VarInt, but Pose
+    // has its own dedicated metadata type ID distinct from the generic VarInt
+    // type (1) -- using 1 silently failed even though the value bytes
+    // themselves would have been identical either way. That type ID is ALSO
+    // version-specific: it's 21 for 1.21 through 1.21.7, shifting to 20 only
+    // at 1.21.9+ (and renamed again in later snapshots) -- verified against
+    // version-pinned data after the type-registry table on the live wiki page
+    // (which defaults to showing the newest version, same trap as the
+    // skin-parts index) gave 20 and silently failed for our actual 1.21 target.
+    const Byte POSE_INDEX = 6;
+    const int POSE_METADATA_TYPE = 21;
+    const int POSE_STANDING = 0;
+    const int POSE_SNEAKING = 5;
+
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(POSE_INDEX);
+    std::vector<Byte> typeBytes = varIntSerialize(POSE_METADATA_TYPE);
+    packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
+    std::vector<Byte> valueBytes = varIntSerialize(_sneaking ? POSE_SNEAKING : POSE_STANDING);
+    packet_data.insert(packet_data.end(), valueBytes.begin(), valueBytes.end());
+    packet_data.push_back(0xFF); // terminator: no more metadata entries
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
 Remove_Entities_p::Remove_Entities_p(int threshold, int entityId) {
     _threshold = threshold;
     _entityId = entityId;
@@ -1286,6 +1348,29 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
                 return std::make_shared<Set_Entity_Velocity_p>(broadcastThreshold, entityId, vx, vy, vz);
             });
         }
+    }
+}
+
+void Player_Command_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Player_Command_p::deserialize(): Received.");
+    #endif
+    deserializeVarInt(in_buff); // Entity ID: always the sender's own, unused.
+    int actionId = deserializeVarInt(in_buff);
+    deserializeVarInt(in_buff); // Jump Boost: horse-related, unused.
+
+    Player& player = cont.connection.getPlayer();
+    bool changed = true;
+    switch (actionId) {
+        case 0: player.setSneaking(true); break;
+        case 1: player.setSneaking(false); break;
+        case 3: player.setSprinting(true); break;
+        case 4: player.setSprinting(false); break;
+        default: changed = false; break; // leave bed / horse jump / vehicle inventory / elytra: not implemented
+    }
+
+    if (changed) {
+        PlayerVisibilityManager::getInstance().broadcastPoseChange(cont.connection.shared_from_this());
     }
 }
 

@@ -34,12 +34,19 @@ class PlayerVisibilityManager {
         void broadcastMovement(std::shared_ptr<Connection> mover,
                                double oldX, double oldY, double oldZ,
                                bool positionChanged, bool rotationChanged, bool onGround);
+        // Tells every connection that currently has `mover` visible about
+        // their current sneaking/sprinting state (Set_Player_Pose_Metadata_p) --
+        // called from Player_Command_p after Player's own state is updated.
+        void broadcastPoseChange(std::shared_ptr<Connection> mover);
     private:
         PlayerVisibilityManager() = default;
         enum class VisibilityChange { None, Spawn, Despawn };
         // Locked check-and-update against _visibleTo[viewerEntityId]; the
         // caller sends the actual packet outside the lock based on the result.
         VisibilityChange decideChange(int viewerEntityId, int targetEntityId, bool shouldBeVisible);
+        // Snapshot of every viewer entity ID that currently has targetEntityId
+        // in its visible set -- shared by broadcastMovement and broadcastPoseChange.
+        std::set<int> findViewersOf(int targetEntityId);
 
         std::mutex _mutex;
         std::unordered_map<int, std::set<int>> _visibleTo; // viewer entityId -> currently-spawned target entityIds

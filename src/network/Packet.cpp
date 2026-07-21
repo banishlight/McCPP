@@ -67,6 +67,7 @@ void Packet_Registry::initializeRegistry() {
     PlayVec[0x1C] = std::make_shared<Set_Player_Rotation_p>();
     PlayVec[0x18] = std::make_shared<Serverbound_Keep_Alive_play_p>();
     PlayVec[0x24] = std::make_shared<Player_Action_p>();
+    PlayVec[0x25] = std::make_shared<Player_Command_p>();
     PlayVec[0x2F] = std::make_shared<Set_Held_Item_serverbound_p>();
     PlayVec[0x38] = std::make_shared<Use_Item_On_p>();
 
