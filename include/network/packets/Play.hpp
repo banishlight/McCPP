@@ -301,15 +301,18 @@ class Set_Head_Rotation_p : public Play_Packet, public Outgoing_Packet {
         static int constexpr _PACKET_ID = 0x48;
 };
 // Server-wide tab list (not proximity-based -- every connected player is told
-// about every other one, regardless of distance, matching vanilla). Only
-// implements the "Add Player" action (mask 0x01): the rest (game mode,
-// latency, etc.) aren't tracked by this server yet.
+// about every other one, regardless of distance, matching vanilla). Implements
+// Add Player (0x01), Update Game Mode (0x04), and Update Listed (0x08).
+// Latency (0x10) isn't tracked by this server yet -- no round-trip Keep Alive
+// timing exists to source a real ping from. Listed is always sent true: this
+// project has no mechanism to hide a connected player from the tab list.
 class Player_Info_Update_p : public Play_Packet, public Outgoing_Packet {
     public:
         struct Entry {
             std::vector<long> uuid;
             std::string name;
             std::vector<PlayerProfileProperty> properties;
+            int gamemode = 0;
         };
         Player_Info_Update_p(int threshold, const std::vector<Entry>& entries);
         int getID() const override { return _PACKET_ID; }

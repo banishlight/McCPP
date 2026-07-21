@@ -1024,15 +1024,22 @@ std::vector<Byte> Player_Info_Update_p::serialize() const {
     #ifdef DEBUG
         Console::getConsole().Entry("Player_Info_Update_p::serialize(): Sending.");
     #endif
-    const Byte ADD_PLAYER_ACTION = 0x01;
+    // Add Player (0x01) | Update Game Mode (0x04) | Update Listed (0x08) --
+    // Update Listed is the one that actually makes a player appear in the
+    // client's tab-list overlay at all; without it, the client defaults an
+    // entry to unlisted (an empty-looking overlay), even though Add Player's
+    // own fields (name/skin) are otherwise applied fine.
+    const Byte ACTIONS = 0x01 | 0x04 | 0x08;
     std::vector<Byte> packet_data;
-    packet_data.push_back(ADD_PLAYER_ACTION);
+    packet_data.push_back(ACTIONS);
     std::vector<Byte> count = varIntSerialize(static_cast<int>(_entries.size()));
     packet_data.insert(packet_data.end(), count.begin(), count.end());
 
     // Interleaved per player (UUID immediately followed by that player's own
-    // action fields), not all UUIDs then all action blocks -- the vendored
-    // doc's table is ambiguous on this point, verified rather than guessed.
+    // action fields, in the same order as the Actions bitmask's set bits: Add
+    // Player, then Update Game Mode, then Update Listed), not all UUIDs then
+    // all action blocks -- the vendored doc's table is ambiguous on grouping,
+    // verified rather than guessed.
     for (const auto& entry : _entries) {
         std::vector<Byte> uuidBytes = serializeUUID(entry.uuid);
         packet_data.insert(packet_data.end(), uuidBytes.begin(), uuidBytes.end());
@@ -1054,6 +1061,11 @@ std::vector<Byte> Player_Info_Update_p::serialize() const {
                 packet_data.push_back(0x00);
             }
         }
+
+        std::vector<Byte> gamemodeBytes = varIntSerialize(entry.gamemode);
+        packet_data.insert(packet_data.end(), gamemodeBytes.begin(), gamemodeBytes.end());
+
+        packet_data.push_back(0x01); // Listed = true, always -- no hide-from-tab-list mechanism exists
     }
     return assemblePacket(getID(), _threshold, packet_data);
 }
@@ -1168,6 +1180,7 @@ void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer) {
     joiningEntry.uuid = joiningPlayer.getUUID();
     joiningEntry.name = joiningPlayer.getUsername();
     joiningEntry.properties = joiningPlayer.getProfileProperties();
+    joiningEntry.gamemode = joiningPlayer.getGamemode();
 
     // The client needs its own Add Player entry too, not just other players' --
     // skin variant (slim/classic arms) and cape data are only ever delivered via
@@ -1188,6 +1201,7 @@ void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer) {
         existingEntry.uuid = other.getUUID();
         existingEntry.name = other.getUsername();
         existingEntry.properties = other.getProfileProperties();
+        existingEntry.gamemode = other.getGamemode();
         entriesForJoiner.push_back(existingEntry);
     }
 
