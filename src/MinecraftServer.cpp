@@ -10,6 +10,7 @@
 #include <TickLoop.hpp>
 #include <WorldWorkerPool.hpp>
 #include <World.hpp>
+#include <systems/AutosaveSystem.hpp>
 #include <sstream>
 
 int main() {
@@ -44,6 +45,10 @@ int main() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+    // Persist everything before the world/connection singletons get torn
+    // down by static destruction -- the same save path AutosaveSystem runs
+    // periodically, just run once more immediately on the way out.
+    AutosaveSystem::saveNow();
     // StopCommand queues a Disconnect packet for every connected player before
     // requesting shutdown, but actually sending it only happens on each
     // connection's own processing thread the next time it runs -- give that a

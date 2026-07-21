@@ -50,3 +50,7 @@ int Chunk::getBlockLight(int localX, int worldY, int localZ) const {
 Int32 Chunk::getBiomeId() const {
     return _biomeId;
 }
+
+void Chunk::setBiomeId(Int32 biomeId) {
+    _biomeId = biomeId;
+}

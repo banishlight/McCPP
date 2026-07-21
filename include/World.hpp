@@ -2,10 +2,14 @@
 #include <Standards.hpp>
 #include <Chunk.hpp>
 #include <ChunkGenerator.hpp>
+#include <LevelDat.hpp>
 #include <map>
+#include <set>
 #include <mutex>
 #include <memory>
 #include <functional>
+#include <vector>
+#include <utility>
 
 // Exists as the query boundary a real multi-chunk world sits behind, so
 // callers ask "the world" for spawn/chunk data instead of hardcoding it inline.
@@ -13,6 +17,9 @@ class World {
     public:
         static World& getInstance();
         string getDimensionName() const;
+        // Resolved from Properties::level_name at construction -- the
+        // directory level.dat and region/ live in (see LevelDat, RegionFile).
+        const string& getWorldDir() const;
         double getSpawnX() const;
         double getSpawnY() const;
         double getSpawnZ() const;
@@ -44,12 +51,26 @@ class World {
         // other thread is mid-read of it, is left untouched and internally
         // consistent. Returns false (no-op) if the chunk isn't cached.
         bool setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId);
+        // Drains and returns every chunk coordinate generated/edited since
+        // the last call (AutosaveSystem / the shutdown save hook are the two
+        // callers) -- locks just long enough to copy and clear the set, not
+        // held during the disk I/O that follows, mirroring setBlock's own
+        // "never hold the lock during the expensive part" caution.
+        std::vector<std::pair<int,int>> takeDirtyChunksSnapshot();
+        // Snapshot of current world-level state ready for LevelDat::save --
+        // shared by AutosaveSystem and the shutdown save hook so neither
+        // duplicates the Properties-field mapping.
+        LevelData buildLevelData() const;
     private:
         World();
         // Inserts into _chunkCache and drops the now-redundant _terrainCache
         // entry for the same coordinate, if any -- called at every point a
         // chunk becomes fully lit, so a coordinate is never stored twice.
+        // Marks the coordinate dirty (needs saving) unless it was just loaded
+        // unmodified from disk (see getOrGenerateTerrain/_cleanChunks) --
+        // an untouched imported chunk shouldn't get rewritten every autosave.
         void cacheAsLit(int chunkX, int chunkZ, std::shared_ptr<Chunk> chunk);
+        string _worldDir;
         string _dimensionName = "minecraft:overworld";
         double _spawnX = 0.5;
         double _spawnY = -48.0; // placeholder; recomputed in the constructor for non-flat generators
@@ -62,4 +83,11 @@ class World {
         std::mutex _chunkCacheMutex;
         std::map<std::pair<int,int>, std::shared_ptr<Chunk>> _terrainCache; // block data only, no light
         std::mutex _terrainCacheMutex;
+        // Both guarded by _chunkCacheMutex (reusing it avoids a second
+        // lock-ordering concern). _cleanChunks holds coordinates that were
+        // just loaded from disk unmodified -- consumed (erased) the first
+        // time cacheAsLit runs for that coordinate, so a *later* edit via
+        // setBlock still marks it dirty normally.
+        std::set<std::pair<int,int>> _dirtyChunks;
+        std::set<std::pair<int,int>> _cleanChunks;
 };
