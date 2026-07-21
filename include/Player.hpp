@@ -11,6 +11,17 @@ struct HotbarSlot {
     Int32 count = 0;
 };
 
+// One entry of a Mojang game profile's "properties" array (currently always
+// at most one, named "textures", carrying the base64-encoded skin/cape JSON
+// blob plus Mojang's signature over it) -- shared by Login_Success_p (tells
+// this player's own client its skin) and the future Player Info Update
+// broadcast (tells other players' clients the same thing).
+struct PlayerProfileProperty {
+    std::string name;
+    std::string value;
+    std::string signature;
+};
+
 // Player/gameplay-related state for a connected client. Deliberately separate from
 // Connection, which stays scoped to socket/protocol concerns (state, compression,
 // encryption). Populated incrementally as login/configuration packets arrive.
@@ -22,6 +33,11 @@ class Player {
         void setUsername(const string& username);
         std::vector<long> getUUID() const;
         void setUUID(std::vector<long> uuid);
+        // Populated from Mojang's hasJoined response once online-mode
+        // verification completes (Encryption_Response_p::deserialize) --
+        // empty until then, which clients render as a default Steve/Alex skin.
+        const std::vector<PlayerProfileProperty>& getProfileProperties() const;
+        void setProfileProperties(std::vector<PlayerProfileProperty> properties);
         int getViewDistance() const;
         void setViewDistance(int viewDistance);
         int getEntityId() const;
@@ -62,6 +78,7 @@ class Player {
     private:
         string _username;
         std::vector<long> _uuid;
+        std::vector<PlayerProfileProperty> _profileProperties;
         int _viewDistance = 10;
         int _entityId;
         int _gamemode = 0; // 0: Survival, 1: Creative, 2: Adventure, 3: Spectator

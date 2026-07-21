@@ -7,6 +7,8 @@
 #include <Properties.hpp>
 #include <ThreadPool.hpp>
 #include <network/Crypto.hpp>
+#include <network/packets/Play.hpp>
+#include <entities/PlayerVisibilityManager.hpp>
 #include <thread>
 #include <algorithm>
 
@@ -28,6 +30,9 @@ void ConnectionManager::initialize() {
     if (_initialized) return; // Already initialized
     // Initialize Crypto key
     initCrypto();
+    // Generate the server's RSA keypair once, eagerly, so no connection can
+    // race generatePublicKey()'s first-call memoization once real traffic starts.
+    generatePublicKey();
     // Fetch server address and make socket
     auto& props = Properties::getProperties();
     _serverSocket = std::make_unique<ServerSocket>(props.getIP(), props.getPort());
@@ -55,7 +60,20 @@ void ConnectionManager::close() {
 }
 
 void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
-    if (!conn->isValid()) return;
+    if (!conn->isValid()) {
+        // Only Play-state connections were ever announced to anyone (tab
+        // list + in-world visibility), so only those need an announced exit.
+        if (conn->getState() == ConnectionState::Play) {
+            std::vector<std::vector<long>> leavingUuid{conn->getPlayer().getUUID()};
+            for (auto& other : getActiveConnections()) {
+                if (!other || other.get() == conn.get()) continue;
+                if (other->getState() != ConnectionState::Play) continue;
+                other->addPacket(std::make_shared<Player_Info_Remove_p>(other->getCompressionThreshold(), leavingUuid));
+            }
+            PlayerVisibilityManager::getInstance().handleDisconnect(conn);
+        }
+        return;
+    }
     conn->receivePacket();
     conn->deliverGeneratedChunks();
     conn->sendPackets();

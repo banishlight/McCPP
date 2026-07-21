@@ -195,6 +195,10 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     cont.connection.setState(ConnectionState::Play);
 
     Player& player = cont.connection.getPlayer();
+    // Tab-list sync: tell everyone else about this player, and this player
+    // about everyone else. Separate from in-world visibility (PlayerVisibilityManager),
+    // which is chunk/proximity-based and handled once chunks start delivering.
+    BroadcastPlayerJoin(cont, player);
     World& world = World::getInstance();
     player.setPosition(world.getSpawnX(), world.getSpawnY(), world.getSpawnZ());
     player.setRotation(world.getSpawnYaw(), 0.0f);

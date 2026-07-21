@@ -6,6 +6,7 @@
 #include <network/PacketContext.hpp>
 #include <network/Compression.hpp>
 #include <network/packets/Play.hpp>
+#include <entities/PlayerVisibilityManager.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
 #include <Chunk.hpp>
@@ -56,6 +57,22 @@ void Connection::deserializePacket(std::vector<Byte> packet) {
     // TODO set action processor for context if needed
     incomingPacket->deserialize(packet, cont);
 	return;
+}
+
+void Connection::setVerifyToken(const std::vector<Byte>& token) {
+    _verifyToken = token;
+}
+
+const std::vector<Byte>& Connection::getVerifyToken() const {
+    return _verifyToken;
+}
+
+void Connection::setServerId(const std::string& serverId) {
+    _serverId = serverId;
+}
+
+const std::string& Connection::getServerId() const {
+    return _serverId;
 }
 
 std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> packet) {
@@ -181,4 +198,9 @@ void Connection::deliverGeneratedChunks() {
         _player.markChunkLoaded(cx, cz);
         addPacket(std::make_shared<Chunk_Data_p>(threshold, chunk));
     }
+    // This connection's loaded-chunk set just changed -- re-evaluate player
+    // visibility both directions against every other connection (also catches
+    // another player having moved into/out of this player's view, since that
+    // player's own chunk delivery triggers their side of the same check).
+    PlayerVisibilityManager::getInstance().refresh(shared_from_this());
 }

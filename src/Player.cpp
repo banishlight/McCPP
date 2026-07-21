@@ -27,6 +27,14 @@ void Player::setUUID(std::vector<long> uuid) {
     _uuid = uuid;
 }
 
+const std::vector<PlayerProfileProperty>& Player::getProfileProperties() const {
+    return _profileProperties;
+}
+
+void Player::setProfileProperties(std::vector<PlayerProfileProperty> properties) {
+    _profileProperties = std::move(properties);
+}
+
 int Player::getViewDistance() const {
     return _viewDistance;
 }

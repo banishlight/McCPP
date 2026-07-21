@@ -1,6 +1,7 @@
 #pragma once
 #include <Standards.hpp>
 #include <network/Packet.hpp>
+#include <Player.hpp>
 
 // **Login Packets**
 
@@ -15,27 +16,24 @@ class Disconnect_login_p : public Login_Packet, public Outgoing_Packet {
 };
 class Encryption_Request_p : public Login_Packet, public Outgoing_Packet {
     public:
-        Encryption_Request_p(int threshold);
+        Encryption_Request_p(int threshold, const std::string& serverId, const std::vector<Byte>& verifyToken);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
+        std::string _serverId;
+        std::vector<Byte> _verifyToken;
         static int constexpr _PACKET_ID = 0x01;
 };
 class Login_Success_p : public Login_Packet, public Outgoing_Packet {
     public:
-        Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username);
+        Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username, const std::vector<PlayerProfileProperty>& properties);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
-        struct login_properties {
-            std::string name;
-            std::string value;
-            std::string signature;
-        };
     private:
         static int constexpr _PACKET_ID = 0x02;
         std::vector<long> _uuid;
         std::string _username;
-        std::vector<login_properties> _properties; // Optional properties
+        std::vector<PlayerProfileProperty> _properties;
 };
 class Set_Compression_p : public Login_Packet, public Outgoing_Packet {
     public:

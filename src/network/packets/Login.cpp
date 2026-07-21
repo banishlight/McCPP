@@ -5,10 +5,42 @@
 #include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
 #include <network/Crypto.hpp>
+#include <network/HttpsClient.hpp>
 #include <Console.hpp>
 #include <memory>
+#include <sstream>
+#include <iomanip>
+#include <cctype>
 #include <lib/json.hpp>
 using json = nlohmann::json;
+
+namespace {
+    // Usernames are normally already URL-safe (alphanumeric + underscore), but
+    // percent-encode defensively rather than assume the client-supplied string
+    // never contains anything else.
+    std::string urlEncodeUsername(const std::string& username) {
+        std::ostringstream oss;
+        for (unsigned char c : username) {
+            if (std::isalnum(c) || c == '_' || c == '-' || c == '.') {
+                oss << c;
+            } else {
+                oss << '%' << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+                oss << std::nouppercase << std::dec;
+            }
+        }
+        return oss.str();
+    }
+
+    // Converts Mojang's dashless 32-hex-char UUID string into the
+    // {mostSignificant, leastSignificant} long-pair representation
+    // deserializeUUID/serializeUUID already use elsewhere.
+    std::vector<long> uuidFromMojangHex(const std::string& hex) {
+        if (hex.size() != 32) return {0, 0};
+        unsigned long long msb = std::stoull(hex.substr(0, 16), nullptr, 16);
+        unsigned long long lsb = std::stoull(hex.substr(16, 16), nullptr, 16);
+        return {static_cast<long>(msb), static_cast<long>(lsb)};
+    }
+}
 
 Disconnect_login_p::Disconnect_login_p(int threshold, const std::string& reason) {
     _threshold = threshold;
@@ -35,8 +67,10 @@ std::vector<Byte> Disconnect_login_p::serialize() const {
     return packet;
 }
 
-Encryption_Request_p::Encryption_Request_p(int threshold) {
+Encryption_Request_p::Encryption_Request_p(int threshold, const std::string& serverId, const std::vector<Byte>& verifyToken) {
     _threshold = threshold;
+    _serverId = serverId;
+    _verifyToken = verifyToken;
 }
 
 std::vector<Byte> Encryption_Request_p::serialize() const {
@@ -48,13 +82,11 @@ std::vector<Byte> Encryption_Request_p::serialize() const {
     // Public key (Prefixed array of byte)
     // Verify Token (Prefixed array of byte)
     // Should authenticate (Boolean)
-    string server_id = "";
     std::vector<Byte> pub_key = generatePublicKey();
-    std::vector<Byte> verify_token = generateVerifyToken();
+    std::vector<Byte> verify_token = serializePrefixedArray(_verifyToken);
     pub_key = serializePrefixedArray(pub_key);
-    verify_token = serializePrefixedArray(verify_token);
-    Byte authenticate = 0x01; // 0x00 false, 0x01 true
-    std::vector<Byte> data = serializeString(server_id);
+    Byte authenticate = Properties::getProperties().online_mode ? 0x01 : 0x00; // must match whether Encryption_Response_p actually verifies with Mojang
+    std::vector<Byte> data = serializeString(_serverId);
     data.insert(data.end(), pub_key.begin(), pub_key.end());
     data.insert(data.end(), verify_token.begin(), verify_token.end());
     data.push_back(authenticate);
@@ -62,10 +94,11 @@ std::vector<Byte> Encryption_Request_p::serialize() const {
     return packet;
 }
 
-Login_Success_p::Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username) {
+Login_Success_p::Login_Success_p(int threshold, const std::vector<long>& uuid, const std::string& username, const std::vector<PlayerProfileProperty>& properties) {
     _threshold = threshold;
     _uuid = uuid;
     _username = username;
+    _properties = properties;
 }
 
 std::vector<Byte> Login_Success_p::serialize() const {
@@ -153,7 +186,13 @@ void Login_Start_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     uuid = deserializeUUID(in_buff);
     cont.connection.getPlayer().setUsername(username);
     cont.connection.getPlayer().setUUID(uuid);
-    std::shared_ptr<Outgoing_Packet> encryptionRequestPacket = std::make_shared<Encryption_Request_p>(cont.connection.getCompressionThreshold());
+
+    std::string serverId = generateServerId();
+    std::vector<Byte> verifyToken = generateVerifyToken();
+    cont.connection.setServerId(serverId);
+    cont.connection.setVerifyToken(verifyToken);
+
+    std::shared_ptr<Outgoing_Packet> encryptionRequestPacket = std::make_shared<Encryption_Request_p>(cont.connection.getCompressionThreshold(), serverId, verifyToken);
     cont.connection.addPacket(encryptionRequestPacket);
 }
 
@@ -168,7 +207,7 @@ void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext
     encrypted_verify_token = deserializePrefixedArray(in_buff);
 
     std::vector<Byte> decrypted_verify_token = decryptWithPrivateKey(encrypted_verify_token);
-    if (!verifyToken(decrypted_verify_token)) {
+    if (!verifyToken(cont.connection.getVerifyToken(), decrypted_verify_token)) {
         Console::getConsole().Error("Encryption_Response_p::deserialize(): Verify token mismatch, disconnecting client.");
         int threshold = cont.connection.getCompressionThreshold();
         std::shared_ptr<Outgoing_Packet> disconnect = std::make_shared<Disconnect_login_p>(threshold, "Invalid verify token.");
@@ -181,13 +220,57 @@ void Encryption_Response_p::deserialize(std::vector<Byte> in_buff, PacketContext
     std::vector<Byte> shared_secret = decryptWithPrivateKey(encrypted_shared_secret);
     cont.connection.enableEncryption(shared_secret);
 
+    // Offline mode (server.properties online-mode=false): keep trusting the
+    // client-supplied UUID/username from Login Start, same as before this
+    // feature existed -- no Mojang round-trip, no real skin data.
+    if (Properties::getProperties().online_mode) {
+        // Online-mode verification: Mojang's join-hash must be computed over the
+        // exact same public key DER sent in Encryption_Request_p -- generatePublicKey()
+        // memoizes after its first call (see Crypto.hpp), so this reuses those same bytes.
+        std::string serverHash = computeServerHash(cont.connection.getServerId(), shared_secret, generatePublicKey());
+        std::string username = cont.connection.getPlayer().getUsername();
+        HttpsClient::Response hasJoinedResp = HttpsClient::Get("sessionserver.mojang.com",
+            "/session/minecraft/hasJoined?username=" + urlEncodeUsername(username) + "&serverId=" + serverHash);
+
+        if (!hasJoinedResp.success || hasJoinedResp.body.empty()) {
+            Console::getConsole().Error("Encryption_Response_p::deserialize(): Mojang authentication failed for \"" + username + "\", disconnecting.");
+            int failThreshold = cont.connection.getCompressionThreshold();
+            cont.connection.addPacket(std::make_shared<Disconnect_login_p>(failThreshold, "Failed to verify username!"));
+            return;
+        }
+
+        try {
+            json profile = json::parse(hasJoinedResp.body);
+            Player& player = cont.connection.getPlayer();
+            player.setUUID(uuidFromMojangHex(profile.at("id").get<std::string>()));
+            player.setUsername(profile.at("name").get<std::string>());
+
+            std::vector<PlayerProfileProperty> properties;
+            if (profile.contains("properties")) {
+                for (const auto& prop : profile["properties"]) {
+                    PlayerProfileProperty p;
+                    p.name = prop.value("name", "");
+                    p.value = prop.value("value", "");
+                    p.signature = prop.value("signature", "");
+                    properties.push_back(p);
+                }
+            }
+            player.setProfileProperties(properties);
+        } catch (const json::exception& e) {
+            Console::getConsole().Error("Encryption_Response_p::deserialize(): Malformed Mojang response, disconnecting: " + std::string(e.what()));
+            int failThreshold = cont.connection.getCompressionThreshold();
+            cont.connection.addPacket(std::make_shared<Disconnect_login_p>(failThreshold, "Failed to verify username!"));
+            return;
+        }
+    }
+
     int threshold = cont.connection.getCompressionThreshold();
     std::shared_ptr<Outgoing_Packet> setCompressionPacket = std::make_shared<Set_Compression_p>(threshold, cont.connection);
     cont.connection.addPacket(setCompressionPacket);
     // Set_Compression_p above switches the connection to the real compression threshold once it's
     // flushed, and per protocol Login Success must already use compressed framing in that same flush.
     int postCompressionThreshold = Properties::getProperties().getCompressionThreshold();
-    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(postCompressionThreshold, cont.connection.getPlayer().getUUID(), cont.connection.getPlayer().getUsername());
+    std::shared_ptr<Outgoing_Packet> login_success = std::make_shared<Login_Success_p>(postCompressionThreshold, cont.connection.getPlayer().getUUID(), cont.connection.getPlayer().getUsername(), cont.connection.getPlayer().getProfileProperties());
     cont.connection.addPacket(login_success);
 }
 

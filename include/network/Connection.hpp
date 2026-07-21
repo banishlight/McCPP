@@ -33,6 +33,14 @@ class Connection : public std::enable_shared_from_this<Connection> {
         // now happens elsewhere.
         void addGeneratedChunk(std::shared_ptr<Chunk> chunk);
         void deliverGeneratedChunks();
+        // Per-login-attempt state for online-mode auth. Both are only ever
+        // touched during the Login state, sequentially on this connection's
+        // own processing thread, so no synchronization is needed -- mirrors
+        // _threshold's unguarded style.
+        void setVerifyToken(const std::vector<Byte>& token);
+        const std::vector<Byte>& getVerifyToken() const;
+        void setServerId(const std::string& serverId);
+        const std::string& getServerId() const;
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
@@ -47,6 +55,8 @@ class Connection : public std::enable_shared_from_this<Connection> {
         int _threshold = -1;
         bool _enableCompression = false;
         Player _player;
+        std::vector<Byte> _verifyToken;
+        std::string _serverId;
         // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
         // TODO: string disconnectReason;
         // TODO: bool readyToDisconnect = false; // Maybe?

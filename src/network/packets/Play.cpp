@@ -782,6 +782,101 @@ std::vector<Byte> Teleport_Entity_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Player_Info_Update_p::Player_Info_Update_p(int threshold, const std::vector<Entry>& entries) {
+    _threshold = threshold;
+    _entries = entries;
+}
+
+std::vector<Byte> Player_Info_Update_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Player_Info_Update_p::serialize(): Sending.");
+    #endif
+    const Byte ADD_PLAYER_ACTION = 0x01;
+    std::vector<Byte> packet_data;
+    packet_data.push_back(ADD_PLAYER_ACTION);
+    std::vector<Byte> count = varIntSerialize(static_cast<int>(_entries.size()));
+    packet_data.insert(packet_data.end(), count.begin(), count.end());
+
+    // Interleaved per player (UUID immediately followed by that player's own
+    // action fields), not all UUIDs then all action blocks -- confirmed
+    // against Pumpkin's CPlayerInfoUpdate, the vendored doc's table is
+    // ambiguous on this point.
+    for (const auto& entry : _entries) {
+        std::vector<Byte> uuidBytes = serializeUUID(entry.uuid);
+        packet_data.insert(packet_data.end(), uuidBytes.begin(), uuidBytes.end());
+
+        std::vector<Byte> nameBytes = serializeString(entry.name);
+        packet_data.insert(packet_data.end(), nameBytes.begin(), nameBytes.end());
+        std::vector<Byte> propCount = varIntSerialize(static_cast<int>(entry.properties.size()));
+        packet_data.insert(packet_data.end(), propCount.begin(), propCount.end());
+        for (const auto& prop : entry.properties) {
+            std::vector<Byte> nameB = serializeString(prop.name);
+            std::vector<Byte> valueB = serializeString(prop.value);
+            packet_data.insert(packet_data.end(), nameB.begin(), nameB.end());
+            packet_data.insert(packet_data.end(), valueB.begin(), valueB.end());
+            if (!prop.signature.empty()) {
+                packet_data.push_back(0x01);
+                std::vector<Byte> sigB = serializeString(prop.signature);
+                packet_data.insert(packet_data.end(), sigB.begin(), sigB.end());
+            } else {
+                packet_data.push_back(0x00);
+            }
+        }
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Player_Info_Remove_p::Player_Info_Remove_p(int threshold, const std::vector<std::vector<long>>& uuids) {
+    _threshold = threshold;
+    _uuids = uuids;
+}
+
+std::vector<Byte> Player_Info_Remove_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Player_Info_Remove_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(static_cast<int>(_uuids.size()));
+    for (const auto& uuid : _uuids) {
+        std::vector<Byte> uuidBytes = serializeUUID(uuid);
+        packet_data.insert(packet_data.end(), uuidBytes.begin(), uuidBytes.end());
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer) {
+    std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
+
+    Player_Info_Update_p::Entry joiningEntry;
+    joiningEntry.uuid = joiningPlayer.getUUID();
+    joiningEntry.name = joiningPlayer.getUsername();
+    joiningEntry.properties = joiningPlayer.getProfileProperties();
+
+    // The client needs its own Add Player entry too, not just other players' --
+    // skin variant (slim/classic arms) and cape data are only ever delivered via
+    // this packet, and third-person rendering of yourself depends on it just
+    // like it does for everyone else.
+    std::vector<Player_Info_Update_p::Entry> entriesForJoiner{joiningEntry};
+
+    for (auto& conn : connections) {
+        if (!conn) continue;
+        if (conn.get() == &cont.connection) continue; // the joining connection itself
+        if (conn->getState() != ConnectionState::Play) continue;
+
+        int otherThreshold = conn->getCompressionThreshold();
+        conn->addPacket(std::make_shared<Player_Info_Update_p>(otherThreshold, std::vector<Player_Info_Update_p::Entry>{joiningEntry}));
+
+        Player& other = conn->getPlayer();
+        Player_Info_Update_p::Entry existingEntry;
+        existingEntry.uuid = other.getUUID();
+        existingEntry.name = other.getUsername();
+        existingEntry.properties = other.getProfileProperties();
+        entriesForJoiner.push_back(existingEntry);
+    }
+
+    int threshold = cont.connection.getCompressionThreshold();
+    cont.connection.addPacket(std::make_shared<Player_Info_Update_p>(threshold, entriesForJoiner));
+}
+
 void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::shared_ptr<Outgoing_Packet>(int threshold)>& makePacket) {
     std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
     for (auto& conn : connections) {

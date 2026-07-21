@@ -195,6 +195,33 @@ class Teleport_Entity_p : public Play_Packet, public Outgoing_Packet {
         bool _onGround;
         static int constexpr _PACKET_ID = 0x70;
 };
+// Server-wide tab list (not proximity-based -- every connected player is told
+// about every other one, regardless of distance, matching vanilla). Only
+// implements the "Add Player" action (mask 0x01): the rest (game mode,
+// latency, etc.) aren't tracked by this server yet.
+class Player_Info_Update_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        struct Entry {
+            std::vector<long> uuid;
+            std::string name;
+            std::vector<PlayerProfileProperty> properties;
+        };
+        Player_Info_Update_p(int threshold, const std::vector<Entry>& entries);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        std::vector<Entry> _entries;
+        static int constexpr _PACKET_ID = 0x3E;
+};
+class Player_Info_Remove_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Player_Info_Remove_p(int threshold, const std::vector<std::vector<long>>& uuids);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        std::vector<std::vector<long>> _uuids;
+        static int constexpr _PACKET_ID = 0x3D;
+};
 
 // Shared by the initial Configuration->Play chunk send and every subsequent
 // movement-triggered update: diffs the player's currently-loaded chunk set
@@ -213,6 +240,12 @@ void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::sh
 // Rotation). Scans nearby tracked item entities and, for any the player has
 // hotbar room for, claims and collects it.
 void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player);
+
+// Server-wide tab-list sync for a newly-joined player: broadcasts an Add
+// Player entry for them to every other already-Play connection, and sends
+// them one Player_Info_Update_p covering every existing player. Called once,
+// right after a connection enters Play state.
+void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer);
 
 class Confirm_Teleportation_p : public Play_Packet, public Incoming_Packet {
     public:
