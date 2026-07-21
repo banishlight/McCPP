@@ -44,5 +44,11 @@ int main() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+    // StopCommand queues a Disconnect packet for every connected player before
+    // requesting shutdown, but actually sending it only happens on each
+    // connection's own processing thread the next time it runs -- give that a
+    // moment before ConnectionManager's static destruction tears the thread
+    // pool down, or the kick reason never reaches the client.
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     return 0;
 }

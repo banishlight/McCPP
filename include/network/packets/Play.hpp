@@ -311,6 +311,21 @@ class Player_Info_Remove_p : public Play_Packet, public Outgoing_Packet {
         static int constexpr _PACKET_ID = 0x3D;
 };
 
+// Sent before closing a Play-state connection server-side (kick, /stop) so
+// the client knows why -- the client is expected to close its own end on
+// receipt, which is what actually makes Connection::isValid() go false
+// afterward (see Connection::disconnect()); this server never force-closes
+// the socket itself.
+class Disconnect_play_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Disconnect_play_p(int threshold, const string& reason);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        string _reason;
+        static int constexpr _PACKET_ID = 0x1D;
+};
+
 // A chat message with no signing information -- what vanilla itself sends for
 // console/command-originated chat (/say, /tell, /me), which is exactly this
 // server's use case since it never implements chat signing. chatTypeId is a

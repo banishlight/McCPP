@@ -41,6 +41,12 @@ class Connection : public std::enable_shared_from_this<Connection> {
         const std::vector<Byte>& getVerifyToken() const;
         void setServerId(const std::string& serverId);
         const std::string& getServerId() const;
+        // Queues a state-appropriate Disconnect packet with reason, then relies
+        // on the client closing its own end on receipt (same as every existing
+        // Disconnect_login_p use) rather than force-closing the socket from
+        // here -- isValid() naturally goes false once that happens, on the
+        // next receive attempt on this connection's own processing thread.
+        void disconnect(const string& reason);
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);
@@ -58,6 +64,4 @@ class Connection : public std::enable_shared_from_this<Connection> {
         std::vector<Byte> _verifyToken;
         std::string _serverId;
         // TODO: std::shared_ptr<ActionProcessor> _actionProcessor;
-        // TODO: string disconnectReason;
-        // TODO: bool readyToDisconnect = false; // Maybe?
 };

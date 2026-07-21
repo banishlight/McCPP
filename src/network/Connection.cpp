@@ -6,6 +6,7 @@
 #include <network/PacketContext.hpp>
 #include <network/Compression.hpp>
 #include <network/packets/Play.hpp>
+#include <network/packets/Login.hpp>
 #include <entities/PlayerVisibilityManager.hpp>
 #include <Properties.hpp>
 #include <Console.hpp>
@@ -73,6 +74,23 @@ void Connection::setServerId(const std::string& serverId) {
 
 const std::string& Connection::getServerId() const {
     return _serverId;
+}
+
+void Connection::disconnect(const string& reason) {
+    int threshold = getCompressionThreshold();
+    switch (_state.load()) {
+        case ConnectionState::Play:
+            addPacket(std::make_shared<Disconnect_play_p>(threshold, reason));
+            break;
+        case ConnectionState::Login:
+            addPacket(std::make_shared<Disconnect_login_p>(threshold, reason));
+            break;
+        default:
+            // Handshake/Status/Config: no kick command or shutdown-kick
+            // targets a connection in these states today, so it's left
+            // unhandled rather than guessed at.
+            break;
+    }
 }
 
 std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> packet) {

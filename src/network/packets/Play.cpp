@@ -1038,6 +1038,18 @@ namespace {
     }
 }
 
+Disconnect_play_p::Disconnect_play_p(int threshold, const string& reason) {
+    _threshold = threshold;
+    _reason = reason;
+}
+
+std::vector<Byte> Disconnect_play_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Disconnect_play_p::serialize(): Sending.");
+    #endif
+    return assemblePacket(getID(), _threshold, makeTextComponentNbt(_reason));
+}
+
 Disguised_Chat_Message_p::Disguised_Chat_Message_p(int threshold, const string& message, int chatTypeIndex, const string& senderName) {
     _threshold = threshold;
     _message = message;

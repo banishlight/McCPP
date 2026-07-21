@@ -5,6 +5,7 @@
 #include <commands/OpCommand.hpp>
 #include <commands/DeopCommand.hpp>
 #include <commands/ListCommand.hpp>
+#include <commands/KickCommand.hpp>
 #include <Console.hpp>
 
 CommandRegistry& CommandRegistry::getInstance() {
@@ -20,6 +21,7 @@ void CommandRegistry::initialize() {
     registerCommand(std::make_shared<OpCommand>());
     registerCommand(std::make_shared<DeopCommand>());
     registerCommand(std::make_shared<ListCommand>());
+    registerCommand(std::make_shared<KickCommand>());
     _initialized = true;
 }
 
