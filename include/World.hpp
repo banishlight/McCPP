@@ -45,6 +45,16 @@ class World {
         // Synchronous read of an already-cached, fully-lit chunk -- nullptr if
         // not cached (not loaded/generated yet). Safe from any thread.
         std::shared_ptr<Chunk> getCachedChunk(int chunkX, int chunkZ);
+        // Synchronously generates/loads + lights + caches (chunkX, chunkZ) if
+        // not already cached -- a no-op otherwise. Unlike getChunkAsync, this
+        // does the work on the calling thread rather than WorldWorkerPool, so
+        // callers can guarantee a specific chunk is ready before proceeding.
+        // Used at join time for a player's own standing chunk: teleporting a
+        // player somewhere before their chunk is even queued for generation
+        // (as an async dispatch would allow) lets the client simulate a
+        // moment of free-fall through an unloaded column before real terrain
+        // arrives, landing embedded a few blocks below the surface once it does.
+        void ensureChunkLoaded(int chunkX, int chunkZ);
         // Applies one block edit at absolute world coordinates. Copy-then-replace
         // (see docs/general-documentation.md, "Terrain cache vs. lit cache"):
         // builds a modified copy of the cached chunk, relights just that copy,

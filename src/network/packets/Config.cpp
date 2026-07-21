@@ -7,8 +7,11 @@
 #include <Player.hpp>
 #include <World.hpp>
 #include <ItemBlockMapping.hpp>
+#include <PlayerDataPersistence.hpp>
 #include <Console.hpp>
+#include <cmath>
 #include <memory>
+#include <optional>
 #include <vector>
 
 std::vector<Byte> Cookie_Request_config_p::serialize() const {
@@ -203,13 +206,39 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     // which is chunk/proximity-based and handled once chunks start delivering.
     BroadcastPlayerJoin(cont, player);
     World& world = World::getInstance();
-    player.setPosition(world.getSpawnX(), world.getSpawnY(), world.getSpawnZ());
-    player.setRotation(world.getSpawnYaw(), 0.0f);
+    // A returning player resumes exactly where they left off (position,
+    // rotation, gamemode, hotbar) -- see PlayerDataPersistence. A brand-new
+    // UUID falls back to the world spawn point and a starting test stack, as
+    // this project always did before per-player persistence existed.
+    std::optional<PlayerSaveData> saved = PlayerDataPersistence::tryLoad(world.getWorldDir(), player.getUUID());
+    if (saved) {
+        player.setPosition(saved->x, saved->y, saved->z);
+        player.setRotation(saved->yaw, saved->pitch);
+        player.setGamemode(saved->gamemode);
+        for (int i = 0; i < Player::HOTBAR_SIZE; i++) {
+            player.setHotbarSlot(i, saved->hotbar[i].itemId, saved->hotbar[i].count);
+        }
+        player.setSelectedSlot(saved->selectedSlot);
+    } else {
+        player.setPosition(world.getSpawnX(), world.getSpawnY(), world.getSpawnZ());
+        player.setRotation(world.getSpawnYaw(), 0.0f);
+        player.setGamemode(0);
+        // Seed the hotbar with a placeable test stack so breaking/placing is
+        // immediately testable without any survival-mode item pickup (which
+        // isn't implemented -- see docs/general-documentation.md, "Minimal inventory").
+        player.setHotbarSlot(0, STONE_ITEM_ID, 64);
+    }
 
-    // Seed the hotbar with a placeable test stack so breaking/placing is
-    // immediately testable without any survival-mode item pickup (which
-    // isn't implemented -- see docs/general-documentation.md, "Minimal inventory").
-    player.setHotbarSlot(0, STONE_ITEM_ID, 64);
+    // Guarantee the player's own standing chunk is generated/loaded + lit +
+    // cached BEFORE they're teleported there -- previously invisible since
+    // every join was at the pre-warmed spawn chunk (0,0), primed synchronously
+    // in World's constructor. A restored (non-spawn) position is a cache
+    // miss, and without this, the client would receive the teleport before
+    // its chunk was even queued for async generation, free-falling through
+    // an unloaded column until the real terrain caught up a moment later.
+    int homeChunkX = static_cast<int>(std::floor(player.getX() / 16.0));
+    int homeChunkZ = static_cast<int>(std::floor(player.getZ() / 16.0));
+    world.ensureChunkLoaded(homeChunkX, homeChunkZ);
 
     int threshold = cont.connection.getCompressionThreshold();
     // The client's own third-person model (F5) reads its skin-parts bitmask
@@ -230,12 +259,13 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     cont.connection.addPacket(syncPosition);
     cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(threshold, player.getHotbar()));
 
-    // Send every chunk within the player's view distance around the spawn
-    // chunk (0,0). Movement-triggered updates (Set_Player_Position_p etc. in
+    // Send every chunk within the player's view distance around their own
+    // (real, possibly-restored) position, not always spawn -- see homeChunkX/Z
+    // above. Movement-triggered updates (Set_Player_Position_p etc. in
     // Play.cpp) diff against whatever UpdateLoadedChunks records here.
     std::shared_ptr<Outgoing_Packet> gameEvent = std::make_shared<Game_Event_p>(threshold, 13, 0.0f); // Start waiting for level chunks
     cont.connection.addPacket(gameEvent);
-    UpdateLoadedChunks(cont, threshold, player, 0, 0);
+    UpdateLoadedChunks(cont, threshold, player, homeChunkX, homeChunkZ);
 }
 
 void Serverbound_Keep_Alive_config_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

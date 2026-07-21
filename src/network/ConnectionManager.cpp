@@ -10,6 +10,7 @@
 #include <network/packets/Play.hpp>
 #include <entities/PlayerVisibilityManager.hpp>
 #include <World.hpp>
+#include <PlayerDataPersistence.hpp>
 #include <thread>
 #include <algorithm>
 
@@ -79,6 +80,10 @@ void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
             for (auto& [x, z] : conn->getPlayer().getLoadedChunks()) {
                 world.chunkViewerRemoved(x, z);
             }
+            // Persist this player's final position/rotation/gamemode/hotbar so
+            // they resume here next join -- Player is a plain value member of
+            // Connection, so it's still fully populated at this point.
+            PlayerDataPersistence::save(world.getWorldDir(), conn->getPlayer());
         }
         return;
     }

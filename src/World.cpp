@@ -170,6 +170,17 @@ std::shared_ptr<Chunk> World::getCachedChunk(int chunkX, int chunkZ) {
     return (it != _chunkCache.end()) ? it->second : nullptr;
 }
 
+void World::ensureChunkLoaded(int chunkX, int chunkZ) {
+    if (getCachedChunk(chunkX, chunkZ)) return;
+    std::shared_ptr<Chunk> terrain = getOrGenerateTerrain(chunkX, chunkZ);
+    // Copy before lighting -- mirrors getChunkAsync's own comment: `terrain`
+    // may be concurrently shared as a lighting neighbor and must never be
+    // mutated after generation.
+    std::shared_ptr<Chunk> chunk = std::make_shared<Chunk>(*terrain);
+    LightEngine::computeLighting(*chunk, *this);
+    cacheAsLit(chunkX, chunkZ, chunk);
+}
+
 void World::cacheAsLit(int chunkX, int chunkZ, std::shared_ptr<Chunk> chunk) {
     {
         std::lock_guard<std::mutex> lock(_chunkCacheMutex);
