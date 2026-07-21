@@ -12,6 +12,7 @@
 #include <ItemBlockMapping.hpp>
 #include <EntityIdAllocator.hpp>
 #include <entities/ItemEntityManager.hpp>
+#include <entities/PlayerVisibilityManager.hpp>
 #include <network/Crypto.hpp>
 #include <Console.hpp>
 #include <cstring>
@@ -620,7 +621,8 @@ std::vector<Byte> Set_Container_Slot_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z) {
+Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z,
+                               float yaw, float pitch, float headYaw) {
     _threshold = threshold;
     _entityId = entityId;
     _uuid = uuid;
@@ -628,6 +630,9 @@ Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<lo
     _x = x;
     _y = y;
     _z = z;
+    _yaw = yaw;
+    _pitch = pitch;
+    _headYaw = headYaw;
 }
 
 std::vector<Byte> Spawn_Entity_p::serialize() const {
@@ -648,9 +653,9 @@ std::vector<Byte> Spawn_Entity_p::serialize() const {
     for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((yBits >> (i * 8)) & 0xFF));
     for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((zBits >> (i * 8)) & 0xFF));
 
-    packet_data.push_back(0x00); // Pitch (Angle): a static drop has no meaningful rotation
-    packet_data.push_back(0x00); // Yaw
-    packet_data.push_back(0x00); // Head Yaw
+    packet_data.push_back(angleSerialize(_pitch));
+    packet_data.push_back(angleSerialize(_yaw));
+    packet_data.push_back(angleSerialize(_headYaw));
 
     std::vector<Byte> dataBytes = varIntSerialize(0); // Object Data: unused for item entities
     packet_data.insert(packet_data.end(), dataBytes.begin(), dataBytes.end());
@@ -780,12 +785,14 @@ std::vector<Byte> Set_Entity_Velocity_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Teleport_Entity_p::Teleport_Entity_p(int threshold, int entityId, double x, double y, double z, bool onGround) {
+Teleport_Entity_p::Teleport_Entity_p(int threshold, int entityId, double x, double y, double z, float yaw, float pitch, bool onGround) {
     _threshold = threshold;
     _entityId = entityId;
     _x = x;
     _y = y;
     _z = z;
+    _yaw = yaw;
+    _pitch = pitch;
     _onGround = onGround;
 }
 
@@ -803,9 +810,95 @@ std::vector<Byte> Teleport_Entity_p::serialize() const {
     for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((yBits >> (i * 8)) & 0xFF));
     for (int i = 7; i >= 0; i--) packet_data.push_back(static_cast<Byte>((zBits >> (i * 8)) & 0xFF));
 
-    packet_data.push_back(0x00); // Yaw (Angle): item entities have no meaningful rotation
-    packet_data.push_back(0x00); // Pitch
+    packet_data.push_back(angleSerialize(_yaw));
+    packet_data.push_back(angleSerialize(_pitch));
     packet_data.push_back(_onGround ? 0x01 : 0x00);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Update_Entity_Position_p::Update_Entity_Position_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, bool onGround) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _deltaX = deltaX;
+    _deltaY = deltaY;
+    _deltaZ = deltaZ;
+    _onGround = onGround;
+}
+
+std::vector<Byte> Update_Entity_Position_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Update_Entity_Position_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(static_cast<Byte>((_deltaX >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaX & 0xFF));
+    packet_data.push_back(static_cast<Byte>((_deltaY >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaY & 0xFF));
+    packet_data.push_back(static_cast<Byte>((_deltaZ >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaZ & 0xFF));
+    packet_data.push_back(_onGround ? 0x01 : 0x00);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Update_Entity_Position_and_Rotation_p::Update_Entity_Position_and_Rotation_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, float yaw, float pitch, bool onGround) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _deltaX = deltaX;
+    _deltaY = deltaY;
+    _deltaZ = deltaZ;
+    _yaw = yaw;
+    _pitch = pitch;
+    _onGround = onGround;
+}
+
+std::vector<Byte> Update_Entity_Position_and_Rotation_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Update_Entity_Position_and_Rotation_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(static_cast<Byte>((_deltaX >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaX & 0xFF));
+    packet_data.push_back(static_cast<Byte>((_deltaY >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaY & 0xFF));
+    packet_data.push_back(static_cast<Byte>((_deltaZ >> 8) & 0xFF));
+    packet_data.push_back(static_cast<Byte>(_deltaZ & 0xFF));
+    packet_data.push_back(angleSerialize(_yaw));
+    packet_data.push_back(angleSerialize(_pitch));
+    packet_data.push_back(_onGround ? 0x01 : 0x00);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Update_Entity_Rotation_p::Update_Entity_Rotation_p(int threshold, int entityId, float yaw, float pitch, bool onGround) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _yaw = yaw;
+    _pitch = pitch;
+    _onGround = onGround;
+}
+
+std::vector<Byte> Update_Entity_Rotation_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Update_Entity_Rotation_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(angleSerialize(_yaw));
+    packet_data.push_back(angleSerialize(_pitch));
+    packet_data.push_back(_onGround ? 0x01 : 0x00);
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Set_Head_Rotation_p::Set_Head_Rotation_p(int threshold, int entityId, float headYaw) {
+    _threshold = threshold;
+    _entityId = entityId;
+    _headYaw = headYaw;
+}
+
+std::vector<Byte> Set_Head_Rotation_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Head_Rotation_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_entityId);
+    packet_data.push_back(angleSerialize(_headYaw));
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
@@ -1020,13 +1113,16 @@ void Set_Player_Position_p::deserialize(std::vector<Byte> in_buff, PacketContext
     double x = deserializeDouble(in_buff);
     double y = deserializeDouble(in_buff);
     double z = deserializeDouble(in_buff);
-    // On Ground (Boolean) follows; unused, no movement validation yet.
+    bool onGround = deserializeBool(in_buff);
 
     Player& player = cont.connection.getPlayer();
+    double oldX = player.getX(), oldY = player.getY(), oldZ = player.getZ();
     player.setPosition(x, y, z);
 
     int threshold = cont.connection.getCompressionThreshold();
     TryPickupNearbyItems(cont, threshold, player);
+    PlayerVisibilityManager::getInstance().broadcastMovement(cont.connection.shared_from_this(),
+        oldX, oldY, oldZ, true, false, onGround);
     int newCenterX = static_cast<int>(std::floor(x / 16.0));
     int newCenterZ = static_cast<int>(std::floor(z / 16.0));
     UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
@@ -1041,14 +1137,17 @@ void Set_Player_Position_and_Rotation_p::deserialize(std::vector<Byte> in_buff, 
     double z = deserializeDouble(in_buff);
     float yaw = deserializeFloat(in_buff);
     float pitch = deserializeFloat(in_buff);
-    // On Ground (Boolean) follows; unused, no movement validation yet.
+    bool onGround = deserializeBool(in_buff);
 
     Player& player = cont.connection.getPlayer();
+    double oldX = player.getX(), oldY = player.getY(), oldZ = player.getZ();
     player.setPosition(x, y, z);
     player.setRotation(yaw, pitch);
 
     int threshold = cont.connection.getCompressionThreshold();
     TryPickupNearbyItems(cont, threshold, player);
+    PlayerVisibilityManager::getInstance().broadcastMovement(cont.connection.shared_from_this(),
+        oldX, oldY, oldZ, true, true, onGround);
     int newCenterX = static_cast<int>(std::floor(x / 16.0));
     int newCenterZ = static_cast<int>(std::floor(z / 16.0));
     UpdateLoadedChunks(cont, threshold, player, newCenterX, newCenterZ);
@@ -1060,13 +1159,17 @@ void Set_Player_Rotation_p::deserialize(std::vector<Byte> in_buff, PacketContext
     #endif
     float yaw = deserializeFloat(in_buff);
     float pitch = deserializeFloat(in_buff);
-    // On Ground (Boolean) follows; unused, no movement validation yet.
+    bool onGround = deserializeBool(in_buff);
 
     // Sent when the client turns without moving its feet, as opposed to
     // Set_Player_Position_and_Rotation_p which only fires alongside a position
     // change -- without this, Player's stored yaw/pitch goes stale the moment
     // someone stands still and just looks around (e.g. aiming a Q-drop).
-    cont.connection.getPlayer().setRotation(yaw, pitch);
+    Player& player = cont.connection.getPlayer();
+    double x = player.getX(), y = player.getY(), z = player.getZ();
+    player.setRotation(yaw, pitch);
+    PlayerVisibilityManager::getInstance().broadcastMovement(cont.connection.shared_from_this(),
+        x, y, z, false, true, onGround);
 }
 
 void Serverbound_Keep_Alive_play_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

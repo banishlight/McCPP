@@ -66,7 +66,7 @@ void ItemPhysicsSystem::onTick(Int64 tickCount) {
         if (velocityDirty) {
             int entityId = entity.entityId;
             BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newX, newY, newZ, onGround](int threshold) {
-                return std::make_shared<Teleport_Entity_p>(threshold, entityId, newX, newY, newZ, onGround);
+                return std::make_shared<Teleport_Entity_p>(threshold, entityId, newX, newY, newZ, 0.0f, 0.0f, onGround);
             });
             BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newVx, newVy, newVz](int threshold) {
                 return std::make_shared<Set_Entity_Velocity_p>(threshold, entityId, newVx, newVy, newVz);

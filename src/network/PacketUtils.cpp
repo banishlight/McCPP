@@ -293,3 +293,11 @@ std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>&
     }
     return packet;
 }
+
+Byte angleSerialize(float degrees) {
+    // float -> int first (well-defined truncation), then int -> Byte (well-defined
+    // modulo wraparound) -- a direct float -> unsigned-Byte cast of a negative or
+    // out-of-360-range value is undefined behavior in C++.
+    int scaled = static_cast<int>(degrees * (256.0f / 360.0f));
+    return static_cast<Byte>(scaled);
+}

@@ -25,6 +25,15 @@ class PlayerVisibilityManager {
         // currently has them visible, and drops all bookkeeping for them
         // (both as a viewer and as a target).
         void handleDisconnect(std::shared_ptr<Connection> leaving);
+        // Tells every connection that currently has `mover` visible about
+        // their new position/rotation -- called from the movement/rotation
+        // packet handlers after Player's own state has already been updated.
+        // oldX/Y/Z are the pre-update position, needed to compute the
+        // position delta; rotation is always sent as an absolute angle (never
+        // a delta), so no old yaw/pitch is needed.
+        void broadcastMovement(std::shared_ptr<Connection> mover,
+                               double oldX, double oldY, double oldZ,
+                               bool positionChanged, bool rotationChanged, bool onGround);
     private:
         PlayerVisibilityManager() = default;
         enum class VisibilityChange { None, Spawn, Despawn };

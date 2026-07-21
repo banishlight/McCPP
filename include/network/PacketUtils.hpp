@@ -33,4 +33,9 @@ std::vector<Byte> generateVerifyToken();
 std::vector<long> deserializeUUID(std::vector<Byte>& data);
 std::vector<Byte> serializeUUID(const std::vector<long>& data);
 
+// Wire "Angle" type: a full rotation (0-360 degrees) packed into a single
+// byte (256 steps/turn). Used by entity rotation fields (Update Entity
+// Rotation, Set Head Rotation, Teleport Entity, Spawn Entity's pitch/yaw).
+Byte angleSerialize(float degrees);
+
 std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>& data);

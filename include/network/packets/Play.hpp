@@ -134,7 +134,10 @@ class Set_Container_Slot_p : public Play_Packet, public Outgoing_Packet {
 };
 class Spawn_Entity_p : public Play_Packet, public Outgoing_Packet {
     public:
-        Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z);
+        // yaw/pitch/headYaw default to 0 so existing item-entity call sites
+        // (which have no meaningful rotation) are unaffected.
+        Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z,
+                       float yaw = 0.0f, float pitch = 0.0f, float headYaw = 0.0f);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -142,6 +145,7 @@ class Spawn_Entity_p : public Play_Packet, public Outgoing_Packet {
         std::vector<long> _uuid;
         int _entityTypeId;
         double _x, _y, _z;
+        float _yaw, _pitch, _headYaw;
         static int constexpr _PACKET_ID = 0x01;
 };
 class Set_Entity_Metadata_p : public Play_Packet, public Outgoing_Packet {
@@ -196,14 +200,60 @@ class Set_Entity_Velocity_p : public Play_Packet, public Outgoing_Packet {
 };
 class Teleport_Entity_p : public Play_Packet, public Outgoing_Packet {
     public:
-        Teleport_Entity_p(int threshold, int entityId, double x, double y, double z, bool onGround);
+        Teleport_Entity_p(int threshold, int entityId, double x, double y, double z, float yaw, float pitch, bool onGround);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
         int _entityId;
         double _x, _y, _z;
+        float _yaw, _pitch;
         bool _onGround;
         static int constexpr _PACKET_ID = 0x70;
+};
+class Update_Entity_Position_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        // deltaX/Y/Z: fixed-point, 4096 units/block (currentPos*4096 - prevPos*4096).
+        Update_Entity_Position_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, bool onGround);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        Int16 _deltaX, _deltaY, _deltaZ;
+        bool _onGround;
+        static int constexpr _PACKET_ID = 0x2E;
+};
+class Update_Entity_Position_and_Rotation_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Update_Entity_Position_and_Rotation_p(int threshold, int entityId, Int16 deltaX, Int16 deltaY, Int16 deltaZ, float yaw, float pitch, bool onGround);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        Int16 _deltaX, _deltaY, _deltaZ;
+        float _yaw, _pitch;
+        bool _onGround;
+        static int constexpr _PACKET_ID = 0x2F;
+};
+class Update_Entity_Rotation_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Update_Entity_Rotation_p(int threshold, int entityId, float yaw, float pitch, bool onGround);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        float _yaw, _pitch;
+        bool _onGround;
+        static int constexpr _PACKET_ID = 0x30;
+};
+class Set_Head_Rotation_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Set_Head_Rotation_p(int threshold, int entityId, float headYaw);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _entityId;
+        float _headYaw;
+        static int constexpr _PACKET_ID = 0x48;
 };
 // Server-wide tab list (not proximity-based -- every connected player is told
 // about every other one, regardless of distance, matching vanilla). Only
