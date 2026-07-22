@@ -69,3 +69,4 @@ So that I can help diagnose the issue.
 
 ## Known Issues
 - Player model hats are not given to player, but seen by other players.
+- Lava texture is displayed as water?
