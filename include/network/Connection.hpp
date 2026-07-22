@@ -47,6 +47,14 @@ class Connection : public std::enable_shared_from_this<Connection> {
         // here -- isValid() naturally goes false once that happens, on the
         // next receive attempt on this connection's own processing thread.
         void disconnect(const string& reason);
+        // Immediately closes the underlying socket, making isValid() false on
+        // the very next check -- unlike disconnect(), doesn't rely on the
+        // client cooperating (queuing a packet, waiting for them to react).
+        // Used when this connection's own processing threw an unexpected
+        // exception and can no longer be trusted to behave normally; the
+        // next processConnection() call then runs the same disconnect
+        // cleanup a graceful client-initiated close already goes through.
+        void forceClose();
     private:
         void deserializePacket(std::vector<Byte> packet);
         std::vector<Byte> serializePacket(std::shared_ptr<Outgoing_Packet> packet);

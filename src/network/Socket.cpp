@@ -90,29 +90,43 @@ std::vector<Byte> Socket::receivePacket() {
         #endif
         return std::vector<Byte>();
     }
+    if (size == 0) {
+        return std::vector<Byte>();
+    }
+
     // fetch the packet into vector
     std::vector<Byte> buffer(size);
-    // Unsure if I want to enforce blocking while receiving data
-    ssize_t rec;
-    if (_blocking == false) {
-        setBlocking(true);
-        rec = recv(_fd, buffer.data(), size, 0);
-        setBlocking(false);
-    }
-    else {
-        rec = recv(_fd, buffer.data(), size, 0);
-    }
-    #ifdef DEBUG
-        if (rec < 0) {
-            Console::getConsole().Error("Socket::receivePacket(): Failed to receive packet: " + std::string(strerror(errno)));
-        } else if (rec == 0) {
-            Console::getConsole().Error("Socket::receivePacket(): Connection closed by peer");
+    bool wasBlocking = _blocking;
+    if (!wasBlocking) setBlocking(true);
+
+    // A single recv() is not guaranteed to return the full `size` bytes even
+    // once they've all arrived -- TCP is a byte stream, not message-framed.
+    // The old single-call version silently returned a short, zero-padded
+    // buffer as if it were the whole packet whenever that happened; whatever
+    // garbage length/id fields ended up in it then got deserialized as real
+    // data, and eventually threw an exception somewhere downstream that
+    // crashed the entire server (found via a real crash, not by inspection).
+    // Loop until the whole packet is in, mirroring sendPacket's own existing
+    // loop-until-fully-sent pattern below.
+    size_t totalReceived = 0;
+    while (totalReceived < static_cast<size_t>(size)) {
+        ssize_t rec = recv(_fd, buffer.data() + totalReceived, static_cast<size_t>(size) - totalReceived, 0);
+        if (rec <= 0) {
+            #ifdef DEBUG
+                if (rec < 0) {
+                    Console::getConsole().Error("Socket::receivePacket(): Failed to receive packet: " + std::string(strerror(errno)));
+                } else {
+                    Console::getConsole().Error("Socket::receivePacket(): Connection closed by peer");
+                }
+            #endif
+            close(); // matches fetchVarInt's own "can't read -> close" convention
+            if (!wasBlocking) setBlocking(false);
+            return std::vector<Byte>();
         }
-        if (rec != size) {
-            Console::getConsole().Error("Socket::receivePacket(): Incomplete packet received, expected " + std::to_string(size) + " bytes, got " + std::to_string(rec) + " bytes");
-        }
-    #endif
-    (void)rec; // Silence unused variable warning
+        totalReceived += static_cast<size_t>(rec);
+    }
+    if (!wasBlocking) setBlocking(false);
+
     if (_encrypted) {
         buffer = _decryptCipher->process(buffer);
     }

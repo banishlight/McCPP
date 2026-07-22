@@ -94,6 +94,10 @@ void Connection::disconnect(const string& reason) {
     }
 }
 
+void Connection::forceClose() {
+    _socket->close();
+}
+
 std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> packet) {
     if (packet == nullptr) {
         // If packet is null, something has gone very wrong.

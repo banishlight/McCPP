@@ -62,34 +62,60 @@ void ConnectionManager::close() {
 }
 
 void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
-    if (!conn->isValid()) {
-        // Only Play-state connections were ever announced to anyone (tab
-        // list + in-world visibility), so only those need an announced exit.
-        if (conn->getState() == ConnectionState::Play) {
-            std::vector<std::vector<long>> leavingUuid{conn->getPlayer().getUUID()};
-            for (auto& other : getActiveConnections()) {
-                if (!other || other.get() == conn.get()) continue;
-                if (other->getState() != ConnectionState::Play) continue;
-                other->addPacket(std::make_shared<Player_Info_Remove_p>(other->getCompressionThreshold(), leavingUuid));
+    // Computed before the try block below (isValid() itself can't throw) --
+    // used to tell apart "processing threw" from "the disconnect cleanup
+    // itself threw", since those need different recovery (see the catch
+    // blocks below).
+    bool wasDisconnecting = !conn->isValid();
+    try {
+        if (wasDisconnecting) {
+            // Only Play-state connections were ever announced to anyone (tab
+            // list + in-world visibility), so only those need an announced exit.
+            if (conn->getState() == ConnectionState::Play) {
+                std::vector<std::vector<long>> leavingUuid{conn->getPlayer().getUUID()};
+                for (auto& other : getActiveConnections()) {
+                    if (!other || other.get() == conn.get()) continue;
+                    if (other->getState() != ConnectionState::Play) continue;
+                    other->addPacket(std::make_shared<Player_Info_Remove_p>(other->getCompressionThreshold(), leavingUuid));
+                }
+                PlayerVisibilityManager::getInstance().handleDisconnect(conn);
+                // Nothing else decrements this player's view of their loaded
+                // chunks on disconnect -- without this, every chunk they ever saw
+                // would stay "viewed" forever as far as ChunkUnloadSystem is concerned.
+                World& world = World::getInstance();
+                for (auto& [x, z] : conn->getPlayer().getLoadedChunks()) {
+                    world.chunkViewerRemoved(x, z);
+                }
+                // Persist this player's final position/rotation/gamemode/hotbar so
+                // they resume here next join -- Player is a plain value member of
+                // Connection, so it's still fully populated at this point.
+                PlayerDataPersistence::save(world.getWorldDir(), conn->getPlayer());
             }
-            PlayerVisibilityManager::getInstance().handleDisconnect(conn);
-            // Nothing else decrements this player's view of their loaded
-            // chunks on disconnect -- without this, every chunk they ever saw
-            // would stay "viewed" forever as far as ChunkUnloadSystem is concerned.
-            World& world = World::getInstance();
-            for (auto& [x, z] : conn->getPlayer().getLoadedChunks()) {
-                world.chunkViewerRemoved(x, z);
-            }
-            // Persist this player's final position/rotation/gamemode/hotbar so
-            // they resume here next join -- Player is a plain value member of
-            // Connection, so it's still fully populated at this point.
-            PlayerDataPersistence::save(world.getWorldDir(), conn->getPlayer());
+            return;
         }
-        return;
+        conn->receivePacket();
+        conn->deliverGeneratedChunks();
+        conn->sendPackets();
+    } catch (const std::exception& e) {
+        // A single malformed/unexpected packet used to be able to crash the
+        // whole server for every connected player (found via a real crash --
+        // an uncaught exception during packet processing propagated all the
+        // way up through this recursive task and called std::terminate).
+        // Dropping just this one connection instead is the fix; giving up
+        // outright (rather than retrying) if the *disconnect cleanup itself*
+        // is what threw avoids an infinite retry loop against a cleanup that
+        // will just keep failing the same way.
+        Console::getConsole().Error(string("ConnectionManager::processConnection(): Unhandled exception")
+            + (wasDisconnecting ? " during disconnect cleanup -- giving up on this connection: " : " -- closing this connection rather than crashing the server: ")
+            + e.what());
+        if (wasDisconnecting) return;
+        conn->forceClose();
+    } catch (...) {
+        Console::getConsole().Error(string("ConnectionManager::processConnection(): Unknown unhandled exception")
+            + (wasDisconnecting ? " during disconnect cleanup -- giving up on this connection." : " -- closing this connection rather than crashing the server."));
+        if (wasDisconnecting) return;
+        conn->forceClose();
     }
-    conn->receivePacket();
-    conn->deliverGeneratedChunks();
-    conn->sendPackets();
     // An idle connection re-enqueues itself forever; without this check the task
     // queue never empties, so ThreadPool::~ThreadPool() can never join its workers
     // while any client is still connected.
