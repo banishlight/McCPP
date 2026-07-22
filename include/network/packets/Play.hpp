@@ -60,7 +60,20 @@ class Commands_p : public Play_Packet, public Outgoing_Packet {
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
-        std::vector<string> _commandNames; // filtered, in CommandRegistry order
+        // Flat node array (children referenced by index into this same
+        // vector), built once in the constructor -- serialize() just walks
+        // it. Node 0 is always the root (empty name). A command with no
+        // Command::getArgumentSuggestions() is one executable, childless
+        // literal node (the original, still-most-common shape); a command
+        // with suggestions gets a non-executable node whose children are
+        // one executable literal per suggestion (see GamemodeCommand for
+        // the one command using this today).
+        struct Node {
+            Byte flags;
+            std::vector<int> children;
+            string name; // empty only for the root
+        };
+        std::vector<Node> _nodes;
         static int constexpr _PACKET_ID = 0x11;
 };
 class Clientbound_Keep_Alive_play_p : public Play_Packet, public Outgoing_Packet {
@@ -419,6 +432,29 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player);
 // them one Player_Info_Update_p covering every existing player. Called once,
 // right after a connection enters Play state.
 void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer);
+
+// Grants (or revokes) the client-side ability to fly/instant-break for a
+// given gamemode -- used both at join and by /gamemode, see Player_Abilities_p.
+// Creative grants Allow Flying but not Flying itself (matches vanilla: the
+// client's own double-tap-space gesture toggles actual flight once allowed).
+// Spectator grants Flying directly, since spectator always flies/noclips.
+Byte abilitiesFlagsForGamemode(int gamemode);
+
+// Grants/revokes fly and instant-break client-side -- without this, switching
+// to Creative changes the hotbar/tab-list icon but the client still can't
+// actually fly or instant-break, since those are gated behind these flags,
+// not anything Game_Event_p's "Change game mode" event alone conveys.
+class Player_Abilities_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Player_Abilities_p(int threshold, Byte flags, float flyingSpeed = 0.05f, float fovModifier = 0.1f);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        Byte _flags;
+        float _flyingSpeed;
+        float _fovModifier;
+        static int constexpr _PACKET_ID = 0x38; // clientbound -- a distinct namespace from the existing serverbound Use_Item_On_p at the same number
+};
 
 class Confirm_Teleportation_p : public Play_Packet, public Incoming_Packet {
     public:

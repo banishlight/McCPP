@@ -169,11 +169,35 @@ std::vector<Byte> Set_Default_Spawn_Position_p::serialize() const {
 Commands_p::Commands_p(int threshold, int permissionLevel) {
     _threshold = threshold;
     CommandRegistry& registry = CommandRegistry::getInstance();
+
+    _nodes.push_back({0x00, {}, ""}); // root, always index 0
+    std::vector<int> rootChildren; // accumulated locally -- _nodes.push_back below can reallocate, so a live reference into _nodes[0] isn't safe to hold across the loop
+
     for (const string& name : registry.getCommandNames()) {
         std::shared_ptr<Command> command = registry.getCommand(name);
         if (!command || permissionLevel < command->getRequiredPermission()) continue;
-        _commandNames.push_back(name);
+
+        std::vector<string> suggestions = command->getArgumentSuggestions();
+        int commandNodeIndex = static_cast<int>(_nodes.size());
+        // Executable on its own only if it takes no argument suggestions --
+        // a command with suggestions isn't a complete invocation by itself
+        // (e.g. bare "/gamemode" isn't valid without a mode).
+        Byte commandFlags = static_cast<Byte>(0x01 | (suggestions.empty() ? 0x04 : 0x00));
+        _nodes.push_back({commandFlags, {}, name});
+        rootChildren.push_back(commandNodeIndex);
+
+        // Literal-only suggestions (e.g. gamemode names) -- see
+        // Command::getArgumentSuggestions and docs/general-documentation.md,
+        // "Command autocomplete", for why this stops short of real Brigadier
+        // argument/parser-ID encoding.
+        for (const string& suggestion : suggestions) {
+            int childIndex = static_cast<int>(_nodes.size());
+            _nodes.push_back({static_cast<Byte>(0x01 | 0x04), {}, suggestion}); // literal, executable
+            _nodes[commandNodeIndex].children.push_back(childIndex);
+        }
     }
+
+    _nodes[0].children = rootChildren;
 }
 
 std::vector<Byte> Commands_p::serialize() const {
@@ -182,29 +206,21 @@ std::vector<Byte> Commands_p::serialize() const {
     #endif
     std::vector<Byte> packet_data;
 
-    int nodeCount = static_cast<int>(_commandNames.size()) + 1; // +1 for the root node
-    std::vector<Byte> countBytes = varIntSerialize(nodeCount);
+    std::vector<Byte> countBytes = varIntSerialize(static_cast<int>(_nodes.size()));
     packet_data.insert(packet_data.end(), countBytes.begin(), countBytes.end());
 
-    // Node 0: root -- not executable, no name, children = every literal
-    // node's index (1..N).
-    packet_data.push_back(0x00);
-    std::vector<Byte> rootChildCount = varIntSerialize(static_cast<int>(_commandNames.size()));
-    packet_data.insert(packet_data.end(), rootChildCount.begin(), rootChildCount.end());
-    for (int i = 0; i < static_cast<int>(_commandNames.size()); i++) {
-        std::vector<Byte> childIndex = varIntSerialize(i + 1);
-        packet_data.insert(packet_data.end(), childIndex.begin(), childIndex.end());
-    }
-
-    // Nodes 1..N: one bare executable literal per command -- see
-    // docs/general-documentation.md, "Command autocomplete", for why
-    // argument nodes (and their version-fragile parser IDs) are out of scope.
-    for (const string& name : _commandNames) {
-        packet_data.push_back(0x01 | 0x04); // literal, executable
-        std::vector<Byte> childCount = varIntSerialize(0);
+    for (const Node& node : _nodes) {
+        packet_data.push_back(node.flags);
+        std::vector<Byte> childCount = varIntSerialize(static_cast<int>(node.children.size()));
         packet_data.insert(packet_data.end(), childCount.begin(), childCount.end());
-        std::vector<Byte> nameBytes = serializeString(name);
-        packet_data.insert(packet_data.end(), nameBytes.begin(), nameBytes.end());
+        for (int child : node.children) {
+            std::vector<Byte> childIndexBytes = varIntSerialize(child);
+            packet_data.insert(packet_data.end(), childIndexBytes.begin(), childIndexBytes.end());
+        }
+        if (!node.name.empty()) { // the root is the only node with no name
+            std::vector<Byte> nameBytes = serializeString(node.name);
+            packet_data.insert(packet_data.end(), nameBytes.begin(), nameBytes.end());
+        }
     }
 
     std::vector<Byte> rootIndex = varIntSerialize(0); // root is node 0
@@ -1192,6 +1208,47 @@ void BroadcastDisguisedChat(const string& senderName, const string& message, con
         int threshold = conn->getCompressionThreshold();
         conn->addPacket(std::make_shared<Disguised_Chat_Message_p>(threshold, message, chatTypeIndex, senderName));
     }
+}
+
+Byte abilitiesFlagsForGamemode(int gamemode) {
+    const Byte INVULNERABLE = 0x01;
+    const Byte FLYING = 0x02;
+    const Byte ALLOW_FLYING = 0x04;
+    const Byte INSTANT_BREAK = 0x08;
+    switch (gamemode) {
+        case 1: return INVULNERABLE | ALLOW_FLYING | INSTANT_BREAK; // Creative
+        case 3: return INVULNERABLE | FLYING | ALLOW_FLYING; // Spectator -- always flies/noclips
+        default: return 0x00; // Survival, Adventure
+    }
+}
+
+Player_Abilities_p::Player_Abilities_p(int threshold, Byte flags, float flyingSpeed, float fovModifier) {
+    _threshold = threshold;
+    _flags = flags;
+    _flyingSpeed = flyingSpeed;
+    _fovModifier = fovModifier;
+}
+
+std::vector<Byte> Player_Abilities_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Player_Abilities_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    packet_data.push_back(_flags);
+
+    Int32 speedBits;
+    std::memcpy(&speedBits, &_flyingSpeed, sizeof(Int32));
+    for (int i = 3; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((speedBits >> (i * 8)) & 0xFF));
+    }
+
+    Int32 fovBits;
+    std::memcpy(&fovBits, &_fovModifier, sizeof(Int32));
+    for (int i = 3; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((fovBits >> (i * 8)) & 0xFF));
+    }
+
+    return assemblePacket(getID(), _threshold, packet_data);
 }
 
 void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer) {

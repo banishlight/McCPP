@@ -7,6 +7,8 @@
 #include <commands/ListCommand.hpp>
 #include <commands/KickCommand.hpp>
 #include <commands/SaveAllCommand.hpp>
+#include <commands/GamemodeCommand.hpp>
+#include <commands/TimeCommand.hpp>
 #include <Console.hpp>
 
 CommandRegistry& CommandRegistry::getInstance() {
@@ -24,6 +26,8 @@ void CommandRegistry::initialize() {
     registerCommand(std::make_shared<ListCommand>());
     registerCommand(std::make_shared<KickCommand>());
     registerCommand(std::make_shared<SaveAllCommand>());
+    registerCommand(std::make_shared<GamemodeCommand>());
+    registerCommand(std::make_shared<TimeCommand>());
     _initialized = true;
 }
 

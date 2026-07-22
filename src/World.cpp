@@ -234,6 +234,10 @@ Int64 World::getDayTime() const {
     return _dayTime.load(std::memory_order_relaxed);
 }
 
+void World::setDayTime(Int64 dayTime) {
+    _dayTime.store(dayTime, std::memory_order_relaxed);
+}
+
 bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
     int chunkX = floorDiv16(worldX);
     int chunkZ = floorDiv16(worldZ);

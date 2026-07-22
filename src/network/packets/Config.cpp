@@ -249,6 +249,10 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     // never sends this to a player about themselves (a player's own entity is
     // never "spawned" to them), so it has to happen here instead.
     cont.connection.addPacket(std::make_shared<Set_Player_Skin_Parts_Metadata_p>(threshold, player.getEntityId(), player.getSkinParts()));
+    // Grants fly/instant-break for whatever gamemode was just resolved above --
+    // nothing sent this before, so a player rejoining already in Creative (via
+    // PlayerDataPersistence) previously had no fly ability until toggled by /gamemode.
+    cont.connection.addPacket(std::make_shared<Player_Abilities_p>(threshold, abilitiesFlagsForGamemode(player.getGamemode())));
     std::shared_ptr<Outgoing_Packet> loginPlay = std::make_shared<Login_Play_p>(threshold, player);
     cont.connection.addPacket(loginPlay);
     std::shared_ptr<Outgoing_Packet> defaultSpawn = std::make_shared<Set_Default_Spawn_Position_p>(threshold);

@@ -90,13 +90,20 @@ class World {
         // player -- no grace period or save needed, these are never dirty.
         void evictStaleTerrainCache();
         // Ticks since world creation, persisted via buildLevelData/LevelDat --
-        // no /time set command exists, so this doubles as both "World Age"
-        // and "Time of day" for Update_Time_p (see DayNightSystem). Always
+        // this doubles as both "World Age" and "Time of day" for Update_Time_p
+        // (see DayNightSystem) since there's no separate world-age tracking --
+        // a deliberate, documented simplification (see TimeCommand/docs) since
+        // nothing in this project reads World Age for anything else. Always
         // advances continuously; there's no gamerule system in this project
         // to hook a doDaylightCycle-style freeze into (deliberate, documented
         // gap, matching LevelData's own "game rules out of scope" stance).
         void advanceDayTime();
         Int64 getDayTime() const;
+        // /time set's setter -- setDayTime/advanceDayTime can now both write
+        // concurrently (tick thread + command-dispatch threads), still safe
+        // since std::atomic::store/fetch_add never race, just no longer a
+        // single sole writer.
+        void setDayTime(Int64 dayTime);
     private:
         World();
         // Inserts into _chunkCache and drops the now-redundant _terrainCache
