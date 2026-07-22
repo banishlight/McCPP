@@ -534,6 +534,19 @@ class Use_Item_On_p : public Play_Packet, public Incoming_Packet {
     private:
         static int constexpr _PACKET_ID = 0x38;
 };
+// Sent by the client while the Creative-mode inventory screen is open --
+// picking an item from the (entirely client-side, never sent by the server)
+// creative tabs and placing it into a hotbar slot, or dragging it out of the
+// window entirely. Structurally separate from Click Container (still out of
+// scope, see docs/general-documentation.md) -- this is a narrower, distinct
+// mechanism real vanilla uses specifically for creative-menu interactions.
+class Set_Creative_Mode_Slot_p : public Play_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+    private:
+        static int constexpr _PACKET_ID = 0x32;
+};
 class Set_Held_Item_serverbound_p : public Play_Packet, public Incoming_Packet {
     public:
         int getID() const override { return _PACKET_ID; }

@@ -432,6 +432,31 @@ namespace {
         return out;
     }
 
+    // Mirror of packSlot, for the one incoming packet that needs it
+    // (Set_Creative_Mode_Slot_p). count == 0 means empty. A nonzero
+    // addComponents/removeComponents count means the item carries real
+    // component data (enchantments, custom name, etc.) this project has no
+    // model for and never produces itself -- rather than parse variable-
+    // length, type-specific component payloads, that case is reported back
+    // as "unsupported" (present=false) via the count=-1 sentinel, and the
+    // caller no-ops. Safe to do: each packet's own outer length prefix
+    // already demarcates its exact byte range before dispatch, so not fully
+    // consuming this one packet's payload can't desync anything after it.
+    struct DecodedSlot {
+        bool present;
+        Int32 itemId;
+        Int32 count;
+    };
+    DecodedSlot unpackSlot(std::vector<Byte>& in_buff) {
+        Int32 count = deserializeVarInt(in_buff);
+        if (count == 0) return {false, -1, 0};
+        Int32 itemId = deserializeVarInt(in_buff);
+        Int32 addCount = deserializeVarInt(in_buff);
+        Int32 removeCount = deserializeVarInt(in_buff);
+        if (addCount != 0 || removeCount != 0) return {false, -1, -1};
+        return {true, itemId, count};
+    }
+
     // MOTION_BLOCKING heightmap: for each of the 256 columns, the highest
     // non-air block's Y, stored as (y - WORLD_MIN_Y + 1) so 0 means "no
     // blocking block in this column" -- 9 bits/entry, 7 entries/long (never
@@ -1647,6 +1672,10 @@ void Chat_Command_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont)
     CommandRegistry::getInstance().dispatch(sender, name, args);
 }
 
+namespace {
+    const int CREATIVE_GAMEMODE = 1;
+}
+
 void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     #ifdef DEBUG
         Console::getConsole().Entry("Use_Item_On_p::deserialize(): Received.");
@@ -1692,14 +1721,67 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     });
     cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
 
-    // Consume one from the stack -- empties the slot entirely at 0 rather
-    // than leaving a lingering itemId with a 0 count.
-    Int32 newCount = held.count - 1;
-    Int32 newItemId = (newCount > 0) ? held.itemId : -1;
-    if (newCount <= 0) newCount = 0;
-    player.setHotbarSlot(selectedSlot, newItemId, newCount);
-    int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
-    cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, newItemId, newCount));
+    // Creative has infinite blocks -- the slot is left untouched, matching
+    // vanilla. Survival/Adventure consume one from the stack, emptying the
+    // slot entirely at 0 rather than leaving a lingering itemId with a 0 count.
+    if (player.getGamemode() != CREATIVE_GAMEMODE) {
+        Int32 newCount = held.count - 1;
+        Int32 newItemId = (newCount > 0) ? held.itemId : -1;
+        if (newCount <= 0) newCount = 0;
+        player.setHotbarSlot(selectedSlot, newItemId, newCount);
+        int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
+        cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, newItemId, newCount));
+    }
+}
+
+// Sent by the client while the Creative inventory screen is open: picking an
+// item from the creative tabs and placing it in a slot, picking an item back
+// up (empties the slot), or dragging it out of the window entirely (Slot -1,
+// spawns a dropped item -- see the packet's own documented semantics in
+// docs/network-protocol.md).
+void Set_Creative_Mode_Slot_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Set_Creative_Mode_Slot_p::deserialize(): Received.");
+    #endif
+    Int16 slot = deserializeShort(in_buff);
+    DecodedSlot item = unpackSlot(in_buff);
+
+    Player& player = cont.connection.getPlayer();
+    // Only ever legitimately sent while the (Creative-only) inventory screen
+    // is open -- a non-Creative sender is stale or an attempted free-item
+    // exploit, so this is rejected outright rather than honored.
+    if (player.getGamemode() != CREATIVE_GAMEMODE) return;
+
+    if (slot == -1) {
+        // Dropped outside the window -- spawn it as a real dropped item,
+        // reusing the same entity/physics infrastructure the Q-drop path
+        // (Player_Action_p status 3/4) already uses.
+        if (!item.present) return;
+        double px = player.getX(), py = player.getY(), pz = player.getZ();
+        int chunkX = floorDiv16(static_cast<int>(std::floor(px)));
+        int chunkZ = floorDiv16(static_cast<int>(std::floor(pz)));
+        ItemEntity dropped = ItemEntityManager::getInstance().spawn(item.itemId, item.count, px, py + 1.0, pz, chunkX, chunkZ);
+        std::vector<long> uuid = generateRandomUUID();
+        int entityId = dropped.entityId;
+        const int ITEM_ENTITY_TYPE_ID = 58;
+        BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, px, py, pz, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
+            return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, px, py + 1.0, pz);
+        });
+        BroadcastToChunkViewers(chunkX, chunkZ, [entityId, item](int broadcastThreshold) {
+            return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, item.itemId, item.count);
+        });
+        return;
+    }
+
+    if (slot < 36 || slot > 44) return; // crafting grid/armor/offhand -- not modeled
+    int hotbarIndex = slot - 36;
+    if (item.present) {
+        player.setHotbarSlot(hotbarIndex, item.itemId, item.count);
+    } else {
+        player.setHotbarSlot(hotbarIndex, -1, 0);
+    }
+    int threshold = cont.connection.getCompressionThreshold();
+    cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, slot, item.present ? item.itemId : -1, item.present ? item.count : 0));
 }
 
 void Set_Held_Item_serverbound_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

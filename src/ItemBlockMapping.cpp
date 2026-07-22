@@ -1,20 +1,20 @@
 #include <ItemBlockMapping.hpp>
 #include <BlockIds.hpp>
+#include <BlockTable.hpp>
+#include <algorithm>
 
 Int32 itemIdToBlockStateId(Int32 itemId) {
-    switch (itemId) {
-        case STONE_ITEM_ID: return STONE_BLOCK_STATE_ID;
-        case DIRT_ITEM_ID: return DIRT_BLOCK_STATE_ID;
-        case GRASS_BLOCK_ITEM_ID: return GRASS_BLOCK_STATE_ID;
-        default: return -1;
-    }
+    const std::vector<BlockTableEntry>& table = getBlockTable();
+    auto it = std::find_if(table.begin(), table.end(), [itemId](const BlockTableEntry& entry) {
+        return itemId == entry.itemId;
+    });
+    return (it != table.end()) ? it->blockStateId : -1;
 }
 
 Int32 blockStateIdToItemId(Int32 blockStateId) {
-    switch (blockStateId) {
-        case STONE_BLOCK_STATE_ID: return STONE_ITEM_ID;
-        case DIRT_BLOCK_STATE_ID: return DIRT_ITEM_ID;
-        case GRASS_BLOCK_STATE_ID: return GRASS_BLOCK_ITEM_ID;
-        default: return -1;
-    }
+    const std::vector<BlockTableEntry>& table = getBlockTable();
+    auto it = std::find_if(table.begin(), table.end(), [blockStateId](const BlockTableEntry& entry) {
+        return blockStateId == entry.blockStateId;
+    });
+    return (it != table.end()) ? it->itemId : -1;
 }
