@@ -47,8 +47,17 @@ int main() {
     }
     // Persist everything before the world/connection singletons get torn
     // down by static destruction -- the same save path AutosaveSystem runs
-    // periodically, just run once more immediately on the way out.
-    AutosaveSystem::saveNow();
+    // periodically, just run once more immediately on the way out. Wrapped
+    // since this runs directly on main() with nothing else to catch a
+    // filesystem error -- better to finish shutting down than to crash
+    // mid-shutdown and skip the sleep below entirely (found via a real crash).
+    try {
+        AutosaveSystem::saveNow();
+    } catch (const std::exception& e) {
+        Console::getConsole().Error(string("MinecraftServer: Unhandled exception during final save -- shutting down anyway: ") + e.what());
+    } catch (...) {
+        Console::getConsole().Error("MinecraftServer: Unknown unhandled exception during final save -- shutting down anyway.");
+    }
     // StopCommand queues a Disconnect packet for every connected player before
     // requesting shutdown, but actually sending it only happens on each
     // connection's own processing thread the next time it runs -- give that a

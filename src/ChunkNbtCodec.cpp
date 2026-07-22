@@ -1,6 +1,7 @@
 #include <ChunkNbtCodec.hpp>
 #include <BlockNames.hpp>
 #include <BlockIds.hpp>
+#include <FluidBlocks.hpp>
 #include <VanillaVersion.hpp>
 #include <vanilla/VanillaDataManager.hpp>
 #include <algorithm>
@@ -114,8 +115,28 @@ ChunkDecodeResult decodeChunk(const NbtTag& root, std::shared_ptr<Chunk>& out) {
                 for (const NbtTag& entry : paletteList) {
                     const NbtTag* nameTag = entry.get("Name");
                     string name = nameTag ? nameTag->asString() : "minecraft:air";
-                    bool snowy = false;
                     const NbtTag* propsTag = entry.get("Properties");
+
+                    // Water/lava are saved as a single block name ("minecraft:water"/
+                    // "minecraft:lava") with a "level" property (0-15) -- not in
+                    // BlockNames/BlockTable at all, since that table's one-name-per-
+                    // state assumption doesn't fit a 16-state block family. Handled
+                    // here directly rather than teaching BlockNames a second, wider
+                    // property shape (int level vs bool snowy) it doesn't otherwise need.
+                    Fluid::Type fluidType = (name == "minecraft:water") ? Fluid::Type::Water
+                                          : (name == "minecraft:lava") ? Fluid::Type::Lava
+                                          : Fluid::Type::None;
+                    if (fluidType != Fluid::Type::None) {
+                        int level = 0;
+                        if (propsTag) {
+                            const NbtTag* levelTag = propsTag->get("level");
+                            if (levelTag) level = std::stoi(levelTag->asString());
+                        }
+                        resolvedIds.push_back(Fluid::sourceId(fluidType) + level);
+                        continue;
+                    }
+
+                    bool snowy = false;
                     if (propsTag) {
                         const NbtTag* snowyTag = propsTag->get("snowy");
                         if (snowyTag && snowyTag->asString() == "true") snowy = true;
@@ -219,11 +240,28 @@ NbtTag encodeChunk(const Chunk& chunk, int chunkX, int chunkZ) {
         paletteEntries.reserve(paletteIds.size());
         for (Int32 id : paletteIds) {
             NbtTag entry = NbtTag::makeCompound();
-            entry.put("Name", NbtTag::makeString(BlockNames::blockStateIdToName(id)));
-            if (id == GRASS_BLOCK_STATE_ID) {
+            // See the matching decode-side comment: water/lava need a "level"
+            // property BlockNames/BlockTable has no shape for, so they're
+            // written directly here rather than through blockStateIdToName --
+            // which, before this fix, had no entry for any fluid ID and
+            // silently fell back to "minecraft:stone", the real cause of a
+            // reported "water turns to stone after leaving and rejoining" bug
+            // (every fluid block got saved as stone, then faithfully loaded
+            // back as stone).
+            Fluid::Type fluidType = Fluid::typeOf(id);
+            if (fluidType != Fluid::Type::None) {
+                int level = id - Fluid::sourceId(fluidType);
+                entry.put("Name", NbtTag::makeString(fluidType == Fluid::Type::Water ? "minecraft:water" : "minecraft:lava"));
                 NbtTag props = NbtTag::makeCompound();
-                props.put("snowy", NbtTag::makeString("false"));
+                props.put("level", NbtTag::makeString(std::to_string(level)));
                 entry.put("Properties", props);
+            } else {
+                entry.put("Name", NbtTag::makeString(BlockNames::blockStateIdToName(id)));
+                if (id == GRASS_BLOCK_STATE_ID) {
+                    NbtTag props = NbtTag::makeCompound();
+                    props.put("snowy", NbtTag::makeString("false"));
+                    entry.put("Properties", props);
+                }
             }
             paletteEntries.push_back(entry);
         }

@@ -3,6 +3,7 @@
 #include <systems/ItemDespawnSystem.hpp>
 #include <systems/ItemPhysicsSystem.hpp>
 #include <systems/FallingBlockSystem.hpp>
+#include <systems/FluidSystem.hpp>
 #include <systems/AutosaveSystem.hpp>
 #include <systems/ChunkUnloadSystem.hpp>
 #include <systems/DayNightSystem.hpp>
@@ -23,6 +24,7 @@ void TickLoop::initialize() {
     registerSystem(std::make_shared<KeepAliveSystem>());
     registerSystem(std::make_shared<ItemPhysicsSystem>());
     registerSystem(std::make_shared<FallingBlockSystem>());
+    registerSystem(std::make_shared<FluidSystem>());
     registerSystem(std::make_shared<ItemDespawnSystem>());
     registerSystem(std::make_shared<AutosaveSystem>());
     registerSystem(std::make_shared<ChunkUnloadSystem>());
@@ -48,7 +50,20 @@ void TickLoop::tickThreadLoop() {
         nextTick += std::chrono::milliseconds(TICK_RATE_MS);
         _tickCount++;
         for (auto& system : _systems) {
-            system->onTick(_tickCount);
+            // An exception escaping a thread's own function calls std::terminate,
+            // crashing the whole process -- for every connected player, not just
+            // whatever one system was doing (found via a real crash: a filesystem
+            // error from AutosaveSystem's save path, previously uncaught here,
+            // took the entire server down). Catching per-system means one
+            // system misbehaving for a tick doesn't even block the others from
+            // still running that same tick.
+            try {
+                system->onTick(_tickCount);
+            } catch (const std::exception& e) {
+                Console::getConsole().Error("TickLoop::tickThreadLoop(): Unhandled exception in system '" + system->getName() + "': " + e.what());
+            } catch (...) {
+                Console::getConsole().Error("TickLoop::tickThreadLoop(): Unknown unhandled exception in system '" + system->getName() + "'.");
+            }
         }
         #ifdef DEBUG
             if (_tickCount % 200 == 0) {

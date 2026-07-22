@@ -14,6 +14,8 @@
 #include <entities/ItemEntityManager.hpp>
 #include <entities/FallingBlockEntityManager.hpp>
 #include <entities/PlayerVisibilityManager.hpp>
+#include <FluidBlocks.hpp>
+#include <FluidUpdateQueue.hpp>
 #include <network/Crypto.hpp>
 #include <network/Nbt.hpp>
 #include <network/PlayerCommandSender.hpp>
@@ -1375,6 +1377,208 @@ void CheckGravityBlock(World& world, int x, int y, int z) {
     CheckGravityBlock(world, x, y + 1, z);
 }
 
+namespace {
+    // -1 signals "chunk not loaded / out of world bounds" -- distinct from
+    // AIR_BLOCK_STATE_ID (0). Callers must treat it as "unknown, don't touch"
+    // rather than as air, matching CheckGravityBlock's own stance on unloaded
+    // chunks elsewhere in this file.
+    Int32 GetWorldBlockOrUnknown(World& world, int x, int y, int z) {
+        if (y < Chunk::WORLD_MIN_Y || y >= Chunk::WORLD_MIN_Y + Chunk::WORLD_HEIGHT) return -1;
+        int chunkX = floorDiv16(x);
+        int chunkZ = floorDiv16(z);
+        std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+        if (!chunk) return -1;
+        return chunk->getBlock(x - chunkX * 16, y, z - chunkZ * 16);
+    }
+
+    // Vanilla's real Overworld rates -- water re-checks every 5 ticks, lava
+    // every 30 -- confirmed against minecraft.wiki, not guessed. This project
+    // has no per-dimension distinction, so there's no separate Nether rate to
+    // pick between.
+    int FluidTickInterval(Fluid::Type type) {
+        return (type == Fluid::Type::Lava) ? 30 : 5;
+    }
+
+    void ScheduleFluidCheck(int x, int y, int z, int delayTicks) {
+        FluidUpdateQueue::getInstance().schedule(x, y, z, delayTicks);
+    }
+
+    // Schedules a position and its 6 neighbors -- used both for the initial
+    // "something changed nearby" kick-off (see ScheduleFluidNeighbors's own
+    // call sites in the break/place handlers, delay 1) and by ResolveFluid
+    // itself once it determines a position's correct fluid-specific pace.
+    void ScheduleFluidNeighbors(int x, int y, int z, int delayTicks) {
+        ScheduleFluidCheck(x, y, z, delayTicks);
+        ScheduleFluidCheck(x + 1, y, z, delayTicks);
+        ScheduleFluidCheck(x - 1, y, z, delayTicks);
+        ScheduleFluidCheck(x, y, z + 1, delayTicks);
+        ScheduleFluidCheck(x, y, z - 1, delayTicks);
+        ScheduleFluidCheck(x, y + 1, z, delayTicks);
+        ScheduleFluidCheck(x, y - 1, z, delayTicks);
+    }
+}
+
+namespace {
+    struct FluidSupply {
+        Fluid::Type type = Fluid::Type::None;
+        bool falling = false;
+        int distance = 0; // meaningful only when type != None && !falling
+    };
+
+    // Finds the TRUE shortest distance-equivalent cost from (x,y,z) to an
+    // actual source of `type` (or a column fed from directly above),
+    // searching outward through a chain of "capped" same-type fluid tiles.
+    // Each hop adds `Fluid::levelDecreasePerBlock(type)` to the running cost
+    // rather than a flat 1 -- water and lava do NOT decay at the same rate:
+    // lava's cost doubles per block, capping its reach at 3 blocks instead of
+    // water's 7. A first version of this treated both fluids
+    // identically, which meant lava was assigned level values (1, 3, 5, 7)
+    // real lava never produces -- only even levels (2, 4, 6) are reachable
+    // with a decrease-per-block of 2 -- and the client, having no precedent
+    // for those states on an actual lava block, rendered them wrong (this is
+    // what a user-reported "lava looks like water" bug turned out to be, not
+    // a wire-encoding problem -- the encoding itself was independently
+    // verified correct, see docs).
+    //
+    // Deliberately does NOT trust any intermediate tile's own claimed
+    // distance -- only whether it's fluid and capped, i.e. eligible as a
+    // pass-through link -- and instead computes the real cost to a genuine
+    // anchor itself. A single-hop "peek at my neighbor's stored distance and
+    // add one" version of this was a separate real, reported bug: two
+    // neighboring tiles whose shared source had just been removed could
+    // reference each other's still-present (but equally orphaned) values and
+    // prop each other up, so an entire pool would decay in lockstep and
+    // vanish in one layer instead of retreating outward the same way it grew
+    // -- and a freshly-vacated tile could likewise "regrow" from a neighbor
+    // that was itself about to be invalidated. Recomputing from real anchors
+    // every time sidesteps both: a tile with no genuine path to a source
+    // correctly finds nothing, regardless of what stale distance values
+    // happen to be sitting on nearby not-yet-resolved tiles.
+    FluidSupply FindFluidSupplyForType(World& world, int x, int y, int z, Fluid::Type type) {
+        Int32 above = GetWorldBlockOrUnknown(world, x, y + 1, z);
+        if (Fluid::typeOf(above) == type) {
+            return {type, true, 0};
+        }
+
+        int perBlock = Fluid::levelDecreasePerBlock(type);
+        struct Node { int x, z, cost; };
+        std::vector<Node> queue;
+        std::set<std::pair<int,int>> visited;
+        queue.push_back({x, z, 0});
+        visited.insert({x, z});
+
+        Fluid::Type foundType = Fluid::Type::None;
+        int foundCost = 8; // sentinel: worse than any real 1-7 cost
+
+        static constexpr int dx[4] = {1, -1, 0, 0};
+        static constexpr int dz[4] = {0, 0, 1, -1};
+        for (size_t head = 0; head < queue.size(); head++) {
+            Node node = queue[head];
+            for (int i = 0; i < 4; i++) {
+                int nx = node.x + dx[i], nz = node.z + dz[i];
+                if (!visited.insert({nx, nz}).second) continue;
+
+                Int32 neighbor = GetWorldBlockOrUnknown(world, nx, y, nz);
+                if (Fluid::typeOf(neighbor) != type) continue;
+
+                int newCost = node.cost + perBlock;
+                if (Fluid::isSource(neighbor)) {
+                    // Sources project horizontally at full strength regardless
+                    // of what's below them -- no "capped" requirement.
+                    if (newCost < foundCost) { foundCost = newCost; foundType = type; }
+                    continue;
+                }
+
+                // Only a tile that can't fall any further acts as a
+                // horizontal link -- otherwise a waterfall would leak
+                // sideways along its entire height instead of staying a
+                // clean vertical column, the way it does in vanilla. A
+                // falling tile is usually NOT capped (that's what "falling"
+                // means -- open space below), except at the very bottom of a
+                // waterfall, where it's fed from above but sitting on
+                // something solid: that specific tile acts as a full-strength
+                // anchor too (this is what makes a pool form beside the base
+                // of a waterfall), not just a weaker pass-through link.
+                Int32 below = GetWorldBlockOrUnknown(world, nx, y - 1, nz);
+                bool belowIsFluid = Fluid::typeOf(below) != Fluid::Type::None;
+                bool capped = (below >= 0) && (below != AIR_BLOCK_STATE_ID) && !belowIsFluid;
+                if (!capped) continue;
+
+                if (Fluid::isFalling(neighbor)) {
+                    if (newCost < foundCost) { foundCost = newCost; foundType = type; }
+                    continue;
+                }
+
+                if (newCost < foundCost) {
+                    if (newCost < 7) queue.push_back({nx, nz, newCost}); // keep searching through it
+                }
+            }
+        }
+        if (foundType == Fluid::Type::None) return {Fluid::Type::None, false, 0};
+        return {foundType, false, foundCost};
+    }
+
+    // restrictType narrows the search to one fluid type (an already-fluid
+    // tile only accepts same-type supply, see ResolveFluid); Fluid::Type::None
+    // (a fresh air tile) tries both and takes whichever is reachable --
+    // stronger one wins if both are, an accepted gap since no water/lava
+    // interaction is modeled yet (see docs).
+    FluidSupply FindFluidSupply(World& world, int x, int y, int z, Fluid::Type restrictType) {
+        if (restrictType != Fluid::Type::None) {
+            return FindFluidSupplyForType(world, x, y, z, restrictType);
+        }
+        FluidSupply water = FindFluidSupplyForType(world, x, y, z, Fluid::Type::Water);
+        FluidSupply lava = FindFluidSupplyForType(world, x, y, z, Fluid::Type::Lava);
+        if (water.type == Fluid::Type::None) return lava;
+        if (lava.type == Fluid::Type::None) return water;
+        int waterCost = water.falling ? 0 : water.distance;
+        int lavaCost = lava.falling ? 0 : lava.distance;
+        return (waterCost <= lavaCost) ? water : lava;
+    }
+}
+
+void ResolveFluid(World& world, int x, int y, int z) {
+    Int32 current = GetWorldBlockOrUnknown(world, x, y, z);
+    if (current < 0) return; // chunk not loaded / out of bounds -- leave it be
+
+    Fluid::Type currentType = Fluid::typeOf(current);
+    if (currentType != Fluid::Type::None && Fluid::isSource(current)) {
+        // Sources are permanent -- just make sure downstream flow keeps
+        // getting re-checked at the right pace.
+        ScheduleFluidNeighbors(x, y, z, FluidTickInterval(currentType));
+        return;
+    }
+    if (currentType == Fluid::Type::None && current != AIR_BLOCK_STATE_ID) {
+        return; // solid block -- fluids only ever flow into open air (no
+                // waterlogging/passable-block concept in this project yet)
+    }
+
+    // A tile already holding one fluid type is never overridden by a
+    // different type reaching it -- there's no water/lava interaction yet
+    // (obsidian/cobblestone formation is a future stage), so only the SAME
+    // type can supply/strengthen/sustain an already-fluid position. A fresh
+    // air tile has no restriction: whichever type reaches it first claims it
+    // (see the note below).
+    Fluid::Type restrictType = currentType; // None when currently air
+
+    FluidSupply supply = FindFluidSupply(world, x, y, z, restrictType);
+    // Note: a fresh air tile with both a water and a lava candidate reaching
+    // it at the same time picks whichever the search happens to find first
+    // (checked in BFS order) -- no source/lava interaction exists yet,
+    // that's for the next stage.
+
+    Int32 desired = (supply.type == Fluid::Type::None) ? AIR_BLOCK_STATE_ID
+                  : (supply.falling ? Fluid::fallingId(supply.type) : Fluid::flowingId(supply.type, supply.distance));
+    if (desired == current) return; // already correct -- quiesces here, no further scheduling
+
+    Fluid::Type paceType = (supply.type != Fluid::Type::None) ? supply.type : currentType;
+    world.setBlock(x, y, z, desired);
+    BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, desired](int threshold) {
+        return std::make_shared<Block_Update_p>(threshold, x, y, z, desired);
+    });
+    ScheduleFluidNeighbors(x, y, z, FluidTickInterval(paceType));
+}
+
 void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
     const double PICKUP_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's AABB pickup range
     const double MIN_PICKUP_AGE_SECONDS = 0.5; // matches vanilla's 10-tick pickup delay
@@ -1585,16 +1789,27 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             previousBlock = chunk->getBlock(loc.x - chunkX * 16, loc.y, loc.z - chunkZ * 16);
         }
 
-        world.setBlock(loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
-        BroadcastToChunkViewers(chunkX, chunkZ, [loc](int threshold) {
-            return std::make_shared<Block_Update_p>(threshold, loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
-        });
         int threshold = cont.connection.getCompressionThreshold();
+        if (Fluid::typeOf(previousBlock) != Fluid::Type::None) {
+            // Fluids aren't "mined" by punching in vanilla -- picking one up
+            // requires an empty bucket (a future interactions-stage feature).
+            // Still ack, since the client already predicted the break locally.
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            return;
+        }
+
+        world.setBlock(loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
+        BroadcastToChunkViewers(chunkX, chunkZ, [loc](int broadcastThreshold) {
+            return std::make_shared<Block_Update_p>(broadcastThreshold, loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
+        });
         cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
 
         // The block just vacated might have been the only thing holding up a
         // sand/gravel block directly above it.
         CheckGravityBlock(world, loc.x, loc.y + 1, loc.z);
+        // ...or the only thing blocking a neighboring fluid from spreading
+        // into the new opening.
+        ScheduleFluidNeighbors(loc.x, loc.y, loc.z, 1);
 
         // Tracked server-side by ItemEntityManager so it can later be picked
         // up (TryPickupNearbyItems) or despawned (ItemDespawnSystem) -- the
@@ -1750,7 +1965,23 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     Player& player = cont.connection.getPlayer();
     int selectedSlot = player.getSelectedSlot();
     HotbarSlot held = player.getHotbar()[selectedSlot]; // copy: mutating the slot below must not alias this read
-    Int32 blockStateId = itemIdToBlockStateId(held.itemId);
+
+    // Water/lava buckets aren't in BlockTable (they have no real placeable
+    // "block" item -- vanilla's bucket-swap-to-empty mechanic is a future
+    // interactions-stage feature), so they're special-cased directly to a
+    // fluid source rather than going through itemIdToBlockStateId. Creative
+    // only for now: in Survival the bucket would never empty, which would be
+    // more confusing than just not supporting it yet.
+    const int WATER_BUCKET_ITEM_ID = 909;
+    const int LAVA_BUCKET_ITEM_ID = 910;
+    Int32 blockStateId;
+    if (player.getGamemode() == CREATIVE_GAMEMODE && held.itemId == WATER_BUCKET_ITEM_ID) {
+        blockStateId = Fluid::sourceId(Fluid::Type::Water);
+    } else if (player.getGamemode() == CREATIVE_GAMEMODE && held.itemId == LAVA_BUCKET_ITEM_ID) {
+        blockStateId = Fluid::sourceId(Fluid::Type::Lava);
+    } else {
+        blockStateId = itemIdToBlockStateId(held.itemId);
+    }
     if (blockStateId < 0 || held.count <= 0) {
         // Unmapped/empty held item -- still ack (the client predicted a
         // placement that didn't happen), just no-op the world edit.
@@ -1782,6 +2013,10 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     // A sand/gravel block placed directly onto open air starts falling
     // immediately, matching vanilla.
     CheckGravityBlock(world, px, py, pz);
+    // A placed fluid source needs its neighbors to notice it's there and
+    // start spreading; a placed solid block may have just cut off an
+    // existing fluid's supply.
+    ScheduleFluidNeighbors(px, py, pz, 1);
 
     // Creative has infinite blocks -- the slot is left untouched, matching
     // vanilla. Survival/Adventure consume one from the stack, emptying the

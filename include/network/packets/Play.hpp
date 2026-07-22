@@ -436,6 +436,18 @@ void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::sh
 // block is itself an edit that can unsupport the block above it.
 void CheckGravityBlock(World& world, int x, int y, int z);
 
+// Re-derives what fluid (if any) belongs at (x,y,z) from its neighbors and
+// applies the change if it differs from what's there now -- handles both
+// growth (air becoming water/lava fed from a source) and decay (flowing
+// fluid whose supply was cut evaporating back to air) with the same logic.
+// Schedules follow-up checks on FluidUpdateQueue for affected neighbors when
+// something changes, at the fluid-specific pace (see FluidBlocks.hpp).
+// Called by FluidSystem for positions FluidUpdateQueue reports as due, and
+// indirectly kicked off by any block edit (see ScheduleFluidNeighbors in
+// Play.cpp) -- breaking or placing a block near a fluid, or placing a fluid
+// source itself, is what gets a position onto the queue in the first place.
+void ResolveFluid(World& world, int x, int y, int z);
+
 // Called after every position update (matches vanilla: the Notchian server
 // only checks for pickups after Set Player Position/Set Player Position And
 // Rotation). Scans nearby tracked item entities and, for any the player has

@@ -14,3 +14,8 @@ static constexpr Int32 GRASS_BLOCK_STATE_ID = 9; // snowy=false (default)
 // referenced by name/lookup, but gravity checks need a direct ID comparison.
 static constexpr Int32 SAND_BLOCK_STATE_ID = 112;
 static constexpr Int32 GRAVEL_BLOCK_STATE_ID = 118;
+// Level-0 (source) state IDs for the two fluids -- each fluid occupies 16
+// contiguous state IDs, one per "level" property value (0-15), in the same
+// order, so any level's state ID is just base + level. See FluidBlocks.hpp.
+static constexpr Int32 WATER_BLOCK_STATE_ID = 80;
+static constexpr Int32 LAVA_BLOCK_STATE_ID = 96;
