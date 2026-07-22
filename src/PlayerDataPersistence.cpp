@@ -12,19 +12,8 @@
 #include <mutex>
 
 namespace {
-    // Vanilla playerdata filenames are dashed (8-4-4-4-12); the only existing
-    // UUID->string helper (uuidToHexString, network/PacketUtils.hpp) is
-    // dashless (used today only as an OpsList lookup key) -- derive the
-    // dashed form from it rather than reimplementing hex conversion.
-    string dashedUuidString(const std::vector<long>& uuid) {
-        string hex = uuidToHexString(uuid);
-        if (hex.size() != 32) return hex; // shouldn't happen -- uuidToHexString always pads to 32
-        return hex.substr(0, 8) + "-" + hex.substr(8, 4) + "-" + hex.substr(12, 4) + "-"
-             + hex.substr(16, 4) + "-" + hex.substr(20, 12);
-    }
-
     std::filesystem::path pathFor(const string& worldDir, const std::vector<long>& uuid) {
-        return std::filesystem::path(worldDir) / "playerdata" / (dashedUuidString(uuid) + ".dat");
+        return std::filesystem::path(worldDir) / "playerdata" / (uuidToDashedHexString(uuid) + ".dat");
     }
 
     // Serializes all save() calls -- the first place in this codebase where

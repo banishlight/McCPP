@@ -3,6 +3,8 @@
 #include <network/packets/Status.hpp>
 #include <network/PacketUtils.hpp>
 #include <network/Connection.hpp>
+#include <network/ConnectionManager.hpp>
+#include <Player.hpp>
 #include <Console.hpp>
 #include <memory>
 #include <lib/json.hpp>
@@ -18,6 +20,22 @@ std::vector<Byte> Status_Response_p::serialize() const {
         Console::getConsole().Entry("Status_Response_p::serialize(): Sending.");
     #endif
     std::vector<Byte> packet;
+
+    // Real connected-player count/sample, not a placeholder -- only
+    // Play-state connections count as "online" (Status/Login-state
+    // connections are still mid-handshake, not actual players).
+    json sample = json::array();
+    int onlineCount = 0;
+    for (auto& conn : ConnectionManager::getInstance().getActiveConnections()) {
+        if (!conn || conn->getState() != ConnectionState::Play) continue;
+        onlineCount++;
+        Player& player = conn->getPlayer();
+        sample.push_back({
+            {"name", player.getUsername()},
+            {"id", uuidToDashedHexString(player.getUUID())}
+        });
+    }
+
     // Create the JSON response with server status information
     json status_json = {
         {"version", {
@@ -26,8 +44,8 @@ std::vector<Byte> Status_Response_p::serialize() const {
         }},
         {"players", {
             {"max", Properties::getProperties().max_players},
-            {"online", 0},  // TODO: Fetch actual online player count
-            {"sample", json::array()}  // TODO: Fetch actual player sample
+            {"online", onlineCount},
+            {"sample", sample}
         }},
         {"description", {
             {"text", Properties::getProperties().getMotd()}

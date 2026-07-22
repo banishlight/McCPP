@@ -263,6 +263,13 @@ string uuidToHexString(const std::vector<long>& uuid) {
     return oss.str();
 }
 
+string uuidToDashedHexString(const std::vector<long>& uuid) {
+    string hex = uuidToHexString(uuid);
+    if (hex.size() != 32) return hex; // shouldn't happen -- uuidToHexString always pads to 32
+    return hex.substr(0, 8) + "-" + hex.substr(8, 4) + "-" + hex.substr(12, 4) + "-"
+         + hex.substr(16, 4) + "-" + hex.substr(20, 12);
+}
+
 std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>& data) {
     std::vector<Byte> packet;
     if (threshold < 0) {

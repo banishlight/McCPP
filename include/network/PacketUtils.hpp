@@ -35,6 +35,11 @@ std::vector<Byte> serializeUUID(const std::vector<long>& data);
 // Dashless 32-hex-char lowercase form, e.g. for keying OpsList entries -- the
 // inverse of Login.cpp's local uuidFromMojangHex.
 string uuidToHexString(const std::vector<long>& uuid);
+// Standard dashed (8-4-4-4-12) form, e.g. for playerdata filenames and the
+// Status Response's player sample "id" field -- vanilla-matching filename/
+// display convention, derived from uuidToHexString rather than reimplementing
+// hex conversion.
+string uuidToDashedHexString(const std::vector<long>& uuid);
 
 // Wire "Angle" type: a full rotation (0-360 degrees) packed into a single
 // byte (256 steps/turn). Used by entity rotation fields (Update Entity
