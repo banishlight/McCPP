@@ -10,6 +10,7 @@
 // Forward declaration
 class Player;
 class Chunk;
+class World;
 
 // **Play Packets**
 
@@ -179,9 +180,12 @@ class Set_Container_Slot_p : public Play_Packet, public Outgoing_Packet {
 class Spawn_Entity_p : public Play_Packet, public Outgoing_Packet {
     public:
         // yaw/pitch/headYaw default to 0 so existing item-entity call sites
-        // (which have no meaningful rotation) are unaffected.
+        // (which have no meaningful rotation) are unaffected. data defaults to
+        // 0 ("unused" per docs/general-documentation.md's Object Data note)
+        // -- Falling Block is the only entity type this project spawns that
+        // needs a nonzero value (the block state ID it represents).
         Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z,
-                       float yaw = 0.0f, float pitch = 0.0f, float headYaw = 0.0f);
+                       float yaw = 0.0f, float pitch = 0.0f, float headYaw = 0.0f, Int32 data = 0);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
@@ -190,6 +194,7 @@ class Spawn_Entity_p : public Play_Packet, public Outgoing_Packet {
         int _entityTypeId;
         double _x, _y, _z;
         float _yaw, _pitch, _headYaw;
+        Int32 _data;
         static int constexpr _PACKET_ID = 0x01;
 };
 class Set_Entity_Metadata_p : public Play_Packet, public Outgoing_Packet {
@@ -420,6 +425,16 @@ void UpdateLoadedChunks(PacketContext& cont, int threshold, Player& player, int 
 // currently has (chunkX, chunkZ) loaded -- used for block edits, which must
 // reach every nearby player, not just whoever triggered them.
 void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::shared_ptr<Outgoing_Packet>(int threshold)>& makePacket);
+
+// Checks whether the block at (x,y,z) is gravity-affected (sand/gravel) and
+// resting on nothing -- if so, removes it from the static world and spawns a
+// FallingBlockEntity in its place (see FallingBlockSystem for the actual
+// fall/landing simulation). Call after any world edit that could pull support
+// out from under a block above it (breaking, placing into open air) or place
+// a gravity block directly onto open air. Recurses upward through stacked
+// gravity blocks, mirroring vanilla's chain-reaction collapse -- removing one
+// block is itself an edit that can unsupport the block above it.
+void CheckGravityBlock(World& world, int x, int y, int z);
 
 // Called after every position update (matches vanilla: the Notchian server
 // only checks for pickups after Set Player Position/Set Player Position And

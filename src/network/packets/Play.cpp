@@ -12,6 +12,7 @@
 #include <ItemBlockMapping.hpp>
 #include <EntityIdAllocator.hpp>
 #include <entities/ItemEntityManager.hpp>
+#include <entities/FallingBlockEntityManager.hpp>
 #include <entities/PlayerVisibilityManager.hpp>
 #include <network/Crypto.hpp>
 #include <network/Nbt.hpp>
@@ -735,7 +736,7 @@ std::vector<Byte> Set_Container_Slot_p::serialize() const {
 }
 
 Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<long>& uuid, int entityTypeId, double x, double y, double z,
-                               float yaw, float pitch, float headYaw) {
+                               float yaw, float pitch, float headYaw, Int32 data) {
     _threshold = threshold;
     _entityId = entityId;
     _uuid = uuid;
@@ -746,6 +747,7 @@ Spawn_Entity_p::Spawn_Entity_p(int threshold, int entityId, const std::vector<lo
     _yaw = yaw;
     _pitch = pitch;
     _headYaw = headYaw;
+    _data = data;
 }
 
 std::vector<Byte> Spawn_Entity_p::serialize() const {
@@ -770,7 +772,7 @@ std::vector<Byte> Spawn_Entity_p::serialize() const {
     packet_data.push_back(angleSerialize(_yaw));
     packet_data.push_back(angleSerialize(_headYaw));
 
-    std::vector<Byte> dataBytes = varIntSerialize(0); // Object Data: unused for item entities
+    std::vector<Byte> dataBytes = varIntSerialize(_data); // Object Data: meaning depends on entity type, see docs/general-documentation.md
     packet_data.insert(packet_data.end(), dataBytes.begin(), dataBytes.end());
 
     for (int i = 0; i < 3; i++) { // Velocity X/Y/Z: 0 -- no toss/physics on this drop
@@ -1322,6 +1324,57 @@ void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::sh
     }
 }
 
+void CheckGravityBlock(World& world, int x, int y, int z) {
+    // Above the build limit -- Chunk's flat array has no room past WORLD_HEIGHT,
+    // and there's nothing there anyway. Below the floor never happens (callers
+    // only ever pass a position that just held or gained a real block).
+    if (y < Chunk::WORLD_MIN_Y || y >= Chunk::WORLD_MIN_Y + Chunk::WORLD_HEIGHT) return;
+
+    int chunkX = floorDiv16(x);
+    int chunkZ = floorDiv16(z);
+    std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+    if (!chunk) return;
+
+    int localX = x - chunkX * 16;
+    int localZ = z - chunkZ * 16;
+    Int32 blockId = chunk->getBlock(localX, y, localZ);
+    if (blockId != SAND_BLOCK_STATE_ID && blockId != GRAVEL_BLOCK_STATE_ID) return;
+
+    // World floor: treated as solid support, matching ItemPhysicsSystem's own
+    // "can't check below the bottom of the world" stance.
+    if (y <= Chunk::WORLD_MIN_Y) return;
+    Int32 below = chunk->getBlock(localX, y - 1, localZ);
+    if (below != AIR_BLOCK_STATE_ID) return; // supported, nothing to do
+
+    // Unsupported: pull it out of the static world and hand it off to
+    // FallingBlockSystem as a real, simulated entity.
+    world.setBlock(x, y, z, AIR_BLOCK_STATE_ID);
+    BroadcastToChunkViewers(chunkX, chunkZ, [x, y, z](int broadcastThreshold) {
+        return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, AIR_BLOCK_STATE_ID);
+    });
+
+    FallingBlockEntity falling = FallingBlockEntityManager::getInstance().spawn(blockId, x + 0.5, y, z + 0.5, chunkX, chunkZ);
+    std::vector<long> uuid = generateRandomUUID(); // one-time, not persisted -- only needed for this Spawn_Entity_p
+    int entityId = falling.entityId;
+    // minecraft:falling_block entity-type registry ID, sourced from the
+    // vanilla data generator report, not guessed -- cross-checked against the
+    // already-known item (58) and player (128) entity-type IDs in the same report.
+    const int FALLING_BLOCK_ENTITY_TYPE_ID = 40;
+    BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, x, y, z, blockId, FALLING_BLOCK_ENTITY_TYPE_ID](int broadcastThreshold) {
+        // Object Data carries the block state ID for this entity type (confirmed
+        // against a version-pinned minecraft.wiki revision, not the live page) --
+        // no metadata packet is needed, unlike item entities: Falling Block's
+        // only metadata field (index 8, "spawn position") is optional and this
+        // project never sends optional fields it has no use for.
+        return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, FALLING_BLOCK_ENTITY_TYPE_ID,
+                                                 x + 0.5, y, z + 0.5, 0.0f, 0.0f, 0.0f, blockId);
+    });
+
+    // Cascade: the position that just became air might itself have been
+    // supporting another gravity block directly above it.
+    CheckGravityBlock(world, x, y + 1, z);
+}
+
 void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
     const double PICKUP_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's AABB pickup range
     const double MIN_PICKUP_AGE_SECONDS = 0.5; // matches vanilla's 10-tick pickup delay
@@ -1539,6 +1592,10 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         int threshold = cont.connection.getCompressionThreshold();
         cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
 
+        // The block just vacated might have been the only thing holding up a
+        // sand/gravel block directly above it.
+        CheckGravityBlock(world, loc.x, loc.y + 1, loc.z);
+
         // Tracked server-side by ItemEntityManager so it can later be picked
         // up (TryPickupNearbyItems) or despawned (ItemDespawnSystem) -- the
         // Spawn_Entity_p/Set_Entity_Metadata_p broadcast below only tells
@@ -1713,13 +1770,18 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     }
     Int32 px = loc.x + dx, py = loc.y + dy, pz = loc.z + dz;
 
-    World::getInstance().setBlock(px, py, pz, blockStateId);
+    World& world = World::getInstance();
+    world.setBlock(px, py, pz, blockStateId);
     int chunkX = floorDiv16(px);
     int chunkZ = floorDiv16(pz);
     BroadcastToChunkViewers(chunkX, chunkZ, [px, py, pz, blockStateId](int broadcastThreshold) {
         return std::make_shared<Block_Update_p>(broadcastThreshold, px, py, pz, blockStateId);
     });
     cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+
+    // A sand/gravel block placed directly onto open air starts falling
+    // immediately, matching vanilla.
+    CheckGravityBlock(world, px, py, pz);
 
     // Creative has infinite blocks -- the slot is left untouched, matching
     // vanilla. Survival/Adventure consume one from the stack, emptying the
