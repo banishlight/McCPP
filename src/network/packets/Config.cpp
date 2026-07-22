@@ -264,6 +264,10 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     // read one int.
     int permissionLevel = OpsList::getInstance().getOpLevel(uuidToHexString(player.getUUID()));
     cont.connection.addPacket(std::make_shared<Commands_p>(threshold, permissionLevel));
+    // Sent once more here so the sky looks correct immediately at join,
+    // instead of waiting up to a second for DayNightSystem's first periodic
+    // broadcast.
+    cont.connection.addPacket(std::make_shared<Update_Time_p>(threshold, world.getDayTime()));
 
     // Send every chunk within the player's view distance around their own
     // (real, possibly-restored) position, not always spawn -- see homeChunkX/Z

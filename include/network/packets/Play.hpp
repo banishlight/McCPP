@@ -72,6 +72,20 @@ class Clientbound_Keep_Alive_play_p : public Play_Packet, public Outgoing_Packet
         Int64 _keepAliveId;
         static int constexpr _PACKET_ID = 0x26;
 };
+// Drives the client's day/night sky/sun rendering. No /time set command
+// exists in this project, so World Age and Time of day are always the same
+// value (matches LevelDat's own existing DayTime/Time conflation) -- one
+// param, sent for both wire fields. See DayNightSystem for the periodic
+// broadcast and World::advanceDayTime for the underlying counter.
+class Update_Time_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Update_Time_p(int threshold, Int64 dayTime);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        Int64 _dayTime;
+        static int constexpr _PACKET_ID = 0x64;
+};
 class Game_Event_p : public Play_Packet, public Outgoing_Packet {
     public:
         Game_Event_p(int threshold, Byte event, float value);

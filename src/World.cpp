@@ -69,6 +69,7 @@ World::World() {
         _spawnY = loaded->spawnY;
         _spawnZ = loaded->spawnZ;
         _spawnYaw = loaded->spawnYaw;
+        _dayTime = loaded->dayTime;
         Console::getConsole().Entry("World::World(): Loaded existing level.dat from '" + _worldDir + "' (seed " + std::to_string(_hashedSeed) + ").");
     } else {
         _hashedSeed = hashSeedString(Properties::getProperties().level_seed);
@@ -221,8 +222,16 @@ LevelData World::buildLevelData() const {
 
     data.difficulty = static_cast<int>(Properties::getProperties().difficulty);
     data.hardcore = Properties::getProperties().hardcore;
-    data.dayTime = 0; // no day/night cycle system yet -- doesn't advance independently
+    data.dayTime = getDayTime();
     return data;
+}
+
+void World::advanceDayTime() {
+    _dayTime.fetch_add(1, std::memory_order_relaxed);
+}
+
+Int64 World::getDayTime() const {
+    return _dayTime.load(std::memory_order_relaxed);
 }
 
 bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {

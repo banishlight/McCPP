@@ -4,6 +4,7 @@
 #include <systems/ItemPhysicsSystem.hpp>
 #include <systems/AutosaveSystem.hpp>
 #include <systems/ChunkUnloadSystem.hpp>
+#include <systems/DayNightSystem.hpp>
 #include <Console.hpp>
 #include <chrono>
 
@@ -23,6 +24,7 @@ void TickLoop::initialize() {
     registerSystem(std::make_shared<ItemDespawnSystem>());
     registerSystem(std::make_shared<AutosaveSystem>());
     registerSystem(std::make_shared<ChunkUnloadSystem>());
+    registerSystem(std::make_shared<DayNightSystem>());
     _tickThread = std::thread(&TickLoop::tickThreadLoop, this);
     _initialized = true;
 }

@@ -11,6 +11,7 @@
 #include <vector>
 #include <utility>
 #include <chrono>
+#include <atomic>
 
 // Exists as the query boundary a real multi-chunk world sits behind, so
 // callers ask "the world" for spawn/chunk data instead of hardcoding it inline.
@@ -88,6 +89,14 @@ class World {
         // Drops any _terrainCache entry that isn't currently viewed by any
         // player -- no grace period or save needed, these are never dirty.
         void evictStaleTerrainCache();
+        // Ticks since world creation, persisted via buildLevelData/LevelDat --
+        // no /time set command exists, so this doubles as both "World Age"
+        // and "Time of day" for Update_Time_p (see DayNightSystem). Always
+        // advances continuously; there's no gamerule system in this project
+        // to hook a doDaylightCycle-style freeze into (deliberate, documented
+        // gap, matching LevelData's own "game rules out of scope" stance).
+        void advanceDayTime();
+        Int64 getDayTime() const;
     private:
         World();
         // Inserts into _chunkCache and drops the now-redundant _terrainCache
@@ -131,4 +140,9 @@ class World {
         // so evictStaleChunks can tell how long it's been unviewed.
         std::map<std::pair<int,int>, int> _chunkViewerCounts;
         std::map<std::pair<int,int>, std::chrono::steady_clock::time_point> _zeroViewerSince;
+        // Tick thread is the sole writer (DayNightSystem::onTick), connection
+        // threads read it (join packet, periodic broadcast, buildLevelData) --
+        // atomic rather than mutex-guarded since it's a single scalar with no
+        // invariant to hold across other fields.
+        std::atomic<Int64> _dayTime{0};
 };

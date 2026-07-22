@@ -229,6 +229,27 @@ std::vector<Byte> Clientbound_Keep_Alive_play_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Update_Time_p::Update_Time_p(int threshold, Int64 dayTime) {
+    _threshold = threshold;
+    _dayTime = dayTime;
+}
+
+std::vector<Byte> Update_Time_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Update_Time_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data;
+    // World Age, then Time of day -- both the same value here, since no
+    // /time set command exists to ever diverge them.
+    for (int i = 7; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((_dayTime >> (i * 8)) & 0xFF));
+    }
+    for (int i = 7; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((_dayTime >> (i * 8)) & 0xFF));
+    }
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
 Game_Event_p::Game_Event_p(int threshold, Byte event, float value) {
     _threshold = threshold;
     _event = event;
