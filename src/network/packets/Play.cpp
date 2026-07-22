@@ -1518,7 +1518,9 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         // up (TryPickupNearbyItems) or despawned (ItemDespawnSystem) -- the
         // Spawn_Entity_p/Set_Entity_Metadata_p broadcast below only tells
         // clients what to render.
-        Int32 dropItemId = blockStateIdToItemId(previousBlock);
+        // Creative instantly removes the block with no drop, matching vanilla --
+        // only Survival/Adventure actually spawn a pickup-able item entity.
+        Int32 dropItemId = (player.getGamemode() == CREATIVE_GAMEMODE) ? -1 : blockStateIdToItemId(previousBlock);
         if (dropItemId >= 0) {
             double dropX = loc.x + 0.5, dropY = loc.y + 0.5, dropZ = loc.z + 0.5;
             ItemEntity dropped = ItemEntityManager::getInstance().spawn(dropItemId, 1, dropX, dropY, dropZ, chunkX, chunkZ);
