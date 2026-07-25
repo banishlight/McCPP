@@ -465,12 +465,12 @@ namespace {
         return true;
     }
 
-    // Slot (1.20.5+ Data Components format, cross-checked against a reference
-    // implementation since docs/network-protocol.md only links out to an
-    // external page for this type): empty is a single VarInt(0). Non-empty is
-    // VarInt(count), VarInt(item ID), then VarInt(components-to-add count)
-    // and VarInt(components-to-remove count) -- both 0 here, since nothing
-    // this server places needs a non-default component (custom name, damage,
+    // Slot (1.20.5+ Data Components format, verified since
+    // docs/network-protocol.md only links out to an external page for this
+    // type): empty is a single VarInt(0). Non-empty is VarInt(count),
+    // VarInt(item ID), then VarInt(components-to-add count) and
+    // VarInt(components-to-remove count) -- both 0 here, since nothing this
+    // server places needs a non-default component (custom name, damage,
     // etc.), so no component entries ever follow.
     std::vector<Byte> packSlot(Int32 itemId, Int32 count) {
         if (itemId < 0 || count <= 0) {
@@ -735,8 +735,7 @@ std::vector<Byte> Set_Container_Content_p::serialize() const {
     #endif
     // Player inventory (Window ID 0) container-slot layout: 0 = crafting
     // result, 1-4 = crafting grid, 5-8 = armor, 9-35 = main inventory,
-    // 36-44 = hotbar, 45 = offhand (cross-checked against a reference
-    // implementation). The client maps array index directly to
+    // 36-44 = hotbar, 45 = offhand. The client maps array index directly to
     // this absolute slot index, so all 46 must be sent even though only the
     // hotbar range is ever populated -- sending fewer would misplace the
     // hotbar's contents into the crafting/armor slots instead.
