@@ -19,3 +19,8 @@ static constexpr Int32 GRAVEL_BLOCK_STATE_ID = 118;
 // order, so any level's state ID is just base + level. See FluidBlocks.hpp.
 static constexpr Int32 WATER_BLOCK_STATE_ID = 80;
 static constexpr Int32 LAVA_BLOCK_STATE_ID = 96;
+// Needed symbolically by fluid "mixing" reactions (Play.cpp's
+// TryApplyFluidReaction) for the same reason sand/gravel are above -- a
+// direct ID comparison, not a name lookup.
+static constexpr Int32 COBBLESTONE_BLOCK_STATE_ID = 14;
+static constexpr Int32 OBSIDIAN_BLOCK_STATE_ID = 2354;

@@ -58,7 +58,7 @@ void PlayerVisibilityManager::refresh(std::shared_ptr<Connection> conn) {
             conn->addPacket(std::make_shared<Spawn_Entity_p>(threshold, otherEntityId, otherPlayer.getUUID(), PLAYER_ENTITY_TYPE_ID, otherPlayer.getX(), otherPlayer.getY(), otherPlayer.getZ(), otherPlayer.getYaw(), otherPlayer.getPitch(), otherPlayer.getYaw()));
             conn->addPacket(std::make_shared<Set_Player_Skin_Parts_Metadata_p>(threshold, otherEntityId, otherPlayer.getSkinParts()));
             conn->addPacket(std::make_shared<Set_Entity_Flags_Metadata_p>(threshold, otherEntityId, otherPlayer.isSneaking(), otherPlayer.isSprinting()));
-            conn->addPacket(std::make_shared<Set_Player_Pose_Metadata_p>(threshold, otherEntityId, otherPlayer.isSneaking()));
+            conn->addPacket(std::make_shared<Set_Player_Pose_Metadata_p>(threshold, otherEntityId, otherPlayer.getPose()));
         } else if (change == VisibilityChange::Despawn) {
             conn->addPacket(std::make_shared<Remove_Entities_p>(threshold, otherEntityId));
         }
@@ -69,7 +69,7 @@ void PlayerVisibilityManager::refresh(std::shared_ptr<Connection> conn) {
             other->addPacket(std::make_shared<Spawn_Entity_p>(otherThreshold, playerEntityId, player.getUUID(), PLAYER_ENTITY_TYPE_ID, player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch(), player.getYaw()));
             other->addPacket(std::make_shared<Set_Player_Skin_Parts_Metadata_p>(otherThreshold, playerEntityId, player.getSkinParts()));
             other->addPacket(std::make_shared<Set_Entity_Flags_Metadata_p>(otherThreshold, playerEntityId, player.isSneaking(), player.isSprinting()));
-            other->addPacket(std::make_shared<Set_Player_Pose_Metadata_p>(otherThreshold, playerEntityId, player.isSneaking()));
+            other->addPacket(std::make_shared<Set_Player_Pose_Metadata_p>(otherThreshold, playerEntityId, player.getPose()));
         } else if (reverseChange == VisibilityChange::Despawn) {
             other->addPacket(std::make_shared<Remove_Entities_p>(otherThreshold, playerEntityId));
         }
@@ -175,6 +175,6 @@ void PlayerVisibilityManager::broadcastPoseChange(std::shared_ptr<Connection> mo
 
         int threshold = viewerConn->getCompressionThreshold();
         viewerConn->addPacket(std::make_shared<Set_Entity_Flags_Metadata_p>(threshold, moverEntityId, player.isSneaking(), player.isSprinting()));
-        viewerConn->addPacket(std::make_shared<Set_Player_Pose_Metadata_p>(threshold, moverEntityId, player.isSneaking()));
+        viewerConn->addPacket(std::make_shared<Set_Player_Pose_Metadata_p>(threshold, moverEntityId, player.getPose()));
     }
 }

@@ -289,6 +289,57 @@ std::vector<Byte> Game_Event_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+Sound_Effect_p::Sound_Effect_p(int threshold, Int32 soundId, int category, double x, double y, double z, float volume, float pitch, Int64 seed) {
+    _threshold = threshold;
+    _soundId = soundId;
+    _category = category;
+    _x = x;
+    _y = y;
+    _z = z;
+    _volume = volume;
+    _pitch = pitch;
+    _seed = seed;
+}
+
+std::vector<Byte> Sound_Effect_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Sound_Effect_p::serialize(): Sending.");
+    #endif
+    // Sound ID + 1 -- the hardcoded numeric-id path. Sound Name/Has Fixed
+    // Range/Range are only present when Sound ID is 0 (the identifier path),
+    // which this project never uses.
+    std::vector<Byte> packet_data = varIntSerialize(_soundId + 1);
+    std::vector<Byte> categoryBytes = varIntSerialize(_category);
+    packet_data.insert(packet_data.end(), categoryBytes.begin(), categoryBytes.end());
+
+    // Effect Position X/Y/Z: fixed-point, position * 8, as a raw big-endian Int.
+    Int32 fx = static_cast<Int32>(_x * 8.0);
+    Int32 fy = static_cast<Int32>(_y * 8.0);
+    Int32 fz = static_cast<Int32>(_z * 8.0);
+    for (Int32 v : {fx, fy, fz}) {
+        for (int i = 3; i >= 0; i--) {
+            packet_data.push_back(static_cast<Byte>((v >> (i * 8)) & 0xFF));
+        }
+    }
+
+    Int32 volumeBits;
+    std::memcpy(&volumeBits, &_volume, sizeof(Int32));
+    for (int i = 3; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((volumeBits >> (i * 8)) & 0xFF));
+    }
+    Int32 pitchBits;
+    std::memcpy(&pitchBits, &_pitch, sizeof(Int32));
+    for (int i = 3; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((pitchBits >> (i * 8)) & 0xFF));
+    }
+
+    for (int i = 7; i >= 0; i--) {
+        packet_data.push_back(static_cast<Byte>((_seed >> (i * 8)) & 0xFF));
+    }
+
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
 Set_Center_Chunk_p::Set_Center_Chunk_p(int threshold, int chunkX, int chunkZ) {
     _threshold = threshold;
     _chunkX = chunkX;
@@ -869,10 +920,10 @@ std::vector<Byte> Set_Entity_Flags_Metadata_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Set_Player_Pose_Metadata_p::Set_Player_Pose_Metadata_p(int threshold, int entityId, bool sneaking) {
+Set_Player_Pose_Metadata_p::Set_Player_Pose_Metadata_p(int threshold, int entityId, int pose) {
     _threshold = threshold;
     _entityId = entityId;
-    _sneaking = sneaking;
+    _pose = pose;
 }
 
 std::vector<Byte> Set_Player_Pose_Metadata_p::serialize() const {
@@ -890,14 +941,12 @@ std::vector<Byte> Set_Player_Pose_Metadata_p::serialize() const {
     // skin-parts index) gave 20 and silently failed for our actual 1.21 target.
     const Byte POSE_INDEX = 6;
     const int POSE_METADATA_TYPE = 21;
-    const int POSE_STANDING = 0;
-    const int POSE_SNEAKING = 5;
 
     std::vector<Byte> packet_data = varIntSerialize(_entityId);
     packet_data.push_back(POSE_INDEX);
     std::vector<Byte> typeBytes = varIntSerialize(POSE_METADATA_TYPE);
     packet_data.insert(packet_data.end(), typeBytes.begin(), typeBytes.end());
-    std::vector<Byte> valueBytes = varIntSerialize(_sneaking ? POSE_SNEAKING : POSE_STANDING);
+    std::vector<Byte> valueBytes = varIntSerialize(_pose);
     packet_data.insert(packet_data.end(), valueBytes.begin(), valueBytes.end());
     packet_data.push_back(0xFF); // terminator: no more metadata entries
     return assemblePacket(getID(), _threshold, packet_data);
@@ -1521,8 +1570,10 @@ namespace {
     // restrictType narrows the search to one fluid type (an already-fluid
     // tile only accepts same-type supply, see ResolveFluid); Fluid::Type::None
     // (a fresh air tile) tries both and takes whichever is reachable --
-    // stronger one wins if both are, an accepted gap since no water/lava
-    // interaction is modeled yet (see docs).
+    // stronger one wins if both are. Which type claims a fresh air tile first
+    // is still first-come-first-served (an accepted, narrow gap) -- this is
+    // unrelated to the water/lava mixing reactions below, which only ever
+    // fire on tiles that are ALREADY fluid.
     FluidSupply FindFluidSupply(World& world, int x, int y, int z, Fluid::Type restrictType) {
         if (restrictType != Fluid::Type::None) {
             return FindFluidSupplyForType(world, x, y, z, restrictType);
@@ -1535,6 +1586,105 @@ namespace {
         int lavaCost = lava.falling ? 0 : lava.distance;
         return (waterCost <= lavaCost) ? water : lava;
     }
+
+    // Vanilla's water/lava "mixing" rules -- confirmed against minecraft.wiki's
+    // Fluid article, Mixing section (cross-checked via two independent
+    // fetches, not assumed from memory): a long-stable mechanic, unchanged
+    // across versions.
+    //   - water touching a lava SOURCE (top or any side, never below)
+    //     -> the lava source becomes obsidian
+    //   - water touching FLOWING (non-source) lava, any direction except
+    //     below -> the flowing lava becomes cobblestone
+    //   - ANY lava directly above water -> the water becomes stone instead of
+    //     the lava converting. This isn't restricted to this project's
+    //     "falling" (level 8) designation -- real vanilla's own fluid tick
+    //     re-checks this every time regardless of how the lava got there
+    //     (freshly spreading down, or a source/flowing tile just sitting
+    //     there), so a static lava tile resting on top of water reacts too,
+    //     not only one actively falling into it. Restricting this to
+    //     isFalling() only was an earlier, too-narrow reading of the rule
+    //     that a real report ("lava on top of flowing water does nothing")
+    //     caught.
+    // Called from ResolveFluid before normal fluid-supply resolution -- a
+    // reaction replaces the tile with a real solid block entirely, so no
+    // fluid-supply computation applies to it this tick.
+    // The "fizz"/hiss played whenever lava and water react, regardless of
+    // which of the three outcomes (obsidian, cobblestone, stone) results --
+    // real vanilla plays the same sound for all three. Sound ID (776, for
+    // minecraft:block.lava.extinguish) confirmed via this project's own
+    // server.jar --reports registries.json ("minecraft:sound_event"), not
+    // guessed; category 4 is "block" (docs/network-protocol.md's Stop Sound
+    // category table). Volume/pitch are a gameplay-feel approximation, not
+    // wire-format, so not decompile-verified the way packet layouts are --
+    // matching vanilla's general character (moderate volume, noticeably high
+    // pitch) rather than byte-for-byte matching its exact randomization.
+    void PlayFluidFizzSound(int x, int y, int z) {
+        const Int32 soundId = 776;
+        const int category = 4;
+        BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, soundId, category](int threshold) {
+            return std::make_shared<Sound_Effect_p>(threshold, soundId, category,
+                x + 0.5, y + 0.5, z + 0.5, 0.5f, 2.6f, 0LL);
+        });
+    }
+
+    bool TryApplyFluidReaction(World& world, int x, int y, int z, Int32 current, Fluid::Type currentType) {
+        if (currentType == Fluid::Type::Lava) {
+            static constexpr int dx[5] = {0, 1, -1, 0, 0};
+            static constexpr int dy[5] = {1, 0, 0, 0, 0}; // top + 4 sides, never below
+            static constexpr int dz[5] = {0, 0, 0, 1, -1};
+            bool touchesWater = false;
+            for (int i = 0; i < 5; i++) {
+                if (Fluid::typeOf(GetWorldBlockOrUnknown(world, x + dx[i], y + dy[i], z + dz[i])) == Fluid::Type::Water) {
+                    touchesWater = true;
+                    break;
+                }
+            }
+            if (!touchesWater) return false;
+
+            Int32 result = Fluid::isSource(current) ? OBSIDIAN_BLOCK_STATE_ID : COBBLESTONE_BLOCK_STATE_ID;
+            world.setBlock(x, y, z, result);
+            BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, result](int threshold) {
+                return std::make_shared<Block_Update_p>(threshold, x, y, z, result);
+            });
+            PlayFluidFizzSound(x, y, z);
+            ScheduleFluidNeighbors(x, y, z, 1);
+            return true;
+        }
+        if (currentType == Fluid::Type::Water) {
+            Int32 above = GetWorldBlockOrUnknown(world, x, y + 1, z);
+            if (Fluid::typeOf(above) == Fluid::Type::Lava) {
+                world.setBlock(x, y, z, STONE_BLOCK_STATE_ID);
+                BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z](int threshold) {
+                    return std::make_shared<Block_Update_p>(threshold, x, y, z, STONE_BLOCK_STATE_ID);
+                });
+                PlayFluidFizzSound(x, y, z);
+                ScheduleFluidNeighbors(x, y, z, 1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // True if any of the 6 face-adjacent neighbors is the opposite fluid
+    // type. Used only to decide whether an otherwise-stable tile still needs
+    // rechecking every tick (see ResolveFluid's quiesce point below) -- a
+    // real, reported bug was that two fluid bodies could sit fully adjacent
+    // without ever reacting (or only after an unrelated edit nearby happened
+    // to reschedule one of them), since a stable, non-source tile normally
+    // stops being scheduled at all once its own supply computation settles.
+    // Given the reaction rules above cover every direct-contact direction
+    // between water and lava, this always resolves (fires and clears itself)
+    // within a bounded number of ticks once true, rather than looping forever.
+    bool HasAdjacentOppositeFluid(World& world, int x, int y, int z, Fluid::Type currentType) {
+        Fluid::Type opposite = (currentType == Fluid::Type::Water) ? Fluid::Type::Lava : Fluid::Type::Water;
+        static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
+        static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
+        static constexpr int dz[6] = {0, 0, 0, 0, 1, -1};
+        for (int i = 0; i < 6; i++) {
+            if (Fluid::typeOf(GetWorldBlockOrUnknown(world, x + dx[i], y + dy[i], z + dz[i])) == opposite) return true;
+        }
+        return false;
+    }
 }
 
 void ResolveFluid(World& world, int x, int y, int z) {
@@ -1542,6 +1692,12 @@ void ResolveFluid(World& world, int x, int y, int z) {
     if (current < 0) return; // chunk not loaded / out of bounds -- leave it be
 
     Fluid::Type currentType = Fluid::typeOf(current);
+    // Mixing reactions run before anything else -- they apply to source
+    // tiles too (rule 1/2 both explicitly cover source lava), so this has to
+    // come before the "sources are permanent" shortcut just below.
+    if (currentType != Fluid::Type::None && TryApplyFluidReaction(world, x, y, z, current, currentType)) {
+        return;
+    }
     if (currentType != Fluid::Type::None && Fluid::isSource(current)) {
         // Sources are permanent -- just make sure downstream flow keeps
         // getting re-checked at the right pace.
@@ -1554,22 +1710,34 @@ void ResolveFluid(World& world, int x, int y, int z) {
     }
 
     // A tile already holding one fluid type is never overridden by a
-    // different type reaching it -- there's no water/lava interaction yet
-    // (obsidian/cobblestone formation is a future stage), so only the SAME
-    // type can supply/strengthen/sustain an already-fluid position. A fresh
-    // air tile has no restriction: whichever type reaches it first claims it
-    // (see the note below).
+    // different type reaching it -- only the SAME type can
+    // supply/strengthen/sustain an already-fluid position (the opposite type
+    // reacts via TryApplyFluidReaction above instead of ever "claiming" the
+    // tile outright). A fresh air tile has no restriction: whichever type
+    // reaches it first claims it (see the note below).
     Fluid::Type restrictType = currentType; // None when currently air
 
     FluidSupply supply = FindFluidSupply(world, x, y, z, restrictType);
     // Note: a fresh air tile with both a water and a lava candidate reaching
     // it at the same time picks whichever the search happens to find first
-    // (checked in BFS order) -- no source/lava interaction exists yet,
-    // that's for the next stage.
+    // (checked in BFS order) -- a narrow, accepted gap, unrelated to the
+    // mixing reactions above (which only fire on tiles already holding fluid).
 
     Int32 desired = (supply.type == Fluid::Type::None) ? AIR_BLOCK_STATE_ID
                   : (supply.falling ? Fluid::fallingId(supply.type) : Fluid::flowingId(supply.type, supply.distance));
-    if (desired == current) return; // already correct -- quiesces here, no further scheduling
+    if (desired == current) {
+        // Already correct -- normally quiesces here with no further
+        // scheduling. But if the opposite fluid is directly adjacent, keep
+        // checking every tick instead of going fully quiet: TryApplyFluidReaction
+        // already runs unconditionally at the top of this function, so once
+        // this fires it'll catch the reaction on the very next call rather
+        // than depending entirely on whichever neighbor's last write happened
+        // to reschedule this position.
+        if (currentType != Fluid::Type::None && HasAdjacentOppositeFluid(world, x, y, z, currentType)) {
+            ScheduleFluidCheck(x, y, z, 1);
+        }
+        return;
+    }
 
     Fluid::Type paceType = (supply.type != Fluid::Type::None) ? supply.type : currentType;
     world.setBlock(x, y, z, desired);
@@ -1693,6 +1861,17 @@ void Set_Player_Position_p::deserialize(std::vector<Byte> in_buff, PacketContext
     double oldX = player.getX(), oldY = player.getY(), oldZ = player.getZ();
     player.setPosition(x, y, z);
 
+    // Server has no swim/buoyancy physics of its own -- a real client already
+    // slows itself down locally once it sees a real water block (stage 1).
+    // This only tracks the flag so OTHER clients see this player as swimming
+    // (Player::getPose(), broadcast via Set_Player_Pose_Metadata_p).
+    bool nowInWater = Fluid::typeOf(GetWorldBlockOrUnknown(World::getInstance(),
+        static_cast<int>(std::floor(x)), static_cast<int>(std::floor(y)), static_cast<int>(std::floor(z)))) == Fluid::Type::Water;
+    if (nowInWater != player.isInWater()) {
+        player.setInWater(nowInWater);
+        PlayerVisibilityManager::getInstance().broadcastPoseChange(cont.connection.shared_from_this());
+    }
+
     int threshold = cont.connection.getCompressionThreshold();
     TryPickupNearbyItems(cont, threshold, player);
     PlayerVisibilityManager::getInstance().broadcastMovement(cont.connection.shared_from_this(),
@@ -1717,6 +1896,15 @@ void Set_Player_Position_and_Rotation_p::deserialize(std::vector<Byte> in_buff, 
     double oldX = player.getX(), oldY = player.getY(), oldZ = player.getZ();
     player.setPosition(x, y, z);
     player.setRotation(yaw, pitch);
+
+    // See Set_Player_Position_p::deserialize for why this only tracks a flag
+    // (no server-side swim physics -- the real client handles that locally).
+    bool nowInWater = Fluid::typeOf(GetWorldBlockOrUnknown(World::getInstance(),
+        static_cast<int>(std::floor(x)), static_cast<int>(std::floor(y)), static_cast<int>(std::floor(z)))) == Fluid::Type::Water;
+    if (nowInWater != player.isInWater()) {
+        player.setInWater(nowInWater);
+        PlayerVisibilityManager::getInstance().broadcastPoseChange(cont.connection.shared_from_this());
+    }
 
     int threshold = cont.connection.getCompressionThreshold();
     TryPickupNearbyItems(cont, threshold, player);

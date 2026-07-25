@@ -110,6 +110,26 @@ class Game_Event_p : public Play_Packet, public Outgoing_Packet {
         float _value;
         static int constexpr _PACKET_ID = 0x22;
 };
+// Plays a sound effect at a fixed world location (not tied to any entity --
+// see the vendored doc's separate Entity Sound Effect packet, 0x67, unused
+// by this project). Sound ID is the raw numeric registry id, sourced from
+// this project's own server.jar --reports registries.json
+// ("minecraft:sound_event") rather than guessed -- the vendored doc flags
+// these ids as liable to change between versions, but this project only
+// targets one pinned version, so that's not a concern here.
+class Sound_Effect_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Sound_Effect_p(int threshold, Int32 soundId, int category, double x, double y, double z, float volume, float pitch, Int64 seed);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        Int32 _soundId;
+        int _category;
+        double _x, _y, _z;
+        float _volume, _pitch;
+        Int64 _seed;
+        static int constexpr _PACKET_ID = 0x68;
+};
 class Set_Center_Chunk_p : public Play_Packet, public Outgoing_Packet {
     public:
         Set_Center_Chunk_p(int threshold, int chunkX, int chunkZ);
@@ -232,17 +252,20 @@ class Set_Entity_Flags_Metadata_p : public Play_Packet, public Outgoing_Packet {
         bool _sneaking, _sprinting;
         static int constexpr _PACKET_ID = 0x58;
 };
-// Pose, index 6, VarInt enum (STANDING=0, SNEAKING=5) -- also on the base
-// Entity class. Kept as its own packet, sent alongside (not combined with)
-// Set_Entity_Flags_Metadata_p -- see that class's comment.
+// Pose, index 6, VarInt enum (STANDING=0, SWIMMING=3, SNEAKING=5) -- also on
+// the base Entity class. Kept as its own packet, sent alongside (not
+// combined with) Set_Entity_Flags_Metadata_p -- see that class's comment.
+// Takes the raw wire value directly -- Player::getPose() is the single place
+// that decides in-water/sneaking/standing priority, so this class doesn't
+// duplicate that logic.
 class Set_Player_Pose_Metadata_p : public Play_Packet, public Outgoing_Packet {
     public:
-        Set_Player_Pose_Metadata_p(int threshold, int entityId, bool sneaking);
+        Set_Player_Pose_Metadata_p(int threshold, int entityId, int pose);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
         int _entityId;
-        bool _sneaking;
+        int _pose;
         static int constexpr _PACKET_ID = 0x58;
 };
 class Remove_Entities_p : public Play_Packet, public Outgoing_Packet {

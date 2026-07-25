@@ -64,6 +64,18 @@ class Player {
         void setSneaking(bool sneaking);
         bool isSprinting() const;
         void setSprinting(bool sprinting);
+        // Set from the player's own feet-block on every position update
+        // (Set_Player_Position_p et al.) -- drives the swimming Pose sent to
+        // other players. This project has no server-side movement physics at
+        // all, so the actual swim/buoyancy slowdown is the real client's own
+        // local behavior once it sees a real water block; this flag only
+        // controls what OTHER clients render for this player.
+        bool isInWater() const;
+        void setInWater(bool inWater);
+        // Wire value for the Pose metadata field (Set_Player_Pose_Metadata_p):
+        // in-water beats sneaking beats standing, matching vanilla's own
+        // precedence. The single place pose-priority logic lives.
+        int getPose() const;
         // Chunk columns currently sent to this player's client, and the chunk
         // they were last centered on -- lets movement handling diff against
         // what's actually loaded instead of resending everything every move.
@@ -104,6 +116,7 @@ class Player {
         float _pitch = 0.0f;
         bool _sneaking = false;
         bool _sprinting = false;
+        bool _inWater = false;
         std::set<std::pair<int, int>> _loadedChunks;
         int _centerChunkX = 0; // matches the fixed spawn chunk (0,0)
         int _centerChunkZ = 0;

@@ -110,6 +110,24 @@ void Player::setSprinting(bool sprinting) {
     _sprinting = sprinting;
 }
 
+bool Player::isInWater() const {
+    return _inWater;
+}
+
+void Player::setInWater(bool inWater) {
+    _inWater = inWater;
+}
+
+int Player::getPose() const {
+    // Pose enum values confirmed against minecraft.wiki's Entity Metadata
+    // page: STANDING=0, SWIMMING=3, SNEAKING=5. This ordinal list itself is
+    // stable -- only the metadata TYPE id (see Set_Player_Pose_Metadata_p)
+    // is version-fragile, not these values.
+    if (_inWater) return 3;
+    if (_sneaking) return 5;
+    return 0;
+}
+
 bool Player::hasChunkLoaded(int chunkX, int chunkZ) const {
     return _loadedChunks.count({chunkX, chunkZ}) > 0;
 }
