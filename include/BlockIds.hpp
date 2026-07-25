@@ -24,3 +24,7 @@ static constexpr Int32 LAVA_BLOCK_STATE_ID = 96;
 // direct ID comparison, not a name lookup.
 static constexpr Int32 COBBLESTONE_BLOCK_STATE_ID = 14;
 static constexpr Int32 OBSIDIAN_BLOCK_STATE_ID = 2354;
+// Needed symbolically by the biome-aware surface layering in
+// NoiseChunkGenerator, same reason as the other direct-comparison constants
+// above.
+static constexpr Int32 SNOW_BLOCK_STATE_ID = 5781;
