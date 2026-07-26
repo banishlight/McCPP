@@ -10,15 +10,26 @@
 //
 // Chances here are each block's real, base (no-tool-applied) drop chance --
 // sourced directly from server.jar's own bundled loot tables
-// (data/minecraft/loot_table/blocks/*.json), not guessed. No Silk Touch or
-// Fortune support yet (this project has no enchantment system at all) -- see
-// the checklist comment in BlockDropTable.cpp for what that will need to
-// change here once those tools exist.
+// (data/minecraft/loot_table/blocks/*.json), not guessed.
 namespace BlockDropTable {
-    // Returns false if blockStateId has no override entry at all (caller
-    // should fall back to the default ItemBlockMapping-based drop). Returns
-    // true if an entry exists -- *outItemId is then either the real item to
-    // drop (this call's chance roll succeeded) or -1 (roll failed, meaning
-    // this break should drop nothing at all, not fall back to the default).
-    bool TryResolveDrop(Int32 blockStateId, Int32& outItemId);
+    // The breaking tool's enchantment-relevant properties. Scaffolding only,
+    // for now: this project can't yet receive/store enchantment data on an
+    // item at all (Set_Creative_Mode_Slot_p explicitly refuses any item
+    // carrying data components -- see PacketUtils.hpp's unpackSlot), so
+    // every real caller constructs this as ToolInfo{} (the defaults) until
+    // that groundwork lands. CheckDrop below is already correct for that
+    // case, and needs no other changes once fortuneLevel/silkTouch can
+    // actually be populated from a real held item.
+    struct ToolInfo {
+        int fortuneLevel = 0;
+        bool silkTouch = false;
+    };
+
+    // Resolves what a block should drop when broken with the given tool.
+    // Returns false if blockStateId has no override entry AND silkTouch is
+    // false -- caller should fall back to the default ItemBlockMapping-based
+    // drop (drop itself). Returns true otherwise, with *outItemId set to
+    // either the real item to drop, or -1 (an override entry's chance roll
+    // failed -- drop nothing at all, do NOT fall back to the default).
+    bool CheckDrop(Int32 blockStateId, const ToolInfo& tool, Int32& outItemId);
 }

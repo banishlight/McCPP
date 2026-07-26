@@ -1,5 +1,6 @@
 #include <BlockDropTable.hpp>
 #include <BlockIds.hpp>
+#include <ItemBlockMapping.hpp>
 #include <vector>
 #include <random>
 
@@ -19,24 +20,22 @@ namespace {
         double chance; // 0.0-1.0, base chance with no tool applied
     };
 
-    // *** CHECKLIST for adding a Silk Touch / Fortune tool system later ***
+    // *** CHECKLIST for adding real Fortune scaling later ***
     // Every entry here is currently a block's real loot table collapsed down
-    // to its base (no-enchantment) branch: chance the SECOND, non-Silk-Touch
-    // alternative fires. Once tools carry enchantments:
-    //  - Silk Touch on a tool should make ANY block in this table (and every
-    //    block NOT in this table too, e.g. grass_block -> dirt in real
-    //    vanilla, not modeled here yet either) drop itself instead of
-    //    resolving this table at all.
-    //  - Fortune should scale a table entry's chance up per level (the real
-    //    per-level values are already sitting in the loot table json this
-    //    was sourced from, e.g. oak_leaves' sapling chance is
-    //    [0.05, 0.0625, 0.083333336, 0.1] for fortune 0-3) -- re-extract from
-    //    data/minecraft/loot_table/blocks/*.json rather than guess when this
-    //    is built, the same way these base values were.
-    // *** ADD NEW ENTRIES HERE, ONE PER LINE. *** Nowhere else needs to change
-    // for a simple chance-based drop -- Player_Action_p's break handler
-    // (Play.cpp) always checks this table first, before falling back to the
-    // default (drop-itself) behavior.
+    // to its base (fortuneLevel=0) chance. CheckDrop already takes a
+    // ToolInfo::fortuneLevel, but nothing here uses it yet -- the real
+    // per-level values are already sitting in the loot table json this was
+    // sourced from (e.g. oak_leaves' sapling chance is
+    // [0.05, 0.0625, 0.083333336, 0.1] for fortune 0-3); re-extract from
+    // data/minecraft/loot_table/blocks/*.json rather than guess when this is
+    // built, the same way these base values were. Silk Touch itself is
+    // already handled generically in CheckDrop below (it makes ANY block
+    // drop itself, no per-entry value needed) -- NOT modeled: real vanilla
+    // grass_block drops dirt normally and only drops itself under Silk
+    // Touch, i.e. it needs an ordinary 100%-chance entry here (dirt) for the
+    // non-Silk-Touch case, same shape as stone/cobweb above; not added since
+    // nobody asked for it yet, just flagged as the next obvious candidate.
+    // *** ADD NEW ENTRIES HERE, ONE PER LINE. ***
     const std::vector<DropTableEntry>& getDropTable() {
         static const std::vector<DropTableEntry> table = {
             {STONE_BLOCK_STATE_ID, COBBLESTONE_ITEM_ID, 1.0},
@@ -58,9 +57,17 @@ namespace {
 
 namespace BlockDropTable {
 
-bool TryResolveDrop(Int32 blockStateId, Int32& outItemId) {
+bool CheckDrop(Int32 blockStateId, const ToolInfo& tool, Int32& outItemId) {
+    if (tool.silkTouch) {
+        // Silk Touch bypasses the table entirely -- every block drops
+        // itself, including ones with no entry above at all.
+        outItemId = blockStateIdToItemId(blockStateId);
+        return true;
+    }
     for (const DropTableEntry& entry : getDropTable()) {
         if (entry.blockStateId == blockStateId) {
+            // tool.fortuneLevel is intentionally unused for now -- see the
+            // CHECKLIST comment above getDropTable().
             outItemId = (rollChance() < entry.chance) ? entry.itemId : -1;
             return true;
         }

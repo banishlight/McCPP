@@ -2086,12 +2086,18 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         // only Survival/Adventure actually spawn a pickup-able item entity.
         Int32 dropItemId = -1;
         if (player.getGamemode() != CREATIVE_GAMEMODE) {
+            // ToolInfo is always default (no Fortune, no Silk Touch) for now --
+            // this project can't yet receive/store enchantment data on a held
+            // item at all (see BlockDropTable::ToolInfo's own comment). Once
+            // that groundwork exists, this should read the player's actual
+            // held item's enchantments instead of default-constructing.
+            BlockDropTable::ToolInfo tool;
             Int32 overrideItemId;
             // BlockDropTable covers blocks whose drop isn't just themselves
             // (stone -> cobblestone, oak_leaves -> a chance of oak_sapling,
             // etc.) -- only fall back to the default direct block<->item
             // mapping (drop itself) when this block has no override entry.
-            dropItemId = BlockDropTable::TryResolveDrop(previousBlock, overrideItemId)
+            dropItemId = BlockDropTable::CheckDrop(previousBlock, tool, overrideItemId)
                 ? overrideItemId
                 : blockStateIdToItemId(previousBlock);
         }
