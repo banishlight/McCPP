@@ -38,9 +38,10 @@ class Chunk {
         Int32 getBiomeId() const;
         // An index into VanillaDataManager's "worldgen/biome" registry list
         // (same convention as the dimension_type/chat_type index lookups
-        // elsewhere) -- no generator sets this today (every chunk defaults to
-        // index 0), so this exists for ChunkNbtCodec's decode path to set it
-        // from an imported save's actual biome data.
+        // elsewhere). Defaults to index 0 until set -- NoiseChunkGenerator
+        // sets a real value per chunk (see its selectBiome), and
+        // ChunkNbtCodec's decode path sets it from an imported save's actual
+        // biome data.
         void setBiomeId(Int32 biomeId);
     private:
         int index(int localX, int worldY, int localZ) const;

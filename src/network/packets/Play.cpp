@@ -1941,6 +1941,50 @@ void Serverbound_Keep_Alive_play_p::deserialize(std::vector<Byte> in_buff, Packe
     // sends Keep Alives on a timer; nothing does yet, so there's nothing to check.
 }
 
+namespace {
+    // *** CHECKLIST: read this before adding any new block to BlockIds.hpp or
+    // BlockTable.cpp. ***
+    //
+    // Real vanilla clients never send a "Finished digging" (status 2) follow
+    // up for a block with 0 hardness ("instamined") -- only "Started
+    // digging" (status 0), same as they do for Creative mode (see
+    // docs/network-protocol.md's Player Action table). A block missing from
+    // the list below will still visually appear to break for the player
+    // (the client predicts the removal locally regardless), but the SERVER
+    // will silently never remove it or drop anything, since it's waiting on
+    // a status 2 that will never arrive -- exactly the bug this function was
+    // added to fix (see docs/internal-documentation.md, "trees and plants").
+    //
+    // How to check whether a new block needs to be added here: run
+    // `server.jar --reports` and look up the block in the generated
+    // blocks.json -- its `definition.type` field reflects vanilla's real
+    // block-behavior category. Every block whose category is one of these
+    // is 0-hardness in real vanilla (confirmed for the three listed below;
+    // re-verify a new category against a fresh report rather than assuming
+    // this list is exhaustive): minecraft:flower, minecraft:tall_grass,
+    // minecraft:double_plant, minecraft:sapling, minecraft:torch,
+    // minecraft:redstone_wire, minecraft:crop, minecraft:snow_layer,
+    // minecraft:fire. This project has no general block-hardness system (a
+    // deliberate scope decision) and doesn't load blocks.json at runtime at
+    // all, so this stays a small, explicit, hand-maintained list rather than
+    // a data-driven lookup -- same convention BlockTable.cpp itself already
+    // uses for other real, hand-transcribed vanilla facts.
+    //
+    // *** ADD NEW ENTRIES HERE, ONE PER LINE. *** Nowhere else needs to change.
+    constexpr Int32 INSTANT_BREAK_BLOCKS[] = {
+        SHORT_GRASS_STATE_ID,
+        POPPY_STATE_ID,
+        DANDELION_STATE_ID,
+    };
+
+    bool IsInstantBreakBlock(Int32 blockStateId) {
+        for (Int32 id : INSTANT_BREAK_BLOCKS) {
+            if (id == blockStateId) return true;
+        }
+        return false;
+    }
+}
+
 void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     #ifdef DEBUG
         Console::getConsole().Entry("Player_Action_p::deserialize(): Received.");
@@ -1959,24 +2003,49 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
     const int ITEM_ENTITY_TYPE_ID = 58;
 
     // No server-side mining-time/hardness validation (see docs/general-documentation.md,
-    // "Accepted gaps") -- trust status 2 (Finished digging) in any gamemode,
-    // or status 0 (Started digging) in Creative, where the client never sends
-    // a Finished digging follow-up.
-    bool shouldBreak = (status == 2) || (status == 0 && player.getGamemode() == CREATIVE_GAMEMODE);
-    if (shouldBreak) {
+    // "Accepted gaps") -- trust status 2 (Finished digging) in any gamemode.
+    // Status 0 (Started digging) alone is also enough for Creative -- and,
+    // per docs/network-protocol.md's Player Action table: "If the block was
+    // instamined or the player is in creative mode, the client will NOT send
+    // Status = Finished digging, and will assume the server completed the
+    // destruction." This project has no general block-hardness system, but
+    // real vanilla flowers/grass tufts have 0 hardness (instamined) in EVERY
+    // gamemode, not just Creative -- a real, confirmed bug: breaking one of
+    // these in Survival looked like it worked (the client predicts the
+    // removal locally and never sends a follow-up status 2, exactly as
+    // documented), but the server was only watching for status 2 outside
+    // Creative, so it never actually removed the block or dropped anything.
+    // The block reappearing later was the client's unconfirmed local
+    // prediction eventually reconciling back to the server's real,
+    // never-actually-changed state.
+    if (status == 0 || status == 2) {
         World& world = World::getInstance();
         int chunkX = floorDiv16(loc.x);
         int chunkZ = floorDiv16(loc.z);
 
-        // Read the block being broken before it's gone, so its drop can be
-        // resolved -- World::setBlock alone doesn't report what was there.
-        Int32 previousBlock = AIR_BLOCK_STATE_ID;
-        std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
-        if (chunk) {
-            previousBlock = chunk->getBlock(loc.x - chunkX * 16, loc.y, loc.z - chunkZ * 16);
-        }
-
         int threshold = cont.connection.getCompressionThreshold();
+
+        // Read the block being targeted before it's gone, both to resolve
+        // its drop and to check whether it's a known-instant block (see
+        // above). If the chunk isn't actually cached (shouldn't happen for a
+        // chunk the player is standing in and can see, but was previously
+        // silently treated as "the block was air" -- which meant a break
+        // here still acked/broadcast Block_Update_p(AIR) to the client,
+        // making it LOOK removed, while the real server-side block was
+        // untouched). Now this bails out cleanly instead of lying to the client.
+        std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+        if (!chunk) {
+            Console::getConsole().Error("Player_Action_p::deserialize(): break at (" + std::to_string(loc.x) + "," +
+                std::to_string(loc.y) + "," + std::to_string(loc.z) + ") targeted chunk (" + std::to_string(chunkX) +
+                "," + std::to_string(chunkZ) + "), which isn't cached -- ignoring the break.");
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            return;
+        }
+        Int32 previousBlock = chunk->getBlock(loc.x - chunkX * 16, loc.y, loc.z - chunkZ * 16);
+
+        bool shouldBreak = (status == 2) || (status == 0 && (player.getGamemode() == CREATIVE_GAMEMODE || IsInstantBreakBlock(previousBlock)));
+        if (!shouldBreak) return; // "Started digging" on an ordinary (non-instant) block in Survival -- the real break arrives later as status 2
+
         if (Fluid::typeOf(previousBlock) != Fluid::Type::None) {
             // Fluids aren't "mined" by punching in vanilla -- picking one up
             // requires an empty bucket (a future interactions-stage feature).
@@ -1985,7 +2054,17 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             return;
         }
 
-        world.setBlock(loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
+        if (!world.setBlock(loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID)) {
+            // Same "don't lie to the client" reasoning as above -- the chunk
+            // was cached a moment ago (just read successfully) but isn't
+            // anymore, an actual race with eviction/unloading. Rare, but
+            // possible, and worth knowing about if it ever fires.
+            Console::getConsole().Error("Player_Action_p::deserialize(): world.setBlock failed for a break at (" +
+                std::to_string(loc.x) + "," + std::to_string(loc.y) + "," + std::to_string(loc.z) +
+                ") -- the chunk was evicted between the read and the write.");
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            return;
+        }
         BroadcastToChunkViewers(chunkX, chunkZ, [loc](int broadcastThreshold) {
             return std::make_shared<Block_Update_p>(broadcastThreshold, loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
         });

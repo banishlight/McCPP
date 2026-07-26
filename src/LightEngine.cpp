@@ -1,6 +1,7 @@
 #include <LightEngine.hpp>
 #include <Chunk.hpp>
 #include <World.hpp>
+#include <BlockIds.hpp>
 #include <vector>
 #include <queue>
 #include <algorithm>
@@ -23,10 +24,26 @@ namespace {
 }
 
 bool LightEngine::isOpaque(Int32 blockStateId) {
-    // Every block in this world's palette today (stone/dirt/grass_block) is
-    // fully opaque; only air (0) is transparent. No partial-opacity blocks
-    // (glass, leaves, etc.) exist yet.
-    return blockStateId != 0;
+    // Ground plants have zero light opacity in real vanilla -- a grass tuft
+    // or flower never darkens the ground it's on, unlike a full block. This
+    // was a real, visible bug (reported by the user: grass tufts rendering
+    // solid black) once short_grass/poppy/dandelion were added as full-cube
+    // blocks under the old "every non-air block is opaque" rule -- the
+    // sky-light seed walk (see computeLighting) stopped AT the plant's own
+    // cell instead of passing through it, so that cell never got assigned
+    // any light at all.
+    //
+    // Known, accepted gap: every OTHER block (glass, leaves, and anything
+    // else visually thin/transparent already in BlockTable) is still treated
+    // as fully opaque -- a real per-block opacity table covering the whole
+    // ~185-block palette is a bigger undertaking than this fix, deliberately
+    // out of scope here. Leaves in particular do block light in real
+    // vanilla too (partially, not fully), so "opaque" is a coarser but not
+    // obviously-wrong approximation for them, unlike plants which are
+    // unambiguously wrong at full opacity.
+    if (blockStateId == AIR_BLOCK_STATE_ID) return false;
+    if (blockStateId == SHORT_GRASS_STATE_ID || blockStateId == POPPY_STATE_ID || blockStateId == DANDELION_STATE_ID) return false;
+    return true;
 }
 
 int LightEngine::getLightEmission(Int32 blockStateId) {

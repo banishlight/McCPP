@@ -28,3 +28,18 @@ static constexpr Int32 OBSIDIAN_BLOCK_STATE_ID = 2354;
 // NoiseChunkGenerator, same reason as the other direct-comparison constants
 // above.
 static constexpr Int32 SNOW_BLOCK_STATE_ID = 5781;
+// oak_log/oak_leaves both have real properties (axis; distance/persistent/
+// waterlogged) this project doesn't model as a general mechanism -- same
+// treatment as GRASS_BLOCK_STATE_ID's "snowy=false" comment above, one fixed
+// state picked directly rather than exposing the property space. axis=y is
+// the vertical trunk orientation (also this block's own default state); the
+// leaves property values only affect a decay mechanic this project doesn't
+// implement, so any valid state looks identical -- using the block's default.
+static constexpr Int32 OAK_LOG_STATE_ID = 131; // axis=y (default)
+static constexpr Int32 OAK_LEAVES_STATE_ID = 264; // distance=7, persistent=false, waterlogged=false (default)
+// Ground plants placed by NoiseChunkGenerator, same direct-ID-use reasoning
+// as the terrain blocks above (also ordinary BlockTable rows, so breaking
+// one still drops a real item, unlike the log/leaves pair above).
+static constexpr Int32 SHORT_GRASS_STATE_ID = 2005;
+static constexpr Int32 POPPY_STATE_ID = 2077;
+static constexpr Int32 DANDELION_STATE_ID = 2075;
