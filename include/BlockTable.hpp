@@ -3,18 +3,24 @@
 #include <vector>
 
 // One canonical, table-driven source of {blockStateId, itemId, name} for
-// every "simple" block this project knows -- single block-state, zero
-// properties (no directional/waterlogged/multi-part/axis/lit variance).
-// Real IDs, sourced directly from server.jar's own data generator report
-// (blocks.json for block-state IDs + registries.json's "minecraft:item"
-// protocol_id for item IDs), not guessed. BlockNames and ItemBlockMapping
-// both delegate their lookups here internally -- their own public API is
-// unchanged, this just replaces what used to be two separately hand-maintained
-// if-chains/switches (which didn't scale) with one shared table.
+// every block in the real 1.21 registry (1057 entries, generated from
+// server.jar --reports -- blocks.json for each block's default state id +
+// registries.json's "minecraft:item" protocol_id, not guessed). BlockNames
+// and ItemBlockMapping both delegate their lookups here internally -- their
+// own public API is unchanged.
 //
-// Stairs, slabs, doors, logs, and anything else with real per-instance state
-// are deliberately excluded -- each would need many state permutations
-// (see docs/general-documentation.md).
+// Blocks with real properties (stairs, logs, doors, etc.) are represented by
+// their single default state -- correct for round-tripping as long as this
+// project never places a *different* state of that block. The two fluids
+// (water/lava) are the deliberate exception: never rows here, because they
+// need a numeric "level" property this table can't express -- ChunkNbtCodec
+// and BlockNames both special-case them directly instead. grass_block's
+// snowy=true state is the other known gap (BlockNames.cpp's own special
+// case) -- this project never generates it, so it's untested, not fixed.
+//
+// If a future feature needs more than one state of an existing-property
+// block, that needs a real per-block-instance property system -- not another
+// scattered special case. See docs/internal-documentation.md.
 struct BlockTableEntry {
     Int32 blockStateId;
     Int32 itemId;

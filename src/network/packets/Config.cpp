@@ -7,6 +7,7 @@
 #include <Player.hpp>
 #include <World.hpp>
 #include <ItemBlockMapping.hpp>
+#include <FluidBlocks.hpp>
 #include <PlayerDataPersistence.hpp>
 #include <OpsList.hpp>
 #include <Console.hpp>
@@ -132,12 +133,48 @@ Update_Tags_config_p::Update_Tags_config_p(int threshold) {
     _threshold = threshold;
 }
 
+namespace {
+    // Real vanilla "minecraft:fluid" tag membership, confirmed by extracting
+    // data/minecraft/tags/fluid/{lava,water}.json directly from a real 1.21
+    // server.jar (not guessed) -- see docs/internal-documentation.md, "Fluid
+    // rendering: the real root cause of lava showing water's texture".
+    void writeFluidTag(std::vector<Byte>& out, const string& tagName, std::initializer_list<Int32> ids) {
+        std::vector<Byte> nameBytes = serializeString(tagName);
+        out.insert(out.end(), nameBytes.begin(), nameBytes.end());
+        std::vector<Byte> count = varIntSerialize(static_cast<int>(ids.size()));
+        out.insert(out.end(), count.begin(), count.end());
+        for (Int32 id : ids) {
+            std::vector<Byte> idBytes = varIntSerialize(id);
+            out.insert(out.end(), idBytes.begin(), idBytes.end());
+        }
+    }
+}
+
 std::vector<Byte> Update_Tags_config_p::serialize() const {
     #ifdef DEBUG
         Console::getConsole().Entry("Update_Tags_config_p::serialize(): Sending.");
     #endif
-    // No tag registries yet; an empty array is valid and lets the client proceed.
-    std::vector<Byte> packet_data = varIntSerialize(0);
+    // Only the "minecraft:fluid" registry is populated -- this is the one
+    // that actually affects observable client behavior today (the real
+    // client's LiquidBlockRenderer picks its texture set via
+    // fluidState.is(FluidTags.LAVA), so without this, EVERY fluid falls
+    // through to the water texture, regardless of block-state ID). Block/
+    // item/entity_type/game_event tags remain unsent -- a real, known gap,
+    // but nothing this project does today depends on client-side tool-
+    // effectiveness overlays or other tag-gated behavior for those.
+    std::vector<Byte> packet_data = varIntSerialize(1); // 1 registry
+
+    std::vector<Byte> registryIdBytes = serializeString("minecraft:fluid");
+    packet_data.insert(packet_data.end(), registryIdBytes.begin(), registryIdBytes.end());
+
+    std::vector<Byte> tags;
+    writeFluidTag(tags, "minecraft:water", {FLUID_REGISTRY_WATER_ID, FLUID_REGISTRY_FLOWING_WATER_ID});
+    writeFluidTag(tags, "minecraft:lava", {FLUID_REGISTRY_LAVA_ID, FLUID_REGISTRY_FLOWING_LAVA_ID});
+
+    std::vector<Byte> tagCount = varIntSerialize(2);
+    packet_data.insert(packet_data.end(), tagCount.begin(), tagCount.end());
+    packet_data.insert(packet_data.end(), tags.begin(), tags.end());
+
     return assemblePacket(getID(), _threshold, packet_data);
 }
 

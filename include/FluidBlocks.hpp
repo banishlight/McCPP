@@ -26,9 +26,10 @@
 // this project treated both fluids identically (distance = plain hop count),
 // which meant lava was assigned level values real lava never produces
 // (levels 1,3,5,7 -- only even levels 2,4,6 are reachable with a decrease-
-// per-block of 2) -- the client has no real precedent for those states on an
-// actual lava block and appears to fall back to a water-like rendering for
-// them, which is what this was actually causing, not a wire-encoding bug.
+// per-block of 2). NOTE: this was originally (wrongly) believed to be the
+// cause of lava rendering with water's texture client-side -- it wasn't (see
+// the real root cause below); this fix stands on its own merits (matching
+// real lava's spread behavior) but didn't fix that symptom.
 namespace Fluid {
     enum class Type { None, Water, Lava };
 
@@ -48,3 +49,14 @@ namespace Fluid {
     // distance: 1 (strongest, adjacent to a source) .. 7 (weakest, about to vanish).
     Int32 flowingId(Type type, int distance);
 }
+
+// The separate "minecraft:fluid" registry (distinct numbering from
+// block-state IDs above -- this is the registry the client's #minecraft:water
+// / #minecraft:lava tags reference). Real protocol IDs, confirmed via a fresh
+// server.jar --reports run (registries.json's minecraft:fluid entries) --
+// fixed/stable, since vanilla has no datapack mechanism to add custom fluids.
+static constexpr Int32 FLUID_REGISTRY_EMPTY_ID = 0;
+static constexpr Int32 FLUID_REGISTRY_FLOWING_WATER_ID = 1;
+static constexpr Int32 FLUID_REGISTRY_WATER_ID = 2;
+static constexpr Int32 FLUID_REGISTRY_FLOWING_LAVA_ID = 3;
+static constexpr Int32 FLUID_REGISTRY_LAVA_ID = 4;

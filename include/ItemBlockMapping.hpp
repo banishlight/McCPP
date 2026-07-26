@@ -11,16 +11,10 @@
 static constexpr Int32 STONE_ITEM_ID = 1;
 static constexpr Int32 DIRT_ITEM_ID = 28;
 static constexpr Int32 GRASS_BLOCK_ITEM_ID = 27;
-// oak_log is NOT a BlockTable row (it has a real axis property BlockTable's
-// single-state design excludes -- see OAK_LOG_STATE_ID in BlockIds.hpp), so
-// it needs its own special case in both functions below rather than going
-// through the table scan every other block uses.
-static constexpr Int32 OAK_LOG_ITEM_ID = 132;
 
-// Backed by BlockTable's full table scan (182+ entries) for every ordinary
-// block, plus the oak_log special case above. Returns -1 (unmapped) for
-// anything not covered by either -- e.g. oak_leaves, which deliberately has
-// no item mapping (real vanilla leaves only rarely drop a sapling/stick, a
-// chance-based mechanic not implemented here).
+// Backed entirely by BlockTable's full table scan (1057 entries, one row per
+// real vanilla block). Returns -1 (unmapped) for anything BlockTable itself
+// marks as itemId -1 (a block with no matching item in the real registry --
+// wall signs, technical blocks, etc.) or any id not in the table at all.
 Int32 itemIdToBlockStateId(Int32 itemId);
 Int32 blockStateIdToItemId(Int32 blockStateId);
