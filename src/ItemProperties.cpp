@@ -20,4 +20,13 @@ EquipmentSlot getEquipmentSlot(Int32 itemId) {
     return (it != table.end()) ? it->equipmentSlot : EquipmentSlot::None;
 }
 
+ItemCategory getItemCategory(Int32 itemId) {
+    if (itemId < 0) return ItemCategory::None;
+    const std::vector<ItemTableEntry>& table = getItemTable();
+    auto it = std::find_if(table.begin(), table.end(), [itemId](const ItemTableEntry& entry) {
+        return itemId == entry.itemId;
+    });
+    return (it != table.end()) ? it->itemCategory : ItemCategory::None;
+}
+
 }
