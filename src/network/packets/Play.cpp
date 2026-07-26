@@ -10,6 +10,7 @@
 #include <World.hpp>
 #include <BlockIds.hpp>
 #include <ItemBlockMapping.hpp>
+#include <BlockDropTable.hpp>
 #include <EntityIdAllocator.hpp>
 #include <entities/ItemEntityManager.hpp>
 #include <entities/FallingBlockEntityManager.hpp>
@@ -2083,7 +2084,17 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         // clients what to render.
         // Creative instantly removes the block with no drop, matching vanilla --
         // only Survival/Adventure actually spawn a pickup-able item entity.
-        Int32 dropItemId = (player.getGamemode() == CREATIVE_GAMEMODE) ? -1 : blockStateIdToItemId(previousBlock);
+        Int32 dropItemId = -1;
+        if (player.getGamemode() != CREATIVE_GAMEMODE) {
+            Int32 overrideItemId;
+            // BlockDropTable covers blocks whose drop isn't just themselves
+            // (stone -> cobblestone, oak_leaves -> a chance of oak_sapling,
+            // etc.) -- only fall back to the default direct block<->item
+            // mapping (drop itself) when this block has no override entry.
+            dropItemId = BlockDropTable::TryResolveDrop(previousBlock, overrideItemId)
+                ? overrideItemId
+                : blockStateIdToItemId(previousBlock);
+        }
         if (dropItemId >= 0) {
             double dropX = loc.x + 0.5, dropY = loc.y + 0.5, dropZ = loc.z + 0.5;
             ItemEntity dropped = ItemEntityManager::getInstance().spawn(dropItemId, 1, dropX, dropY, dropZ, chunkX, chunkZ);

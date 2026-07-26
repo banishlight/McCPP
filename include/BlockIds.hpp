@@ -43,3 +43,6 @@ static constexpr Int32 OAK_LEAVES_STATE_ID = 264; // distance=7, persistent=fals
 static constexpr Int32 SHORT_GRASS_STATE_ID = 2005;
 static constexpr Int32 POPPY_STATE_ID = 2077;
 static constexpr Int32 DANDELION_STATE_ID = 2075;
+// Needed symbolically by BlockDropTable (a direct-ID lookup key, same
+// reasoning as the other direct-comparison constants above).
+static constexpr Int32 COBWEB_BLOCK_STATE_ID = 2004;
