@@ -7,9 +7,9 @@
 
 // Minimal (not byte-perfect-vanilla) per-player save: just the Player fields
 // that have a real analogue in vanilla's own playerdata/<uuid>.dat (position,
-// rotation, gamemode, hotbar/selected slot). Health, XP, achievements, and a
-// full 36-slot inventory don't exist as Player state today, so there's
-// nothing to persist for them.
+// rotation, gamemode, full inventory, selected slot). Health, XP, and
+// achievements don't exist as Player state today, so there's nothing to
+// persist for them.
 struct PlayerSaveData {
     double x = 0.0;
     double y = 0.0;
@@ -17,7 +17,7 @@ struct PlayerSaveData {
     float yaw = 0.0f;
     float pitch = 0.0f;
     int gamemode = 0;
-    std::array<HotbarSlot, Player::HOTBAR_SIZE> hotbar{}; // defaults to all-empty ({-1, 0})
+    std::array<InventorySlot, Player::TOTAL_SLOTS> inventory{}; // defaults to all-empty ({-1, 0})
     int selectedSlot = 0;
 };
 

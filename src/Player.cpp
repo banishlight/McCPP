@@ -1,5 +1,6 @@
 #include <Player.hpp>
 #include <EntityIdAllocator.hpp>
+#include <ItemProperties.hpp>
 #include <Console.hpp>
 #include <algorithm>
 
@@ -157,8 +158,31 @@ void Player::setCenterChunk(int chunkX, int chunkZ) {
     _centerChunkZ = chunkZ;
 }
 
-const std::array<HotbarSlot, Player::HOTBAR_SIZE>& Player::getHotbar() const {
-    return _hotbar;
+const std::array<InventorySlot, Player::TOTAL_SLOTS>& Player::getInventory() const {
+    return _slots;
+}
+
+const InventorySlot& Player::getSlot(int index) const {
+    static const InventorySlot EMPTY{};
+    if (index < 0 || index >= TOTAL_SLOTS) {
+        Console::getConsole().Error("Player::getSlot(): index out of range.");
+        return EMPTY;
+    }
+    return _slots[index];
+}
+
+void Player::setSlot(int index, Int32 itemId, Int32 count) {
+    if (index < 0 || index >= TOTAL_SLOTS) {
+        Console::getConsole().Error("Player::setSlot(): index out of range.");
+        return;
+    }
+    _slots[index] = {itemId, count};
+}
+
+std::array<InventorySlot, Player::HOTBAR_SIZE> Player::getHotbar() const {
+    std::array<InventorySlot, HOTBAR_SIZE> out;
+    std::copy(_slots.begin() + HOTBAR_START, _slots.begin() + HOTBAR_START + HOTBAR_SIZE, out.begin());
+    return out;
 }
 
 void Player::setHotbarSlot(int index, Int32 itemId, Int32 count) {
@@ -166,7 +190,7 @@ void Player::setHotbarSlot(int index, Int32 itemId, Int32 count) {
         Console::getConsole().Error("Player::setHotbarSlot(): index out of range.");
         return;
     }
-    _hotbar[index] = {itemId, count};
+    _slots[HOTBAR_START + index] = {itemId, count};
 }
 
 int Player::getSelectedSlot() const {
@@ -181,34 +205,51 @@ void Player::setSelectedSlot(int slot) {
     _selectedSlot = slot;
 }
 
-// Every currently-mapped item (stone, dirt, grass_block) caps at vanilla's
-// standard 64 -- no per-item stack size table exists yet (see ItemBlockMapping.hpp).
-static constexpr Int32 MAX_STACK_SIZE = 64;
-
 bool Player::hasRoomFor(Int32 itemId) const {
-    for (const HotbarSlot& slot : _hotbar) {
+    Int32 maxStack = ItemProperties::getMaxStackSize(itemId);
+    for (int i = 0; i < HOTBAR_SIZE; i++) {
+        const InventorySlot& slot = _slots[HOTBAR_START + i];
         if (slot.itemId == -1) return true;
-        if (slot.itemId == itemId && slot.count < MAX_STACK_SIZE) return true;
+        if (slot.itemId == itemId && slot.count < maxStack) return true;
     }
     return false;
 }
 
 Int32 Player::addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& changedSlots) {
+    Int32 maxStack = ItemProperties::getMaxStackSize(itemId);
     for (int i = 0; i < HOTBAR_SIZE && count > 0; i++) {
-        if (_hotbar[i].itemId != itemId) continue;
-        Int32 room = MAX_STACK_SIZE - _hotbar[i].count;
+        InventorySlot& slot = _slots[HOTBAR_START + i];
+        if (slot.itemId != itemId) continue;
+        Int32 room = maxStack - slot.count;
         if (room <= 0) continue;
         Int32 added = std::min(room, count);
-        _hotbar[i].count += added;
+        slot.count += added;
         count -= added;
         changedSlots.push_back(i);
     }
     for (int i = 0; i < HOTBAR_SIZE && count > 0; i++) {
-        if (_hotbar[i].itemId != -1) continue;
-        Int32 added = std::min(MAX_STACK_SIZE, count);
-        _hotbar[i] = {itemId, added};
+        InventorySlot& slot = _slots[HOTBAR_START + i];
+        if (slot.itemId != -1) continue;
+        Int32 added = std::min(maxStack, count);
+        slot = {itemId, added};
         count -= added;
         changedSlots.push_back(i);
     }
     return count;
+}
+
+const InventorySlot& Player::getCarriedItem() const {
+    return _carriedItem;
+}
+
+void Player::setCarriedItem(Int32 itemId, Int32 count) {
+    _carriedItem = {itemId, count};
+}
+
+int Player::getContainerStateId() const {
+    return _containerStateId;
+}
+
+int Player::advanceContainerStateId() {
+    return ++_containerStateId;
 }

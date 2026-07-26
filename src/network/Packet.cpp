@@ -64,6 +64,7 @@ void Packet_Registry::initializeRegistry() {
     PlayVec[0x00] = std::make_shared<Confirm_Teleportation_p>();
     PlayVec[0x04] = std::make_shared<Chat_Command_p>();
     PlayVec[0x06] = std::make_shared<Chat_Message_p>();
+    PlayVec[0x0E] = std::make_shared<Click_Container_p>();
     PlayVec[0x1A] = std::make_shared<Set_Player_Position_p>();
     PlayVec[0x1B] = std::make_shared<Set_Player_Position_and_Rotation_p>();
     PlayVec[0x1C] = std::make_shared<Set_Player_Rotation_p>();

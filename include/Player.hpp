@@ -6,7 +6,7 @@
 #include <utility>
 
 // itemId -1 = empty slot.
-struct HotbarSlot {
+struct InventorySlot {
     Int32 itemId = -1;
     Int32 count = 0;
 };
@@ -28,6 +28,13 @@ struct PlayerProfileProperty {
 class Player {
     public:
         static constexpr int HOTBAR_SIZE = 9;
+        // Real vanilla player-inventory (Window ID 0) slot layout: 0 =
+        // crafting result, 1-4 = crafting grid, 5-8 = armor, 9-35 = main
+        // storage, 36-44 = hotbar, 45 = offhand. One flat array is the single
+        // source of truth for all of it -- the hotbar is just a named
+        // sub-range, not a separate copy.
+        static constexpr int TOTAL_SLOTS = 46;
+        static constexpr int HOTBAR_START = 36;
         Player();
         string getUsername() const;
         void setUsername(const string& username);
@@ -86,21 +93,47 @@ class Player {
         int getCenterChunkX() const;
         int getCenterChunkZ() const;
         void setCenterChunk(int chunkX, int chunkZ);
-        // Hotbar only -- no full inventory/armor/offhand tracking, and no
-        // Click Container handling, so slots can only ever be set server-side
-        // (e.g. the starting stack seeded at join), never rearranged by the client.
-        const std::array<HotbarSlot, HOTBAR_SIZE>& getHotbar() const;
+        // Full 46-slot inventory (crafting/armor/main-storage/hotbar/offhand,
+        // see TOTAL_SLOTS above). No Click Container handling yet, so
+        // non-Creative slots can only ever be set server-side (e.g. the
+        // starting stack seeded at join) or via the Creative direct-set path
+        // -- a Survival client can't rearrange its own inventory server-side
+        // yet.
+        const std::array<InventorySlot, TOTAL_SLOTS>& getInventory() const;
+        const InventorySlot& getSlot(int index) const;
+        void setSlot(int index, Int32 itemId, Int32 count);
+        // Thin views over the hotbar sub-range (indices HOTBAR_START..
+        // HOTBAR_START+HOTBAR_SIZE-1 of the same array above) -- kept so
+        // existing hotbar-only call sites (ground-item pickup, bucket use)
+        // don't need to know about the wider inventory at all.
+        std::array<InventorySlot, HOTBAR_SIZE> getHotbar() const;
         void setHotbarSlot(int index, Int32 itemId, Int32 count);
         int getSelectedSlot() const;
         void setSelectedSlot(int slot);
         // Read-only capacity check (existing partial stack with room, or an
         // empty slot) -- callers should check this before claiming a ground
         // item, so a claim never has to be rolled back for lack of space.
+        // Hotbar-only (matches addItemToHotbar's scope below).
         bool hasRoomFor(Int32 itemId) const;
         // Merges into an existing partial stack of itemId first, then the
-        // first empty slot. Returns leftover count that didn't fit (0 on full
-        // success) and appends the index of every slot it changed to changedSlots.
+        // first empty slot, both within the hotbar sub-range only (widening
+        // ground-item pickup to main storage is a deliberate non-goal here).
+        // Returns leftover count that didn't fit (0 on full success) and
+        // appends the index of every slot it changed to changedSlots.
         Int32 addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& changedSlots);
+        // The server's authoritative view of the mouse cursor's held stack
+        // (Click_Container_p, Play.cpp) -- itemId -1 means nothing carried.
+        const InventorySlot& getCarriedItem() const;
+        void setCarriedItem(Int32 itemId, Int32 count);
+        // A server-managed sequence number the client must echo back in
+        // Click_Container_p to prove it's acting on the server's current view
+        // of the container -- see docs/network-protocol.md's Click Container/
+        // Set Container Slot sections. Every Set_Container_Content_p/
+        // Set_Container_Slot_p sent to this player calls advanceContainerStateId()
+        // for a fresh value; Click_Container_p compares the client's claimed
+        // id against getContainerStateId() before trusting the click.
+        int getContainerStateId() const;
+        int advanceContainerStateId();
     private:
         string _username;
         std::vector<long> _uuid;
@@ -120,6 +153,8 @@ class Player {
         std::set<std::pair<int, int>> _loadedChunks;
         int _centerChunkX = 0; // matches the fixed spawn chunk (0,0)
         int _centerChunkZ = 0;
-        std::array<HotbarSlot, HOTBAR_SIZE> _hotbar{};
+        std::array<InventorySlot, TOTAL_SLOTS> _slots{};
         int _selectedSlot = 0;
+        InventorySlot _carriedItem{};
+        int _containerStateId = 0;
 };

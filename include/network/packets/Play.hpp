@@ -180,19 +180,28 @@ class Acknowledge_Block_Change_p : public Play_Packet, public Outgoing_Packet {
 };
 class Set_Container_Content_p : public Play_Packet, public Outgoing_Packet {
     public:
-        Set_Container_Content_p(int threshold, const std::array<HotbarSlot, Player::HOTBAR_SIZE>& hotbar);
+        Set_Container_Content_p(int threshold, const std::array<InventorySlot, Player::TOTAL_SLOTS>& inventory, int stateId, const InventorySlot& carriedItem);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
-        std::array<HotbarSlot, Player::HOTBAR_SIZE> _hotbar; // snapshot, not a Player& -- serialize() may run later, off the caller's thread
+        std::array<InventorySlot, Player::TOTAL_SLOTS> _inventory; // snapshot, not a Player& -- serialize() may run later, off the caller's thread
+        int _stateId;
+        InventorySlot _carriedItem;
         static int constexpr _PACKET_ID = 0x13;
 };
 class Set_Container_Slot_p : public Play_Packet, public Outgoing_Packet {
     public:
-        Set_Container_Slot_p(int threshold, int slotIndex, Int32 itemId, Int32 count);
+        // windowId: 0 for a normal player-inventory slot update, -1 to set the
+        // item being dragged with the mouse (see docs/network-protocol.md's
+        // Set Container Slot section) -- in that case stateId/slotIndex are
+        // ignored by the client, but still sent (harmless, simpler than a
+        // second constructor).
+        Set_Container_Slot_p(int threshold, int windowId, int stateId, int slotIndex, Int32 itemId, Int32 count);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
+        int _windowId;
+        int _stateId;
         int _slotIndex;
         Int32 _itemId, _count;
         static int constexpr _PACKET_ID = 0x15;
@@ -596,6 +605,19 @@ class Set_Creative_Mode_Slot_p : public Play_Packet, public Incoming_Packet {
         void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
     private:
         static int constexpr _PACKET_ID = 0x32;
+};
+// Real interactive inventory manipulation (drag/drop, shift-click, number-key
+// swap, double-click collect, drop key) for the player's own 46-slot
+// inventory -- see docs/network-protocol.md's Click Container section.
+// Deliberately does not implement Mode 5 (drag/paint across multiple slots,
+// a real cross-packet gesture) -- see the checklist comment above its
+// handling in Play.cpp.
+class Click_Container_p : public Play_Packet, public Incoming_Packet {
+    public:
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+    private:
+        static int constexpr _PACKET_ID = 0x0E;
 };
 class Set_Held_Item_serverbound_p : public Play_Packet, public Incoming_Packet {
     public:

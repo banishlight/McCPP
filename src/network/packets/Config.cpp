@@ -245,16 +245,16 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     BroadcastPlayerJoin(cont, player);
     World& world = World::getInstance();
     // A returning player resumes exactly where they left off (position,
-    // rotation, gamemode, hotbar) -- see PlayerDataPersistence. A brand-new
-    // UUID falls back to the world spawn point and a starting test stack, as
-    // this project always did before per-player persistence existed.
+    // rotation, gamemode, full inventory) -- see PlayerDataPersistence. A
+    // brand-new UUID falls back to the world spawn point and a starting test
+    // stack, as this project always did before per-player persistence existed.
     std::optional<PlayerSaveData> saved = PlayerDataPersistence::tryLoad(world.getWorldDir(), player.getUUID());
     if (saved) {
         player.setPosition(saved->x, saved->y, saved->z);
         player.setRotation(saved->yaw, saved->pitch);
         player.setGamemode(saved->gamemode);
-        for (int i = 0; i < Player::HOTBAR_SIZE; i++) {
-            player.setHotbarSlot(i, saved->hotbar[i].itemId, saved->hotbar[i].count);
+        for (int i = 0; i < Player::TOTAL_SLOTS; i++) {
+            player.setSlot(i, saved->inventory[i].itemId, saved->inventory[i].count);
         }
         player.setSelectedSlot(saved->selectedSlot);
     } else {
@@ -299,7 +299,7 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
     std::shared_ptr<Outgoing_Packet> syncPosition = std::make_shared<Synchronize_Player_Position_p>(
         threshold, player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch(), 0);
     cont.connection.addPacket(syncPosition);
-    cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(threshold, player.getHotbar()));
+    cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(threshold, player.getInventory(), player.advanceContainerStateId(), player.getCarriedItem()));
     // Same permission lookup PlayerCommandSender::getPermissionLevel() does --
     // reused directly rather than constructing a full CommandSender just to
     // read one int.

@@ -11,6 +11,7 @@
 #include <BlockIds.hpp>
 #include <ItemBlockMapping.hpp>
 #include <BlockDropTable.hpp>
+#include <ItemProperties.hpp>
 #include <EntityIdAllocator.hpp>
 #include <entities/ItemEntityManager.hpp>
 #include <entities/FallingBlockEntityManager.hpp>
@@ -725,9 +726,11 @@ std::vector<Byte> Acknowledge_Block_Change_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Set_Container_Content_p::Set_Container_Content_p(int threshold, const std::array<HotbarSlot, Player::HOTBAR_SIZE>& hotbar) {
+Set_Container_Content_p::Set_Container_Content_p(int threshold, const std::array<InventorySlot, Player::TOTAL_SLOTS>& inventory, int stateId, const InventorySlot& carriedItem) {
     _threshold = threshold;
-    _hotbar = hotbar;
+    _inventory = inventory;
+    _stateId = stateId;
+    _carriedItem = carriedItem;
 }
 
 std::vector<Byte> Set_Container_Content_p::serialize() const {
@@ -736,37 +739,29 @@ std::vector<Byte> Set_Container_Content_p::serialize() const {
     #endif
     // Player inventory (Window ID 0) container-slot layout: 0 = crafting
     // result, 1-4 = crafting grid, 5-8 = armor, 9-35 = main inventory,
-    // 36-44 = hotbar, 45 = offhand. The client maps array index directly to
-    // this absolute slot index, so all 46 must be sent even though only the
-    // hotbar range is ever populated -- sending fewer would misplace the
-    // hotbar's contents into the crafting/armor slots instead.
-    const int TOTAL_SLOTS = 46;
-    const int HOTBAR_START = 36;
-
+    // 36-44 = hotbar, 45 = offhand -- see Player.hpp's TOTAL_SLOTS/
+    // HOTBAR_START comment, the same layout Player's own array uses, so no
+    // hotbar-relative translation is needed here anymore.
     std::vector<Byte> packet_data;
     packet_data.push_back(0x00); // Window ID: 0 = player inventory
-    std::vector<Byte> stateId = varIntSerialize(0); // no Click Container handling, so state tracking is moot
+    std::vector<Byte> stateId = varIntSerialize(_stateId);
     packet_data.insert(packet_data.end(), stateId.begin(), stateId.end());
-    std::vector<Byte> count = varIntSerialize(TOTAL_SLOTS);
+    std::vector<Byte> count = varIntSerialize(Player::TOTAL_SLOTS);
     packet_data.insert(packet_data.end(), count.begin(), count.end());
-    for (int i = 0; i < TOTAL_SLOTS; i++) {
-        std::vector<Byte> slotBytes;
-        if (i >= HOTBAR_START && i < HOTBAR_START + Player::HOTBAR_SIZE) {
-            const HotbarSlot& slot = _hotbar[i - HOTBAR_START];
-            slotBytes = packSlot(slot.itemId, slot.count);
-        } else {
-            slotBytes = packSlot(-1, 0);
-        }
+    for (int i = 0; i < Player::TOTAL_SLOTS; i++) {
+        std::vector<Byte> slotBytes = packSlot(_inventory[i].itemId, _inventory[i].count);
         packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
     }
-    std::vector<Byte> carried = packSlot(-1, 0); // nothing dragged with the mouse
+    std::vector<Byte> carried = packSlot(_carriedItem.itemId, _carriedItem.count);
     packet_data.insert(packet_data.end(), carried.begin(), carried.end());
 
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-Set_Container_Slot_p::Set_Container_Slot_p(int threshold, int slotIndex, Int32 itemId, Int32 count) {
+Set_Container_Slot_p::Set_Container_Slot_p(int threshold, int windowId, int stateId, int slotIndex, Int32 itemId, Int32 count) {
     _threshold = threshold;
+    _windowId = windowId;
+    _stateId = stateId;
     _slotIndex = slotIndex;
     _itemId = itemId;
     _count = count;
@@ -777,8 +772,8 @@ std::vector<Byte> Set_Container_Slot_p::serialize() const {
         Console::getConsole().Entry("Set_Container_Slot_p::serialize(): Sending.");
     #endif
     std::vector<Byte> packet_data;
-    packet_data.push_back(0x00); // Window ID: 0 = player inventory
-    std::vector<Byte> stateId = varIntSerialize(0); // no Click Container handling, so state tracking is moot
+    packet_data.push_back(static_cast<Byte>(_windowId)); // -1 = the carried/dragged item, matches vanilla's own convention
+    std::vector<Byte> stateId = varIntSerialize(_stateId);
     packet_data.insert(packet_data.end(), stateId.begin(), stateId.end());
     Int16 slot16 = static_cast<Int16>(_slotIndex);
     packet_data.push_back(static_cast<Byte>((slot16 >> 8) & 0xFF));
@@ -1780,8 +1775,8 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
 
         for (int slot : changedSlots) {
             int containerSlot = 36 + slot; // player inventory: hotbar occupies slots 36-44
-            const HotbarSlot& updated = player.getHotbar()[slot];
-            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, updated.itemId, updated.count));
+            InventorySlot updated = player.getHotbar()[slot]; // copy -- getHotbar() returns by value now
+            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), containerSlot, updated.itemId, updated.count));
         }
     }
 }
@@ -2115,7 +2110,7 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         }
     } else if (status == 3 || status == 4) { // Drop item stack / Drop item (the Q key)
         int selectedSlot = player.getSelectedSlot();
-        HotbarSlot held = player.getHotbar()[selectedSlot]; // copy: setHotbarSlot below must not alias this read
+        InventorySlot held = player.getHotbar()[selectedSlot]; // copy: setHotbarSlot below must not alias this read
         if (held.itemId >= 0 && held.count > 0) {
             Int32 dropCount = (status == 3) ? held.count : 1;
             Int32 newCount = held.count - dropCount;
@@ -2123,7 +2118,7 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             player.setHotbarSlot(selectedSlot, newItemId, newCount);
             int threshold = cont.connection.getCompressionThreshold();
             int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
-            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, newItemId, newCount));
+            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), containerSlot, newItemId, newCount));
 
             // Standard forward-facing direction vector from yaw/pitch, tossed
             // with a small upward kick -- an approximation of vanilla's drop
@@ -2247,7 +2242,7 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     int threshold = cont.connection.getCompressionThreshold();
     Player& player = cont.connection.getPlayer();
     int selectedSlot = player.getSelectedSlot();
-    HotbarSlot held = player.getHotbar()[selectedSlot]; // copy: mutating the slot below must not alias this read
+    InventorySlot held = player.getHotbar()[selectedSlot]; // copy: mutating the slot below must not alias this read
 
     // Water/lava buckets aren't in BlockTable (they have no real placeable
     // "block" item -- vanilla's bucket-swap-to-empty mechanic is a future
@@ -2310,7 +2305,7 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
         if (newCount <= 0) newCount = 0;
         player.setHotbarSlot(selectedSlot, newItemId, newCount);
         int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
-        cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, containerSlot, newItemId, newCount));
+        cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), containerSlot, newItemId, newCount));
     }
 }
 
@@ -2353,15 +2348,295 @@ void Set_Creative_Mode_Slot_p::deserialize(std::vector<Byte> in_buff, PacketCont
         return;
     }
 
-    if (slot < 36 || slot > 44) return; // crafting grid/armor/offhand -- not modeled
-    int hotbarIndex = slot - 36;
-    if (item.present) {
-        player.setHotbarSlot(hotbarIndex, item.itemId, item.count);
-    } else {
-        player.setHotbarSlot(hotbarIndex, -1, 0);
-    }
+    if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+    player.setSlot(slot, item.present ? item.itemId : -1, item.present ? item.count : 0);
     int threshold = cont.connection.getCompressionThreshold();
-    cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, slot, item.present ? item.itemId : -1, item.present ? item.count : 0));
+    cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), slot, item.present ? item.itemId : -1, item.present ? item.count : 0));
+}
+
+namespace {
+    // Spawns a real, pickup-able dropped item at the player's own position --
+    // the same entity/physics infrastructure Player_Action_p's Q-drop and
+    // Set_Creative_Mode_Slot_p's slot=-1 drop already use (kept separate
+    // there rather than migrated, to avoid touching already-working code) --
+    // extracted here since Click_Container_p needs the identical sequence in
+    // two more places (outside-window click, drop-key mode).
+    void SpawnDroppedItemEntity(Player& player, Int32 itemId, Int32 count) {
+        if (itemId < 0 || count <= 0) return;
+        double px = player.getX(), py = player.getY(), pz = player.getZ();
+        int chunkX = floorDiv16(static_cast<int>(std::floor(px)));
+        int chunkZ = floorDiv16(static_cast<int>(std::floor(pz)));
+        ItemEntity dropped = ItemEntityManager::getInstance().spawn(itemId, count, px, py + 1.0, pz, chunkX, chunkZ);
+        std::vector<long> uuid = generateRandomUUID();
+        int entityId = dropped.entityId;
+        const int ITEM_ENTITY_TYPE_ID = 58;
+        BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, px, py, pz, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
+            return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, px, py + 1.0, pz);
+        });
+        BroadcastToChunkViewers(chunkX, chunkZ, [entityId, itemId, count](int broadcastThreshold) {
+            return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, itemId, count);
+        });
+    }
+
+    // Mode 0: normal left/right click. Slot == -999 means "outside the
+    // window" (drop from cursor); otherwise picks up/places/merges/swaps
+    // between the cursor and the clicked slot. See docs/network-protocol.md's
+    // Click Container section for the exact button semantics this mirrors.
+    void HandleNormalClick(Player& player, int slot, int button) {
+        InventorySlot cursor = player.getCarriedItem();
+        if (slot == -999) {
+            if (cursor.itemId < 0 || cursor.count <= 0) return;
+            if (button == 0) {
+                SpawnDroppedItemEntity(player, cursor.itemId, cursor.count);
+                player.setCarriedItem(-1, 0);
+            } else {
+                SpawnDroppedItemEntity(player, cursor.itemId, 1);
+                Int32 newCount = cursor.count - 1;
+                player.setCarriedItem(newCount > 0 ? cursor.itemId : -1, newCount);
+            }
+            return;
+        }
+        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        InventorySlot target = player.getSlot(slot);
+
+        if (cursor.itemId < 0) {
+            if (target.itemId < 0) return; // both empty
+            if (button == 0) {
+                player.setCarriedItem(target.itemId, target.count);
+                player.setSlot(slot, -1, 0);
+            } else {
+                // Right click on a stack: half picked up, half (the smaller
+                // amount if odd) left behind -- per docs/network-protocol.md.
+                Int32 stays = target.count / 2;
+                Int32 pickedUp = target.count - stays;
+                player.setCarriedItem(target.itemId, pickedUp);
+                player.setSlot(slot, stays > 0 ? target.itemId : -1, stays);
+            }
+            return;
+        }
+
+        if (target.itemId < 0) {
+            if (button == 0) {
+                player.setSlot(slot, cursor.itemId, cursor.count);
+                player.setCarriedItem(-1, 0);
+            } else {
+                player.setSlot(slot, cursor.itemId, 1);
+                Int32 newCursorCount = cursor.count - 1;
+                player.setCarriedItem(newCursorCount > 0 ? cursor.itemId : -1, newCursorCount);
+            }
+            return;
+        }
+
+        if (target.itemId == cursor.itemId) {
+            Int32 maxStack = ItemProperties::getMaxStackSize(target.itemId);
+            if (button == 0) {
+                Int32 room = maxStack - target.count;
+                Int32 moved = std::min(room, cursor.count);
+                if (moved > 0) {
+                    player.setSlot(slot, target.itemId, target.count + moved);
+                    Int32 remaining = cursor.count - moved;
+                    player.setCarriedItem(remaining > 0 ? cursor.itemId : -1, remaining);
+                }
+            } else if (target.count < maxStack) {
+                player.setSlot(slot, target.itemId, target.count + 1);
+                Int32 remaining = cursor.count - 1;
+                player.setCarriedItem(remaining > 0 ? cursor.itemId : -1, remaining);
+            }
+        } else {
+            // Mismatched items -- full swap regardless of button.
+            player.setSlot(slot, cursor.itemId, cursor.count);
+            player.setCarriedItem(target.itemId, target.count);
+        }
+    }
+
+    // Merges `count` of itemId into slots [start, end), existing partial
+    // stacks first then empty slots. Returns leftover that didn't fit.
+    Int32 MergeIntoRange(Player& player, Int32 itemId, Int32 count, int start, int end) {
+        Int32 maxStack = ItemProperties::getMaxStackSize(itemId);
+        for (int i = start; i < end && count > 0; i++) {
+            InventorySlot s = player.getSlot(i);
+            if (s.itemId != itemId) continue;
+            Int32 room = maxStack - s.count;
+            if (room <= 0) continue;
+            Int32 moved = std::min(room, count);
+            player.setSlot(i, itemId, s.count + moved);
+            count -= moved;
+        }
+        for (int i = start; i < end && count > 0; i++) {
+            InventorySlot s = player.getSlot(i);
+            if (s.itemId != -1) continue;
+            Int32 moved = std::min(maxStack, count);
+            player.setSlot(i, itemId, moved);
+            count -= moved;
+        }
+        return count;
+    }
+
+    // Real slot index for an EquipmentSlot (armor 5-8, offhand 45) -- None
+    // has no single slot and is never queried here.
+    int ArmorSlotIndex(EquipmentSlot equipmentSlot) {
+        switch (equipmentSlot) {
+            case EquipmentSlot::Head: return 5;
+            case EquipmentSlot::Chest: return 6;
+            case EquipmentSlot::Legs: return 7;
+            case EquipmentSlot::Feet: return 8;
+            case EquipmentSlot::Offhand: return Player::HOTBAR_START + Player::HOTBAR_SIZE; // 45
+            default: return -1;
+        }
+    }
+
+    // Mode 1: shift click -- quick-move the entire clicked stack. Armor and
+    // shield route straight to their matching equipment slot if it's empty
+    // (matches real vanilla's well-known shift-click-to-equip behavior);
+    // everything else (and armor/shield when that slot is already occupied)
+    // falls back to the complementary region (hotbar/offhand <-> main
+    // storage). Slots 0-8 (crafting grid, no gameplay meaning yet) default to
+    // main storage.
+    void HandleShiftClick(Player& player, int slot) {
+        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        InventorySlot source = player.getSlot(slot);
+        if (source.itemId < 0) return;
+
+        EquipmentSlot equipSlot = ItemProperties::getEquipmentSlot(source.itemId);
+        int armorSlot = ArmorSlotIndex(equipSlot);
+        if (armorSlot >= 0 && armorSlot != slot && player.getSlot(armorSlot).itemId < 0) {
+            player.setSlot(armorSlot, source.itemId, source.count);
+            player.setSlot(slot, -1, 0);
+            return;
+        }
+
+        int targetStart, targetEnd;
+        if (slot >= Player::HOTBAR_START) {
+            targetStart = 9; targetEnd = Player::HOTBAR_START;
+        } else if (slot >= 9) {
+            targetStart = Player::HOTBAR_START; targetEnd = Player::HOTBAR_START + Player::HOTBAR_SIZE;
+        } else {
+            targetStart = 9; targetEnd = Player::HOTBAR_START;
+        }
+
+        Int32 leftover = MergeIntoRange(player, source.itemId, source.count, targetStart, targetEnd);
+        if (leftover == 0) {
+            player.setSlot(slot, -1, 0);
+        } else if (leftover < source.count) {
+            player.setSlot(slot, source.itemId, leftover);
+        }
+    }
+
+    // Mode 2: number-key swap (button 0-8 -> hotbar index, 40 -> offhand) --
+    // full swap with the clicked slot, no merging.
+    void HandleNumberKeySwap(Player& player, int slot, int button) {
+        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        int targetSlot;
+        if (button >= 0 && button <= 8) {
+            targetSlot = Player::HOTBAR_START + button;
+        } else if (button == 40) {
+            targetSlot = Player::HOTBAR_START + Player::HOTBAR_SIZE; // offhand slot (45)
+        } else {
+            return;
+        }
+        if (targetSlot == slot) return;
+        InventorySlot a = player.getSlot(slot);
+        InventorySlot b = player.getSlot(targetSlot);
+        player.setSlot(slot, b.itemId, b.count);
+        player.setSlot(targetSlot, a.itemId, a.count);
+    }
+
+    // Mode 4: drop key -- acts directly on the clicked slot, cursor untouched.
+    // Button 0 = drop one (Q), button 1 = drop the entire stack (Ctrl+Q).
+    void HandleDropClick(Player& player, int slot, int button) {
+        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        InventorySlot source = player.getSlot(slot);
+        if (source.itemId < 0 || source.count <= 0) return;
+        if (button == 0) {
+            SpawnDroppedItemEntity(player, source.itemId, 1);
+            Int32 newCount = source.count - 1;
+            player.setSlot(slot, newCount > 0 ? source.itemId : -1, newCount);
+        } else {
+            SpawnDroppedItemEntity(player, source.itemId, source.count);
+            player.setSlot(slot, -1, 0);
+        }
+    }
+
+    // Mode 6: double-click collect -- scans the whole inventory for stacks
+    // matching the cursor's item, folding them into the cursor up to its
+    // real max stack size. Button 1 ("pickup all but check items in reverse
+    // order") is documented as impossible for a real vanilla client to send.
+    void HandleDoubleClick(Player& player, int button) {
+        if (button != 0) return;
+        InventorySlot cursor = player.getCarriedItem();
+        if (cursor.itemId < 0) return;
+        Int32 needed = ItemProperties::getMaxStackSize(cursor.itemId) - cursor.count;
+        if (needed <= 0) return;
+        for (int i = 0; i < Player::TOTAL_SLOTS && needed > 0; i++) {
+            InventorySlot s = player.getSlot(i);
+            if (s.itemId != cursor.itemId) continue;
+            Int32 taken = std::min(s.count, needed);
+            if (taken <= 0) continue;
+            player.setSlot(i, taken == s.count ? -1 : s.itemId, s.count - taken);
+            needed -= taken;
+            cursor.count += taken;
+        }
+        player.setCarriedItem(cursor.itemId, cursor.count);
+    }
+}
+
+void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Click_Container_p::deserialize(): Received.");
+    #endif
+    Byte windowId = deserializeByte(in_buff);
+    Int32 stateId = deserializeVarInt(in_buff);
+    Int16 slot = deserializeShort(in_buff);
+    Byte button = deserializeByte(in_buff);
+    Int32 mode = deserializeVarInt(in_buff);
+    // The trailing array-of-changed-slots and carried-item fields are
+    // deliberately never parsed -- every result above is computed purely
+    // server-side from Mode/Button/Slot plus the player's own already-tracked
+    // state, never trusting client-claimed values. Safe to leave unconsumed:
+    // this packet's own outer length prefix already demarcates its exact
+    // byte range before dispatch (same established convention documented on
+    // unpackSlot above).
+
+    Player& player = cont.connection.getPlayer();
+    int threshold = cont.connection.getCompressionThreshold();
+
+    if (windowId != 0) return; // only the player inventory window exists in this project
+
+    if (stateId != player.getContainerStateId()) {
+        // Stale/desynced client view -- ignore the click and resync fully,
+        // exactly matching docs/network-protocol.md's documented behavior.
+        cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
+            threshold, player.getInventory(), player.advanceContainerStateId(), player.getCarriedItem()));
+        return;
+    }
+
+    switch (mode) {
+        case 0: HandleNormalClick(player, slot, button); break;
+        case 1: HandleShiftClick(player, slot); break;
+        case 2: HandleNumberKeySwap(player, slot, button); break;
+        case 3: break; // middle-click clone -- only meaningful in non-player-inventory windows, which don't exist in this project
+        case 4: HandleDropClick(player, slot, button); break;
+        case 5:
+            // *** CHECKLIST: drag/paint-dragging across multiple slots ***
+            // Real vanilla sends this as a 3-packet sequence (start at Slot
+            // -999 with button 0/4/8 for left/right/middle, one packet per
+            // painted slot with button 1/5/9, end at Slot -999 with button
+            // 2/6/10) -- needs a real per-player "in-progress drag" session
+            // (accumulated slot list + which button started it) tracked
+            // across those packets, a genuine scope jump from every other
+            // mode here (each fully resolved within its own single packet).
+            // Deliberately a no-op until that's built.
+            break;
+        case 6: HandleDoubleClick(player, button); break;
+        default: break;
+    }
+
+    // Always resync the full inventory + cursor rather than diff exactly
+    // which slots each mode touched (several above can touch anywhere from 1
+    // to all 46 slots) -- simpler and safer than per-slot bookkeeping, at a
+    // bandwidth cost that's negligible for a hobby server.
+    cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
+        threshold, player.getInventory(), player.advanceContainerStateId(), player.getCarriedItem()));
 }
 
 void Set_Held_Item_serverbound_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

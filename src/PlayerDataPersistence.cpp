@@ -1,7 +1,6 @@
 #include <PlayerDataPersistence.hpp>
 #include <VanillaVersion.hpp>
-#include <BlockNames.hpp>
-#include <ItemBlockMapping.hpp>
+#include <ItemNames.hpp>
 #include <network/Nbt.hpp>
 #include <network/Compression.hpp>
 #include <network/PacketUtils.hpp>
@@ -69,9 +68,8 @@ std::optional<PlayerSaveData> tryLoad(const string& worldDir, const std::vector<
             const NbtTag* countTag = entry.get("Count");
             if (!slotTag || !idTag || !countTag) continue;
             int slot = slotTag->asInt();
-            if (slot < 0 || slot >= Player::HOTBAR_SIZE) continue; // this project only has a hotbar, not a full 36-slot inventory
-            Int32 blockStateId = BlockNames::blockNameToStateId(idTag->asString());
-            result.hotbar[slot] = {blockStateIdToItemId(blockStateId), countTag->asInt()};
+            if (slot < 0 || slot >= Player::TOTAL_SLOTS) continue;
+            result.inventory[slot] = {ItemNames::itemNameToId(idTag->asString()), countTag->asInt()};
         }
     }
 
@@ -94,16 +92,16 @@ void save(const string& worldDir, const Player& player) {
     root.put("SelectedItemSlot", NbtTag::makeInt(player.getSelectedSlot()));
 
     // Only occupied slots are listed, matching vanilla's own convention --
-    // hotbar slots map directly onto vanilla's own slot numbering (0-8 are
-    // the hotbar in a full 36-slot inventory too).
+    // slot numbering matches Player's own absolute inventory indices (see
+    // Player.hpp's TOTAL_SLOTS/HOTBAR_START layout comment).
     std::vector<NbtTag> inventoryEntries;
-    const std::array<HotbarSlot, Player::HOTBAR_SIZE>& hotbar = player.getHotbar();
-    for (int i = 0; i < Player::HOTBAR_SIZE; i++) {
-        if (hotbar[i].itemId == -1) continue;
+    const std::array<InventorySlot, Player::TOTAL_SLOTS>& inventory = player.getInventory();
+    for (int i = 0; i < Player::TOTAL_SLOTS; i++) {
+        if (inventory[i].itemId == -1) continue;
         NbtTag entry = NbtTag::makeCompound();
         entry.put("Slot", NbtTag::makeByte(static_cast<Int8>(i)));
-        entry.put("id", NbtTag::makeString(BlockNames::blockStateIdToName(itemIdToBlockStateId(hotbar[i].itemId))));
-        entry.put("Count", NbtTag::makeByte(static_cast<Int8>(hotbar[i].count)));
+        entry.put("id", NbtTag::makeString(ItemNames::itemIdToName(inventory[i].itemId)));
+        entry.put("Count", NbtTag::makeByte(static_cast<Int8>(inventory[i].count)));
         inventoryEntries.push_back(entry);
     }
     root.put("Inventory", NbtTag::makeList(NbtTagType::Compound, inventoryEntries));
