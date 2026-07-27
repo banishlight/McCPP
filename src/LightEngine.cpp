@@ -2,6 +2,7 @@
 #include <Chunk.hpp>
 #include <World.hpp>
 #include <BlockIds.hpp>
+#include <CropBlocks.hpp>
 #include <vector>
 #include <queue>
 #include <algorithm>
@@ -43,6 +44,11 @@ bool LightEngine::isOpaque(Int32 blockStateId) {
     // unambiguously wrong at full opacity.
     if (blockStateId == AIR_BLOCK_STATE_ID) return false;
     if (blockStateId == SHORT_GRASS_STATE_ID || blockStateId == POPPY_STATE_ID || blockStateId == DANDELION_STATE_ID) return false;
+    // Crops (wheat/carrots/potatoes/beetroots, any growth stage) are the same
+    // kind of non-full plant as short_grass/poppy/dandelion above -- zero
+    // light opacity in real vanilla. Farmland itself stays opaque (it's a
+    // near-full-height block, just with a lowered top surface).
+    if (Crop::isCrop(blockStateId)) return false;
     return true;
 }
 

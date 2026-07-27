@@ -18,6 +18,8 @@
 #include <entities/PlayerVisibilityManager.hpp>
 #include <FluidBlocks.hpp>
 #include <FluidUpdateQueue.hpp>
+#include <CropBlocks.hpp>
+#include <CropGrowthQueue.hpp>
 #include <network/Crypto.hpp>
 #include <network/Nbt.hpp>
 #include <network/PlayerCommandSender.hpp>
@@ -29,6 +31,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
+#include <random>
 #include <set>
 #include <utility>
 #include <vector>
@@ -1742,6 +1745,103 @@ void ResolveFluid(World& world, int x, int y, int z) {
     ScheduleFluidNeighbors(x, y, z, FluidTickInterval(paceType));
 }
 
+namespace {
+    // Gameplay-feel tuning, not decompile-verified (like the tree/plant
+    // density constants earlier this session) -- real vanilla's actual
+    // random-tick-driven pacing/odds are a much more complex function of
+    // random tick speed, light, and per-crop growth-speed multipliers this
+    // project doesn't model. These constants get the same core loop (grows
+    // faster near water + in light, eventually matures) without chasing
+    // vanilla's exact timing.
+    constexpr int FARMLAND_CHECK_INTERVAL = 40;   // 2 seconds at 20 TPS
+    constexpr int CROP_CHECK_INTERVAL = 40;
+    constexpr int CROP_MIN_LIGHT = 8;             // approximate -- real vanilla requires "not dark", exact threshold not decompile-verified here
+    constexpr double CROP_GROWTH_CHANCE_WET = 0.15;  // farmland moisture > 0
+    constexpr double CROP_GROWTH_CHANCE_DRY = 0.05;  // no wet farmland below (still allowed to grow, just slower)
+
+    double RollUnit() {
+        thread_local std::mt19937 generator(std::random_device{}());
+        thread_local std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        return distribution(generator);
+    }
+
+    // Real vanilla farmland hydration range: a 9x9 column (4 blocks each
+    // horizontal direction) spanning 1 block above/below the farmland's own
+    // Y, confirmed against minecraft.wiki's Farmland article.
+    bool HasNearbyWater(World& world, int x, int y, int z) {
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    if (Fluid::typeOf(GetWorldBlockOrUnknown(world, x + dx, y + dy, z + dz)) == Fluid::Type::Water) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    int GetCombinedLight(World& world, int x, int y, int z) {
+        int chunkX = floorDiv16(x);
+        int chunkZ = floorDiv16(z);
+        std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+        if (!chunk) return 0;
+        int localX = x - chunkX * 16;
+        int localZ = z - chunkZ * 16;
+        return std::max(chunk->getSkyLight(localX, y, localZ), chunk->getBlockLight(localX, y, localZ));
+    }
+}
+
+void ResolveCropGrowth(World& world, int x, int y, int z) {
+    Int32 current = GetWorldBlockOrUnknown(world, x, y, z);
+    if (current < 0) return; // chunk not loaded
+
+    if (Crop::isFarmland(current)) {
+        int moisture = Crop::moistureOf(current);
+        int newMoisture = HasNearbyWater(world, x, y, z) ? 7 : std::max(0, moisture - 1);
+        if (newMoisture != moisture) {
+            Int32 newState = Crop::farmlandStateFor(newMoisture);
+            world.setBlock(x, y, z, newState);
+            BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, newState](int threshold) {
+                return std::make_shared<Block_Update_p>(threshold, x, y, z, newState);
+            });
+        }
+        if (newMoisture == 0 && !Crop::isCrop(GetWorldBlockOrUnknown(world, x, y + 1, z))) {
+            // Real vanilla also reverts farmland via player/mob trampling --
+            // not modeled (no server-side jump/fall detection exists here,
+            // movement is client-authoritative), only the moisture-based
+            // revert is implemented.
+            world.setBlock(x, y, z, DIRT_BLOCK_STATE_ID);
+            BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z](int threshold) {
+                return std::make_shared<Block_Update_p>(threshold, x, y, z, DIRT_BLOCK_STATE_ID);
+            });
+            return; // it's dirt now -- no more farmland checks needed
+        }
+        CropGrowthQueue::getInstance().schedule(x, y, z, FARMLAND_CHECK_INTERVAL);
+        return;
+    }
+
+    if (Crop::isCrop(current)) {
+        Crop::Type type = Crop::typeOf(current);
+        int age = Crop::ageOf(current);
+        int maxAge = Crop::maxAge(type);
+        if (age >= maxAge) return; // fully grown -- nothing left to schedule, matches fluid sources' permanent early-exit
+
+        if (GetCombinedLight(world, x, y, z) >= CROP_MIN_LIGHT) {
+            Int32 below = GetWorldBlockOrUnknown(world, x, y - 1, z);
+            bool wet = Crop::isFarmland(below) && Crop::moistureOf(below) > 0;
+            if (RollUnit() < (wet ? CROP_GROWTH_CHANCE_WET : CROP_GROWTH_CHANCE_DRY)) {
+                Int32 newState = Crop::stateFor(type, age + 1);
+                world.setBlock(x, y, z, newState);
+                BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, newState](int threshold) {
+                    return std::make_shared<Block_Update_p>(threshold, x, y, z, newState);
+                });
+            }
+        }
+        CropGrowthQueue::getInstance().schedule(x, y, z, CROP_CHECK_INTERVAL);
+    }
+}
+
 void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
     const double PICKUP_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's AABB pickup range
     const double MIN_PICKUP_AGE_SECONDS = 0.5; // matches vanilla's 10-tick pickup delay
@@ -1977,6 +2077,14 @@ namespace {
         for (Int32 id : INSTANT_BREAK_BLOCKS) {
             if (id == blockStateId) return true;
         }
+        // Crops (wheat/carrots/potatoes/beetroots, any growth stage) are
+        // real vanilla:crop/carrot/potato/beetroot definition.type blocks --
+        // confirmed 0-hardness, same category this whole list exists for.
+        // Checked via Crop::isCrop() rather than 28 individual entries (one
+        // per age state across 4 crop types) since that helper already
+        // exists and covers exactly this set -- missed when farming was
+        // first added, exactly the gap this checklist warns about.
+        if (Crop::isCrop(blockStateId)) return true;
         return false;
     }
 }
@@ -2080,6 +2188,9 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         // Creative instantly removes the block with no drop, matching vanilla --
         // only Survival/Adventure actually spawn a pickup-able item entity.
         Int32 dropItemId = -1;
+        Int32 dropCount = 1;
+        Int32 bonusDropItemId = -1;
+        Int32 bonusDropCount = 0;
         if (player.getGamemode() != CREATIVE_GAMEMODE) {
             // ToolInfo is always default (no Fortune, no Silk Touch) for now --
             // this project can't yet receive/store enchantment data on a held
@@ -2087,25 +2198,44 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             // that groundwork exists, this should read the player's actual
             // held item's enchantments instead of default-constructing.
             BlockDropTable::ToolInfo tool;
-            Int32 overrideItemId;
+            Int32 overrideItemId, overrideCount;
             // BlockDropTable covers blocks whose drop isn't just themselves
             // (stone -> cobblestone, oak_leaves -> a chance of oak_sapling,
             // etc.) -- only fall back to the default direct block<->item
-            // mapping (drop itself) when this block has no override entry.
-            dropItemId = BlockDropTable::CheckDrop(previousBlock, tool, overrideItemId)
-                ? overrideItemId
-                : blockStateIdToItemId(previousBlock);
+            // mapping (drop itself, count 1) when this block has no override entry.
+            if (BlockDropTable::CheckDrop(previousBlock, tool, overrideItemId, overrideCount)) {
+                dropItemId = overrideItemId;
+                dropCount = overrideCount;
+            } else {
+                dropItemId = blockStateIdToItemId(previousBlock);
+            }
+            // A handful of blocks (mature wheat/beetroot) drop a second,
+            // independent item stack on top of the above -- see
+            // BlockDropTable::CheckBonusDrop's own comment.
+            BlockDropTable::CheckBonusDrop(previousBlock, tool, bonusDropItemId, bonusDropCount);
         }
-        if (dropItemId >= 0) {
+        if (dropItemId >= 0 && dropCount > 0) {
             double dropX = loc.x + 0.5, dropY = loc.y + 0.5, dropZ = loc.z + 0.5;
-            ItemEntity dropped = ItemEntityManager::getInstance().spawn(dropItemId, 1, dropX, dropY, dropZ, chunkX, chunkZ);
+            ItemEntity dropped = ItemEntityManager::getInstance().spawn(dropItemId, dropCount, dropX, dropY, dropZ, chunkX, chunkZ);
             std::vector<long> uuid = generateRandomUUID(); // one-time, not persisted -- only needed for this Spawn_Entity_p
             int entityId = dropped.entityId;
             BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
                 return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, dropX, dropY, dropZ);
             });
-            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, dropItemId](int broadcastThreshold) {
-                return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, dropItemId, 1);
+            BroadcastToChunkViewers(chunkX, chunkZ, [entityId, dropItemId, dropCount](int broadcastThreshold) {
+                return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, dropItemId, dropCount);
+            });
+        }
+        if (bonusDropItemId >= 0 && bonusDropCount > 0) {
+            double dropX = loc.x + 0.5, dropY = loc.y + 0.5, dropZ = loc.z + 0.5;
+            ItemEntity bonusDropped = ItemEntityManager::getInstance().spawn(bonusDropItemId, bonusDropCount, dropX, dropY, dropZ, chunkX, chunkZ);
+            std::vector<long> bonusUuid = generateRandomUUID();
+            int bonusEntityId = bonusDropped.entityId;
+            BroadcastToChunkViewers(chunkX, chunkZ, [bonusEntityId, bonusUuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
+                return std::make_shared<Spawn_Entity_p>(broadcastThreshold, bonusEntityId, bonusUuid, ITEM_ENTITY_TYPE_ID, dropX, dropY, dropZ);
+            });
+            BroadcastToChunkViewers(chunkX, chunkZ, [bonusEntityId, bonusDropItemId, bonusDropCount](int broadcastThreshold) {
+                return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, bonusEntityId, bonusDropItemId, bonusDropCount);
             });
         }
     } else if (status == 3 || status == 4) { // Drop item stack / Drop item (the Q key)
@@ -2224,6 +2354,20 @@ void Chat_Command_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont)
 
 namespace {
     const int CREATIVE_GAMEMODE = 1;
+
+    // Survival/Adventure consume one from the held stack; Creative's
+    // infinite-item slot is left untouched, matching vanilla. Shared by the
+    // generic placement path below and the till/plant/bone-meal handlers --
+    // all four need the exact same "decrement, empty at 0, echo back" logic.
+    void ConsumeOneFromHeldSlot(PacketContext& cont, int threshold, Player& player, int selectedSlot, const InventorySlot& held) {
+        if (player.getGamemode() == CREATIVE_GAMEMODE) return;
+        Int32 newCount = held.count - 1;
+        Int32 newItemId = (newCount > 0) ? held.itemId : -1;
+        if (newCount <= 0) newCount = 0;
+        player.setHotbarSlot(selectedSlot, newItemId, newCount);
+        int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
+        cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), containerSlot, newItemId, newCount));
+    }
 }
 
 void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -2243,6 +2387,88 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     Player& player = cont.connection.getPlayer();
     int selectedSlot = player.getSelectedSlot();
     InventorySlot held = player.getHotbar()[selectedSlot]; // copy: mutating the slot below must not alias this read
+    World& world = World::getInstance();
+
+    // Farming: till / plant / bone meal, checked before the generic
+    // placement path below (a hoe/seed/bone-meal item would otherwise either
+    // no-op via itemIdToBlockStateId returning -1, or -- for seeds, which
+    // also have a placeable block form -- place the wrong thing). Real item/
+    // block names and IDs sourced from a fresh server.jar --reports run, not
+    // guessed.
+    {
+        const Int32 BONE_MEAL_ITEM_ID = 960;
+        const Int32 WHEAT_SEEDS_ITEM_ID = 853;
+        const Int32 CARROT_ITEM_ID = 1097;
+        const Int32 POTATO_ITEM_ID = 1098;
+        const Int32 BEETROOT_SEEDS_ITEM_ID = 1155;
+
+        Int32 clickedBlock = GetWorldBlockOrUnknown(world, loc.x, loc.y, loc.z);
+        Int32 aboveClicked = GetWorldBlockOrUnknown(world, loc.x, loc.y + 1, loc.z);
+
+        // Till: hoe on dirt/grass_block with air directly above -> farmland
+        // (moisture 0). No durability cost -- this project has no durability
+        // system for any tool yet.
+        if (ItemProperties::getItemCategory(held.itemId) == ItemCategory::Hoe
+            && (clickedBlock == DIRT_BLOCK_STATE_ID || clickedBlock == GRASS_BLOCK_STATE_ID)
+            && aboveClicked == AIR_BLOCK_STATE_ID) {
+            Int32 x = loc.x, y = loc.y, z = loc.z;
+            Int32 farmlandId = Crop::farmlandStateFor(0);
+            world.setBlock(x, y, z, farmlandId);
+            BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, farmlandId](int broadcastThreshold) {
+                return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, farmlandId);
+            });
+            CropGrowthQueue::getInstance().schedule(x, y, z, 40);
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            return;
+        }
+
+        // Plant: a seed item on farmland with air directly above -> that
+        // crop's age-0 state, planted in the position ABOVE the farmland
+        // (always straight up, matching real vanilla -- not face-relative
+        // like a normal block placement).
+        Crop::Type seedType = Crop::Type::None;
+        if (held.itemId == WHEAT_SEEDS_ITEM_ID) seedType = Crop::Type::Wheat;
+        else if (held.itemId == CARROT_ITEM_ID) seedType = Crop::Type::Carrots;
+        else if (held.itemId == POTATO_ITEM_ID) seedType = Crop::Type::Potatoes;
+        else if (held.itemId == BEETROOT_SEEDS_ITEM_ID) seedType = Crop::Type::Beetroot;
+        if (seedType != Crop::Type::None && Crop::isFarmland(clickedBlock) && aboveClicked == AIR_BLOCK_STATE_ID && held.count > 0) {
+            Int32 x = loc.x, y = loc.y + 1, z = loc.z;
+            Int32 cropId = Crop::stateFor(seedType, 0);
+            world.setBlock(x, y, z, cropId);
+            BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, cropId](int broadcastThreshold) {
+                return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, cropId);
+            });
+            CropGrowthQueue::getInstance().schedule(x, y, z, 40);
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            ConsumeOneFromHeldSlot(cont, threshold, player, selectedSlot, held);
+            return;
+        }
+
+        // Bone meal: instantly jumps a crop's age (capped at its real max).
+        // Jump size is a gameplay-feel approximation (1-3), not vanilla-exact
+        // -- same treatment as the growth-chance constants near
+        // ResolveCropGrowth. Real vanilla also works on saplings/grass;
+        // crops only for this pass.
+        if (held.itemId == BONE_MEAL_ITEM_ID && Crop::isCrop(clickedBlock) && held.count > 0) {
+            Crop::Type cropType = Crop::typeOf(clickedBlock);
+            int age = Crop::ageOf(clickedBlock);
+            int maxAge = Crop::maxAge(cropType);
+            if (age < maxAge) {
+                thread_local std::mt19937 boneMealGenerator(std::random_device{}());
+                std::uniform_int_distribution<int> jumpDist(1, 3);
+                int newAge = std::min(maxAge, age + jumpDist(boneMealGenerator));
+                Int32 x = loc.x, y = loc.y, z = loc.z;
+                Int32 newState = Crop::stateFor(cropType, newAge);
+                world.setBlock(x, y, z, newState);
+                BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, newState](int broadcastThreshold) {
+                    return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, newState);
+                });
+            }
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            ConsumeOneFromHeldSlot(cont, threshold, player, selectedSlot, held);
+            return;
+        }
+    }
 
     // Water/lava buckets aren't in BlockTable (they have no real placeable
     // "block" item -- vanilla's bucket-swap-to-empty mechanic is a future
@@ -2279,7 +2505,6 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     }
     Int32 px = loc.x + dx, py = loc.y + dy, pz = loc.z + dz;
 
-    World& world = World::getInstance();
     world.setBlock(px, py, pz, blockStateId);
     int chunkX = floorDiv16(px);
     int chunkZ = floorDiv16(pz);
@@ -2296,17 +2521,7 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
     // existing fluid's supply.
     ScheduleFluidNeighbors(px, py, pz, 1);
 
-    // Creative has infinite blocks -- the slot is left untouched, matching
-    // vanilla. Survival/Adventure consume one from the stack, emptying the
-    // slot entirely at 0 rather than leaving a lingering itemId with a 0 count.
-    if (player.getGamemode() != CREATIVE_GAMEMODE) {
-        Int32 newCount = held.count - 1;
-        Int32 newItemId = (newCount > 0) ? held.itemId : -1;
-        if (newCount <= 0) newCount = 0;
-        player.setHotbarSlot(selectedSlot, newItemId, newCount);
-        int containerSlot = 36 + selectedSlot; // player inventory: hotbar occupies slots 36-44
-        cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), containerSlot, newItemId, newCount));
-    }
+    ConsumeOneFromHeldSlot(cont, threshold, player, selectedSlot, held);
 }
 
 // Sent by the client while the Creative inventory screen is open: picking an

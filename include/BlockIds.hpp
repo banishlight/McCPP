@@ -46,3 +46,13 @@ static constexpr Int32 DANDELION_STATE_ID = 2075;
 // Needed symbolically by BlockDropTable (a direct-ID lookup key, same
 // reasoning as the other direct-comparison constants above).
 static constexpr Int32 COBWEB_BLOCK_STATE_ID = 2004;
+// Moisture-0 / age-0 base state IDs for farming -- each occupies a
+// contiguous run of state IDs, one per property value (farmland: moisture
+// 0-7; wheat/carrots/potatoes: age 0-7; beetroots: age 0-3 only), in the
+// same order, so any property value's state ID is just base + value. Same
+// pattern as the two fluids above -- see CropBlocks.hpp.
+static constexpr Int32 FARMLAND_BLOCK_STATE_ID = 4286;
+static constexpr Int32 WHEAT_BASE_STATE_ID = 4278;
+static constexpr Int32 CARROTS_BASE_STATE_ID = 8595;
+static constexpr Int32 POTATOES_BASE_STATE_ID = 8603;
+static constexpr Int32 BEETROOT_BASE_STATE_ID = 12509;

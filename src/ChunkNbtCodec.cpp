@@ -2,6 +2,7 @@
 #include <BlockNames.hpp>
 #include <BlockIds.hpp>
 #include <FluidBlocks.hpp>
+#include <CropBlocks.hpp>
 #include <VanillaVersion.hpp>
 #include <vanilla/VanillaDataManager.hpp>
 #include <algorithm>
@@ -136,6 +137,38 @@ ChunkDecodeResult decodeChunk(const NbtTag& root, std::shared_ptr<Chunk>& out) {
                         continue;
                     }
 
+                    // Farmland (moisture 0-7) and the 4 crops (age 0-7, or
+                    // 0-3 for beetroots) are the same "one name, many real
+                    // states via a numeric property" shape as fluids above --
+                    // BlockTable only has a single (default) state row for
+                    // each of these 5 names, so routing anything but the
+                    // default state through BlockNames would silently produce
+                    // stone, the exact bug class fixed twice already this
+                    // session (oak_log/oak_leaves, and fluids before that).
+                    if (name == "minecraft:farmland") {
+                        int moisture = 0;
+                        if (propsTag) {
+                            const NbtTag* moistureTag = propsTag->get("moisture");
+                            if (moistureTag) moisture = std::stoi(moistureTag->asString());
+                        }
+                        resolvedIds.push_back(Crop::farmlandStateFor(moisture));
+                        continue;
+                    }
+                    Crop::Type cropType = (name == "minecraft:wheat") ? Crop::Type::Wheat
+                                        : (name == "minecraft:carrots") ? Crop::Type::Carrots
+                                        : (name == "minecraft:potatoes") ? Crop::Type::Potatoes
+                                        : (name == "minecraft:beetroots") ? Crop::Type::Beetroot
+                                        : Crop::Type::None;
+                    if (cropType != Crop::Type::None) {
+                        int age = 0;
+                        if (propsTag) {
+                            const NbtTag* ageTag = propsTag->get("age");
+                            if (ageTag) age = std::stoi(ageTag->asString());
+                        }
+                        resolvedIds.push_back(Crop::stateFor(cropType, age));
+                        continue;
+                    }
+
                     bool snowy = false;
                     if (propsTag) {
                         const NbtTag* snowyTag = propsTag->get("snowy");
@@ -254,6 +287,23 @@ NbtTag encodeChunk(const Chunk& chunk, int chunkX, int chunkZ) {
                 entry.put("Name", NbtTag::makeString(fluidType == Fluid::Type::Water ? "minecraft:water" : "minecraft:lava"));
                 NbtTag props = NbtTag::makeCompound();
                 props.put("level", NbtTag::makeString(std::to_string(level)));
+                entry.put("Properties", props);
+            } else if (Crop::isFarmland(id)) {
+                // See the matching decode-side comment: farmland's moisture
+                // property needs the same direct treatment fluids' level did.
+                entry.put("Name", NbtTag::makeString("minecraft:farmland"));
+                NbtTag props = NbtTag::makeCompound();
+                props.put("moisture", NbtTag::makeString(std::to_string(Crop::moistureOf(id))));
+                entry.put("Properties", props);
+            } else if (Crop::isCrop(id)) {
+                Crop::Type cropType = Crop::typeOf(id);
+                const char* cropName = (cropType == Crop::Type::Wheat) ? "minecraft:wheat"
+                                      : (cropType == Crop::Type::Carrots) ? "minecraft:carrots"
+                                      : (cropType == Crop::Type::Potatoes) ? "minecraft:potatoes"
+                                      : "minecraft:beetroots";
+                entry.put("Name", NbtTag::makeString(cropName));
+                NbtTag props = NbtTag::makeCompound();
+                props.put("age", NbtTag::makeString(std::to_string(Crop::ageOf(id))));
                 entry.put("Properties", props);
             } else {
                 entry.put("Name", NbtTag::makeString(BlockNames::blockStateIdToName(id)));

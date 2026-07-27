@@ -480,6 +480,13 @@ void CheckGravityBlock(World& world, int x, int y, int z);
 // source itself, is what gets a position onto the queue in the first place.
 void ResolveFluid(World& world, int x, int y, int z);
 
+// Called by CropGrowthSystem for positions CropGrowthQueue reports as due --
+// same relationship ResolveFluid has to FluidSystem/FluidUpdateQueue. Handles
+// both farmland (moisture update, possible revert to dirt) and crops (age
+// advancement) since both are scheduled through the same queue; see
+// CropBlocks.hpp for the block-state encoding.
+void ResolveCropGrowth(World& world, int x, int y, int z);
+
 // Called after every position update (matches vanilla: the Notchian server
 // only checks for pickups after Set Player Position/Set Player Position And
 // Rotation). Scans nearby tracked item entities and, for any the player has

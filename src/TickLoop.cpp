@@ -4,6 +4,7 @@
 #include <systems/ItemPhysicsSystem.hpp>
 #include <systems/FallingBlockSystem.hpp>
 #include <systems/FluidSystem.hpp>
+#include <systems/CropGrowthSystem.hpp>
 #include <systems/AutosaveSystem.hpp>
 #include <systems/ChunkUnloadSystem.hpp>
 #include <systems/DayNightSystem.hpp>
@@ -25,6 +26,7 @@ void TickLoop::initialize() {
     registerSystem(std::make_shared<ItemPhysicsSystem>());
     registerSystem(std::make_shared<FallingBlockSystem>());
     registerSystem(std::make_shared<FluidSystem>());
+    registerSystem(std::make_shared<CropGrowthSystem>());
     registerSystem(std::make_shared<ItemDespawnSystem>());
     registerSystem(std::make_shared<AutosaveSystem>());
     registerSystem(std::make_shared<ChunkUnloadSystem>());
