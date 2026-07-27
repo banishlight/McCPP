@@ -241,15 +241,61 @@ void World::setDayTime(Int64 dayTime) {
 bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
     int chunkX = floorDiv16(worldX);
     int chunkZ = floorDiv16(worldZ);
-    std::shared_ptr<Chunk> cached = getCachedChunk(chunkX, chunkZ);
-    if (!cached) return false;
-
     int localX = worldX - chunkX * 16;
     int localZ = worldZ - chunkZ * 16;
-    std::shared_ptr<Chunk> edited = std::make_shared<Chunk>(*cached);
-    edited->setBlock(localX, worldY, localZ, blockStateId);
-    LightEngine::computeLighting(*edited, *this);
-    cacheAsLit(chunkX, chunkZ, edited);
+
+    // Optimistic concurrency, not a single held lock across the whole
+    // function: LightEngine::computeLighting reads a 3x3-chunk neighborhood
+    // via this same class's own locked accessors (getCachedChunk/
+    // getOrGenerateTerrain), so it can't run while _chunkCacheMutex is held
+    // by this call too (std::mutex isn't recursive) -- widening the lock
+    // would deadlock. Instead: snapshot the current chunk, edit+relight a
+    // copy OUTSIDE the lock, then re-acquire the lock and only install the
+    // result if nobody else's setBlock replaced this exact chunk in the
+    // meantime; if they did, retry against the newer snapshot (our own edit
+    // gets re-applied on top of it, so nothing is lost either way).
+    //
+    // Without this, two concurrent setBlock calls on DIFFERENT positions in
+    // the SAME chunk -- e.g. a player tilling/planting while
+    // CropGrowthSystem's tick thread independently updates a nearby
+    // farmland/crop a moment later -- silently lose whichever edit's cache
+    // write lands first: a real, reported bug (tilled farmland rendered
+    // correctly client-side via the broadcast, since that part always ran,
+    // but never actually persisted server-side, so it reverted to its real,
+    // untouched state on the very next edit to that chunk, or on rejoin).
+    // Fluids/other earlier features never hit this in practice since they
+    // didn't drive frequent, chunk-dense background setBlock calls from the
+    // tick thread the way farming's per-tile moisture/growth checks do.
+    for (;;) {
+        std::shared_ptr<Chunk> base;
+        {
+            std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+            auto it = _chunkCache.find({chunkX, chunkZ});
+            if (it == _chunkCache.end()) return false;
+            base = it->second;
+        }
+
+        std::shared_ptr<Chunk> edited = std::make_shared<Chunk>(*base);
+        edited->setBlock(localX, worldY, localZ, blockStateId);
+        LightEngine::computeLighting(*edited, *this);
+
+        std::lock_guard<std::mutex> lock(_chunkCacheMutex);
+        auto it = _chunkCache.find({chunkX, chunkZ});
+        if (it == _chunkCache.end()) return false; // evicted while we were relighting
+        if (it->second != base) continue;          // someone else's edit landed first -- retry against it
+
+        it->second = edited;
+        auto cleanIt = _cleanChunks.find({chunkX, chunkZ});
+        if (cleanIt != _cleanChunks.end()) {
+            _cleanChunks.erase(cleanIt);
+        } else {
+            _dirtyChunks.insert({chunkX, chunkZ});
+        }
+        break;
+    }
+
+    std::lock_guard<std::mutex> lock(_terrainCacheMutex);
+    _terrainCache.erase({chunkX, chunkZ});
     return true;
 }
 

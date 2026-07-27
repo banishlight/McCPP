@@ -1753,8 +1753,23 @@ namespace {
     // project doesn't model. These constants get the same core loop (grows
     // faster near water + in light, eventually matures) without chasing
     // vanilla's exact timing.
-    constexpr int FARMLAND_CHECK_INTERVAL = 40;   // 2 seconds at 20 TPS
-    constexpr int CROP_CHECK_INTERVAL = 40;
+    //
+    // A RANGE, not a fixed interval: real vanilla's random tick is a random
+    // per-block sample, not a deterministic per-position schedule, so two
+    // farmland/crop blocks tilled/planted back-to-back naturally drift apart
+    // and never update in lockstep or in the exact order they were placed --
+    // a real, reported gap in an earlier fixed-interval version of this
+    // (every check landed on the same tick count relative to when it was
+    // scheduled, so a batch of farmland all reverted/grew in perfect,
+    // visibly-artificial tilling order). A uniform random pick within the
+    // range on every single schedule/reschedule call (not just the first)
+    // is what actually produces that organic drift -- fixing the RANGE alone
+    // without re-rolling each time would've just meant "always +/- the same
+    // offset from a fixed base," not real per-block independence.
+    constexpr int FARMLAND_CHECK_MIN_INTERVAL = 60;  // 3 seconds at 20 TPS
+    constexpr int FARMLAND_CHECK_MAX_INTERVAL = 140; // 7 seconds
+    constexpr int CROP_CHECK_MIN_INTERVAL = 60;
+    constexpr int CROP_CHECK_MAX_INTERVAL = 140;
     constexpr int CROP_MIN_LIGHT = 8;             // approximate -- real vanilla requires "not dark", exact threshold not decompile-verified here
     constexpr double CROP_GROWTH_CHANCE_WET = 0.15;  // farmland moisture > 0
     constexpr double CROP_GROWTH_CHANCE_DRY = 0.05;  // no wet farmland below (still allowed to grow, just slower)
@@ -1762,6 +1777,12 @@ namespace {
     double RollUnit() {
         thread_local std::mt19937 generator(std::random_device{}());
         thread_local std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        return distribution(generator);
+    }
+
+    int RandomDelay(int minTicks, int maxTicks) {
+        thread_local std::mt19937 generator(std::random_device{}());
+        std::uniform_int_distribution<int> distribution(minTicks, maxTicks);
         return distribution(generator);
     }
 
@@ -1817,7 +1838,7 @@ void ResolveCropGrowth(World& world, int x, int y, int z) {
             });
             return; // it's dirt now -- no more farmland checks needed
         }
-        CropGrowthQueue::getInstance().schedule(x, y, z, FARMLAND_CHECK_INTERVAL);
+        CropGrowthQueue::getInstance().schedule(x, y, z, RandomDelay(FARMLAND_CHECK_MIN_INTERVAL, FARMLAND_CHECK_MAX_INTERVAL));
         return;
     }
 
@@ -1838,7 +1859,7 @@ void ResolveCropGrowth(World& world, int x, int y, int z) {
                 });
             }
         }
-        CropGrowthQueue::getInstance().schedule(x, y, z, CROP_CHECK_INTERVAL);
+        CropGrowthQueue::getInstance().schedule(x, y, z, RandomDelay(CROP_CHECK_MIN_INTERVAL, CROP_CHECK_MAX_INTERVAL));
     }
 }
 
@@ -2417,7 +2438,7 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
             BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, farmlandId](int broadcastThreshold) {
                 return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, farmlandId);
             });
-            CropGrowthQueue::getInstance().schedule(x, y, z, 40);
+            CropGrowthQueue::getInstance().schedule(x, y, z, RandomDelay(FARMLAND_CHECK_MIN_INTERVAL, FARMLAND_CHECK_MAX_INTERVAL));
             cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
             return;
         }
@@ -2438,7 +2459,7 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
             BroadcastToChunkViewers(floorDiv16(x), floorDiv16(z), [x, y, z, cropId](int broadcastThreshold) {
                 return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, cropId);
             });
-            CropGrowthQueue::getInstance().schedule(x, y, z, 40);
+            CropGrowthQueue::getInstance().schedule(x, y, z, RandomDelay(CROP_CHECK_MIN_INTERVAL, CROP_CHECK_MAX_INTERVAL));
             cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
             ConsumeOneFromHeldSlot(cont, threshold, player, selectedSlot, held);
             return;
