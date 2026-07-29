@@ -1979,7 +1979,18 @@ void ResolveCropGrowth(World& world, int x, int y, int z) {
 }
 
 void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
-    const double PICKUP_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's AABB pickup range
+    // A single spherical radius around player.getY() (the FEET position)
+    // was wrong: real vanilla pickup is really "does the item overlap the
+    // player's whole body volume" -- a 0.6-wide, ~1.8-tall box from the
+    // player's feet up to over their head, not a 1-block sphere centered on
+    // the feet. Horizontal reach and vertical reach need separate checks, or
+    // any item sitting near head height (dy approaching 1.8 on its own)
+    // fails the combined dx^2+dy^2+dz^2 radius before dx/dz are even
+    // considered -- a real, reported bug (items adjacent to the player's
+    // head were never pickup-able, only ones down near their feet).
+    const double PICKUP_HORIZONTAL_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's horizontal reach
+    const double PLAYER_HEIGHT = 1.8; // real vanilla standing hitbox height
+    const double PICKUP_VERTICAL_MARGIN = 0.5; // slop above/below the hitbox itself, matching vanilla's own inflate
     const double MIN_PICKUP_AGE_SECONDS = 0.5; // matches vanilla's 10-tick pickup delay
 
     ItemEntityManager& manager = ItemEntityManager::getInstance();
@@ -1989,9 +2000,10 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
         if (age < MIN_PICKUP_AGE_SECONDS) continue;
 
         double dx = entity.x - player.getX();
-        double dy = entity.y - player.getY();
         double dz = entity.z - player.getZ();
-        if (dx * dx + dy * dy + dz * dz > PICKUP_RADIUS_SQUARED) continue;
+        if (dx * dx + dz * dz > PICKUP_HORIZONTAL_RADIUS_SQUARED) continue;
+        if (entity.y < player.getY() - PICKUP_VERTICAL_MARGIN ||
+            entity.y > player.getY() + PLAYER_HEIGHT + PICKUP_VERTICAL_MARGIN) continue;
 
         if (!player.hasRoomFor(entity.itemId)) continue;
         if (!manager.tryClaim(entity.entityId)) continue; // someone else got it first

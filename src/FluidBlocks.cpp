@@ -45,7 +45,7 @@ int levelDecreasePerBlock(Type type) {
 
 Int32 sourceId(Type type) { return baseId(type); }
 Int32 fallingId(Type type) { return baseId(type) + 8; }
-// Int32 flowingId(Type type, int distance) { return baseId(type) + (8 - distance); }
 Int32 flowingId(Type type, int distance) { return baseId(type) + distance; }
+// Int32 flowingId(Type type, int distance) { return baseId(type) + (8 - distance); }
 
 }
