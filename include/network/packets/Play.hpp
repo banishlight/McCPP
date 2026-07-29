@@ -468,6 +468,12 @@ void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::sh
 // block is itself an edit that can unsupport the block above it.
 void CheckGravityBlock(World& world, int x, int y, int z);
 
+// Checks whether (x,y,z) is one of the non-solid "plant" blocks (short grass,
+// poppy, dandelion) and, if its support (the block directly below) is gone
+// (air or fluid), breaks it with a real drop -- same "does my support still
+// exist" shape as CheckGravityBlock, called from the same places.
+void CheckPlantSupport(World& world, int x, int y, int z);
+
 // Re-derives what fluid (if any) belongs at (x,y,z) from its neighbors and
 // applies the change if it differs from what's there now -- handles both
 // growth (air becoming water/lava fed from a source) and decay (flowing

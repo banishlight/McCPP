@@ -1373,6 +1373,51 @@ void BroadcastToChunkViewers(int chunkX, int chunkZ, const std::function<std::sh
     }
 }
 
+namespace {
+    // Shared by CheckPlantSupport and ResolveFluid's plant/crop destruction --
+    // the same spawn-a-real-pickup-able-entity-and-broadcast-it sequence the
+    // break handler uses, factored out now that it's needed in more than one
+    // place (the break handler's own two call sites are older/already-tested
+    // code, left as-is rather than churned for this).
+    void SpawnDroppedItem(int chunkX, int chunkZ, double dropX, double dropY, double dropZ, Int32 itemId, Int32 count) {
+        const int ITEM_ENTITY_TYPE_ID = 58;
+        ItemEntity dropped = ItemEntityManager::getInstance().spawn(itemId, count, dropX, dropY, dropZ, chunkX, chunkZ);
+        std::vector<long> uuid = generateRandomUUID(); // one-time, not persisted -- only needed for this Spawn_Entity_p
+        int entityId = dropped.entityId;
+        BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
+            return std::make_shared<Spawn_Entity_p>(broadcastThreshold, entityId, uuid, ITEM_ENTITY_TYPE_ID, dropX, dropY, dropZ);
+        });
+        BroadcastToChunkViewers(chunkX, chunkZ, [entityId, itemId, count](int broadcastThreshold) {
+            return std::make_shared<Set_Entity_Metadata_p>(broadcastThreshold, entityId, itemId, count);
+        });
+    }
+
+    // The one real drop-resolution sequence a break (of any origin -- player,
+    // lost support, fluid sweep) should go through: BlockDropTable's override
+    // table first, falling back to "drops itself" when there's no entry, plus
+    // whatever independent bonus stack (mature wheat/beetroot's bonus seeds)
+    // applies. Always with a default (no Fortune/Silk Touch) ToolInfo -- none
+    // of these call sites represent an actual player-held tool.
+    void SpawnBlockBreakDrops(int x, int y, int z, int chunkX, int chunkZ, Int32 blockStateId) {
+        BlockDropTable::ToolInfo tool;
+        Int32 dropItemId, dropCount;
+        if (!BlockDropTable::CheckDrop(blockStateId, tool, dropItemId, dropCount)) {
+            dropItemId = blockStateIdToItemId(blockStateId);
+            dropCount = 1;
+        }
+        Int32 bonusDropItemId = -1, bonusDropCount = 0;
+        BlockDropTable::CheckBonusDrop(blockStateId, tool, bonusDropItemId, bonusDropCount);
+
+        double dropX = x + 0.5, dropY = y + 0.5, dropZ = z + 0.5;
+        if (dropItemId >= 0 && dropCount > 0) {
+            SpawnDroppedItem(chunkX, chunkZ, dropX, dropY, dropZ, dropItemId, dropCount);
+        }
+        if (bonusDropItemId >= 0 && bonusDropCount > 0) {
+            SpawnDroppedItem(chunkX, chunkZ, dropX, dropY, dropZ, bonusDropItemId, bonusDropCount);
+        }
+    }
+}
+
 void CheckGravityBlock(World& world, int x, int y, int z) {
     // Above the build limit -- Chunk's flat array has no room past WORLD_HEIGHT,
     // and there's nothing there anyway. Below the floor never happens (callers
@@ -1422,6 +1467,49 @@ void CheckGravityBlock(World& world, int x, int y, int z) {
     // Cascade: the position that just became air might itself have been
     // supporting another gravity block directly above it.
     CheckGravityBlock(world, x, y + 1, z);
+    // ...or a plant (grass/flowers need solid ground, same as sand needs air
+    // below it -- both are "does my support still exist" checks).
+    CheckPlantSupport(world, x, y + 1, z);
+}
+
+// Short grass/poppy/dandelion (the only 3 non-solid "plant" blocks this
+// project places, see BlockIds.hpp) require a real block directly beneath
+// them, same as real vanilla -- if that support disappears (broken by a
+// player, or exposed by a gravity block falling out from under it), the
+// plant pops off exactly like a direct player break would: real drop table
+// lookup, real dropped-item entity, not silently deleted.
+void CheckPlantSupport(World& world, int x, int y, int z) {
+    if (y < Chunk::WORLD_MIN_Y || y >= Chunk::WORLD_MIN_Y + Chunk::WORLD_HEIGHT) return;
+
+    int chunkX = floorDiv16(x);
+    int chunkZ = floorDiv16(z);
+    std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+    if (!chunk) return;
+
+    int localX = x - chunkX * 16;
+    int localZ = z - chunkZ * 16;
+    Int32 blockId = chunk->getBlock(localX, y, localZ);
+    bool isPlant = (blockId == SHORT_GRASS_STATE_ID || blockId == POPPY_STATE_ID || blockId == DANDELION_STATE_ID);
+    if (!isPlant) return;
+
+    if (y <= Chunk::WORLD_MIN_Y) return; // world floor counts as solid support
+    Int32 below = chunk->getBlock(localX, y - 1, localZ);
+    // Supported by anything solid; unsupported if it's air OR fluid just
+    // flowed/fell into that spot (a plant can't stand on open water either).
+    if (below != AIR_BLOCK_STATE_ID && Fluid::typeOf(below) == Fluid::Type::None) return;
+
+    world.setBlock(x, y, z, AIR_BLOCK_STATE_ID);
+    BroadcastToChunkViewers(chunkX, chunkZ, [x, y, z](int broadcastThreshold) {
+        return std::make_shared<Block_Update_p>(broadcastThreshold, x, y, z, AIR_BLOCK_STATE_ID);
+    });
+    SpawnBlockBreakDrops(x, y, z, chunkX, chunkZ, blockId);
+
+    // Cascade: this plant's own position just became air -- something might
+    // have been resting directly on top of IT too (another plant, or a
+    // gravity block that was, unrealistically but pre-existing, treated as
+    // supported by a non-solid plant beneath it).
+    CheckGravityBlock(world, x, y + 1, z);
+    CheckPlantSupport(world, x, y + 1, z);
 }
 
 namespace {
@@ -1702,18 +1790,29 @@ void ResolveFluid(World& world, int x, int y, int z) {
         ScheduleFluidNeighbors(x, y, z, FluidTickInterval(currentType));
         return;
     }
-    if (currentType == Fluid::Type::None && current != AIR_BLOCK_STATE_ID) {
-        return; // solid block -- fluids only ever flow into open air (no
-                // waterlogging/passable-block concept in this project yet)
+    // Short grass/poppy/dandelion and crops (wheat/carrots/potatoes/beetroot,
+    // any growth stage) are the exception to "fluids only ever flow into open
+    // air": real vanilla treats non-solid plants as replaceable by flowing
+    // fluid, breaking them with a real drop -- this is the actual mechanic
+    // "auto farms" rely on (flood a field of mature crops; the water breaks
+    // each one and the current sweeps the drops to a collection point), not
+    // a silent removal. Applies for water and lava since both use this
+    // project's one shared supply/spread logic below. Everything else solid
+    // still fully blocks flow (no waterlogging/passable-block concept
+    // otherwise).
+    bool currentIsPlant = (current == SHORT_GRASS_STATE_ID || current == POPPY_STATE_ID ||
+                            current == DANDELION_STATE_ID || Crop::isCrop(current));
+    if (currentType == Fluid::Type::None && current != AIR_BLOCK_STATE_ID && !currentIsPlant) {
+        return; // solid block
     }
 
     // A tile already holding one fluid type is never overridden by a
     // different type reaching it -- only the SAME type can
     // supply/strengthen/sustain an already-fluid position (the opposite type
     // reacts via TryApplyFluidReaction above instead of ever "claiming" the
-    // tile outright). A fresh air tile has no restriction: whichever type
-    // reaches it first claims it (see the note below).
-    Fluid::Type restrictType = currentType; // None when currently air
+    // tile outright). A fresh air (or plant) tile has no restriction:
+    // whichever type reaches it first claims it (see the note below).
+    Fluid::Type restrictType = currentType; // None when currently air or a plant
 
     FluidSupply supply = FindFluidSupply(world, x, y, z, restrictType);
     // Note: a fresh air tile with both a water and a lava candidate reaching
@@ -1721,8 +1820,24 @@ void ResolveFluid(World& world, int x, int y, int z) {
     // (checked in BFS order) -- a narrow, accepted gap, unrelated to the
     // mixing reactions above (which only fire on tiles already holding fluid).
 
+    if (currentIsPlant && supply.type == Fluid::Type::None) {
+        // Scheduled (every edit nearby schedules its 6 neighbors) but no
+        // fluid actually reaches here -- leave the plant alone. Without this,
+        // the "desired == current" quiesce check below would never match
+        // (desired defaults to AIR, current is the plant's own block ID) and
+        // every plant that ever got scheduled would be destroyed regardless
+        // of whether fluid was really present.
+        return;
+    }
+
     Int32 desired = (supply.type == Fluid::Type::None) ? AIR_BLOCK_STATE_ID
                   : (supply.falling ? Fluid::fallingId(supply.type) : Fluid::flowingId(supply.type, supply.distance));
+    if (currentIsPlant && desired != current) {
+        // Real fluid is about to claim this position -- break whatever
+        // plant/crop is here first, with the same drops (including mature
+        // wheat/beetroot's bonus seeds) a direct player break would give.
+        SpawnBlockBreakDrops(x, y, z, floorDiv16(x), floorDiv16(z), current);
+    }
     if (desired == current) {
         // Already correct -- normally quiesces here with no further
         // scheduling. But if the opposite fluid is directly adjacent, keep
@@ -2196,8 +2311,10 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
         cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
 
         // The block just vacated might have been the only thing holding up a
-        // sand/gravel block directly above it.
+        // sand/gravel block directly above it...
         CheckGravityBlock(world, loc.x, loc.y + 1, loc.z);
+        // ...or a plant that needs solid ground under it.
+        CheckPlantSupport(world, loc.x, loc.y + 1, loc.z);
         // ...or the only thing blocking a neighboring fluid from spreading
         // into the new opening.
         ScheduleFluidNeighbors(loc.x, loc.y, loc.z, 1);
