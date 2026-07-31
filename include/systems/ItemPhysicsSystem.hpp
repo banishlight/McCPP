@@ -19,4 +19,16 @@ class ItemPhysicsSystem : public TickSystem {
     private:
         static constexpr double GRAVITY = 0.04; // blocks/tick^2
         static constexpr double DRAG = 0.98; // horizontal velocity retained per tick
+        // Fluid push can't run the exact same physics as the real client (see
+        // ComputeFluidPush's own comment in the .cpp), so the server's tracked
+        // position drifts continuously from what the client independently
+        // renders. Correcting only on a big velocity change let that drift
+        // build up silently for many ticks and then snap the client backward
+        // all at once -- fixed by sending small, frequent position deltas
+        // instead of rare, large absolute corrections while an item is
+        // fluid-pushed. Every tick would be more network traffic than this
+        // needs (every actively-pushed item, broadcast to every viewer, at
+        // 20/sec); every 4th tick keeps corrections small enough to be
+        // imperceptible without the cost of full tick-rate broadcasting.
+        static constexpr Int64 FLUID_POSITION_BROADCAST_INTERVAL = 4;
 };

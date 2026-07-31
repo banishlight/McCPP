@@ -180,33 +180,71 @@ void ItemPhysicsSystem::onTick(Int64 tickCount) {
         // every tick, independent of whether clients get a correction this tick.
         manager.updatePosition(entity.entityId, newX, newY, newZ, newVx, newVy, newVz, newChunkX, newChunkZ);
 
-        // Broadcasting a position correction every tick fights the client's own
-        // local physics simulation of this entity: only re-sync when velocity
-        // changes by more than 0.1 units squared, trusting the client to
-        // extrapolate the rest -- sending every tick caused visible stutter,
-        // especially for the larger per-tick steps of a horizontal toss. This
-        // applies to fluid push too, now that push itself is computed
-        // correctly every tick (see the own-layer fluid check above): pickup
-        // range and the despawn sweep both read `manager`'s internally tracked
-        // position directly, which stays authoritative every tick regardless
-        // of whether a broadcast happens, so nothing about correctness depends
-        // on sending a correction here. A prior version of this forced a hard
-        // re-sync on a fixed interval specifically while fluid-pushed, meant
-        // to bound drift from an earlier (since-fixed) bug -- but with the
-        // real bug gone, that forced correction just fought the client's own
-        // otherwise-consistent prediction, causing a visible snap backward
-        // every interval (a real, reported regression: "teleporting back
-        // where they were every second interval"). Removed.
+        int entityId = entity.entityId;
+        bool inFluid = (ownFluidType != Fluid::Type::None || belowFluidType != Fluid::Type::None);
         double dvx = newVx - entity.vx, dvy = newVy - entity.vy, dvz = newVz - entity.vz;
         bool velocityDirty = (dvx * dvx + dvy * dvy + dvz * dvz) > 0.1;
-        if (velocityDirty) {
-            int entityId = entity.entityId;
+
+        if (inFluid) {
+            // See FLUID_POSITION_BROADCAST_INTERVAL's comment (header): the
+            // server's simplified push model can't stay bit-identical to the
+            // real client's, so trajectories drift apart continuously. Rather
+            // than wait for a big velocity change (which lets that drift
+            // build up invisibly, then snaps the client backward all at once
+            // -- a real, reported "rubberbanding" symptom), send small
+            // position corrections on a fixed cadence, delta-encoded exactly
+            // like PlayerVisibilityManager::broadcastMovement already does
+            // for ordinary player movement (falling back to an absolute
+            // Teleport_Entity_p only if a correction somehow exceeds the
+            // delta format's +-8-block range).
+            if (tickCount % FLUID_POSITION_BROADCAST_INTERVAL == 0) {
+                double bdx = newX - entity.lastBroadcastX;
+                double bdy = newY - entity.lastBroadcastY;
+                double bdz = newZ - entity.lastBroadcastZ;
+                if (bdx != 0.0 || bdy != 0.0 || bdz != 0.0) {
+                    bool withinDeltaRange = std::abs(bdx) <= 7.99 && std::abs(bdy) <= 7.99 && std::abs(bdz) <= 7.99;
+                    if (withinDeltaRange) {
+                        Int16 deltaX = static_cast<Int16>(bdx * 4096.0);
+                        Int16 deltaY = static_cast<Int16>(bdy * 4096.0);
+                        Int16 deltaZ = static_cast<Int16>(bdz * 4096.0);
+                        BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, deltaX, deltaY, deltaZ, onGround](int threshold) {
+                            return std::make_shared<Update_Entity_Position_p>(threshold, entityId, deltaX, deltaY, deltaZ, onGround);
+                        });
+                    } else {
+                        BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newX, newY, newZ, onGround](int threshold) {
+                            return std::make_shared<Teleport_Entity_p>(threshold, entityId, newX, newY, newZ, 0.0f, 0.0f, onGround);
+                        });
+                    }
+                    manager.markPositionBroadcast(entityId, newX, newY, newZ);
+                }
+            }
+            // Velocity stays on the old "only when it meaningfully changes"
+            // rule, decoupled from the position cadence above -- once a
+            // current is established, the client extrapolates fine between
+            // position corrections without a fresh velocity value every 4
+            // ticks too.
+            if (velocityDirty) {
+                BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newVx, newVy, newVz](int threshold) {
+                    return std::make_shared<Set_Entity_Velocity_p>(threshold, entityId, newVx, newVy, newVz);
+                });
+            }
+        } else if (velocityDirty) {
+            // Gravity/ground, unchanged: a real free-fall arc is one the
+            // client can extrapolate identically from a single velocity
+            // value (both sides run the same simple constant-gravity
+            // formula), so rare corrections only on a real velocity change
+            // are enough here -- this branch never runs the approximate
+            // fluid model that motivated the above. Still updates the
+            // fluid-delta baseline (markPositionBroadcast) so a later entry
+            // into fluid push isn't computing its first delta against a
+            // stale, long-out-of-date position.
             BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newX, newY, newZ, onGround](int threshold) {
                 return std::make_shared<Teleport_Entity_p>(threshold, entityId, newX, newY, newZ, 0.0f, 0.0f, onGround);
             });
             BroadcastToChunkViewers(newChunkX, newChunkZ, [entityId, newVx, newVy, newVz](int threshold) {
                 return std::make_shared<Set_Entity_Velocity_p>(threshold, entityId, newVx, newVy, newVz);
             });
+            manager.markPositionBroadcast(entityId, newX, newY, newZ);
         }
     }
 }

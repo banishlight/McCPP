@@ -1991,13 +1991,17 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
     const double PICKUP_HORIZONTAL_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's horizontal reach
     const double PLAYER_HEIGHT = 1.8; // real vanilla standing hitbox height
     const double PICKUP_VERTICAL_MARGIN = 0.5; // slop above/below the hitbox itself, matching vanilla's own inflate
-    const double MIN_PICKUP_AGE_SECONDS = 0.5; // matches vanilla's 10-tick pickup delay
 
     ItemEntityManager& manager = ItemEntityManager::getInstance();
     auto now = std::chrono::steady_clock::now();
     for (const ItemEntity& entity : manager.snapshot()) {
         double age = std::chrono::duration<double>(now - entity.spawnTime).count();
-        if (age < MIN_PICKUP_AGE_SECONDS) continue;
+        // Per-entity, not a flat constant: a break-drop becomes pickup-able
+        // almost immediately (ITEM_PICKUP_DELAY_BREAK_SECONDS), but a
+        // player-tossed item needs the longer real-vanilla delay
+        // (ITEM_PICKUP_DELAY_TOSS_SECONDS) so it isn't immediately re-grabbed
+        // by the same player before it's actually moved away -- see spawn().
+        if (age < entity.pickupDelaySeconds) continue;
 
         double dx = entity.x - player.getX();
         double dz = entity.z - player.getZ();
@@ -2417,7 +2421,7 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             double dropX = player.getX(), dropY = player.getY() + 1.2, dropZ = player.getZ();
             int chunkX = floorDiv16(static_cast<int>(std::floor(dropX)));
             int chunkZ = floorDiv16(static_cast<int>(std::floor(dropZ)));
-            ItemEntity dropped = ItemEntityManager::getInstance().spawn(held.itemId, dropCount, dropX, dropY, dropZ, chunkX, chunkZ, vx, vy, vz);
+            ItemEntity dropped = ItemEntityManager::getInstance().spawn(held.itemId, dropCount, dropX, dropY, dropZ, chunkX, chunkZ, vx, vy, vz, ITEM_PICKUP_DELAY_TOSS_SECONDS);
             std::vector<long> uuid = generateRandomUUID();
             int entityId = dropped.entityId;
             BroadcastToChunkViewers(chunkX, chunkZ, [entityId, uuid, dropX, dropY, dropZ, ITEM_ENTITY_TYPE_ID](int broadcastThreshold) {
@@ -2700,7 +2704,7 @@ void Set_Creative_Mode_Slot_p::deserialize(std::vector<Byte> in_buff, PacketCont
         double px = player.getX(), py = player.getY(), pz = player.getZ();
         int chunkX = floorDiv16(static_cast<int>(std::floor(px)));
         int chunkZ = floorDiv16(static_cast<int>(std::floor(pz)));
-        ItemEntity dropped = ItemEntityManager::getInstance().spawn(item.itemId, item.count, px, py + 1.0, pz, chunkX, chunkZ);
+        ItemEntity dropped = ItemEntityManager::getInstance().spawn(item.itemId, item.count, px, py + 1.0, pz, chunkX, chunkZ, 0.0, 0.0, 0.0, ITEM_PICKUP_DELAY_TOSS_SECONDS);
         std::vector<long> uuid = generateRandomUUID();
         int entityId = dropped.entityId;
         const int ITEM_ENTITY_TYPE_ID = 58;
@@ -2731,7 +2735,7 @@ namespace {
         double px = player.getX(), py = player.getY(), pz = player.getZ();
         int chunkX = floorDiv16(static_cast<int>(std::floor(px)));
         int chunkZ = floorDiv16(static_cast<int>(std::floor(pz)));
-        ItemEntity dropped = ItemEntityManager::getInstance().spawn(itemId, count, px, py + 1.0, pz, chunkX, chunkZ);
+        ItemEntity dropped = ItemEntityManager::getInstance().spawn(itemId, count, px, py + 1.0, pz, chunkX, chunkZ, 0.0, 0.0, 0.0, ITEM_PICKUP_DELAY_TOSS_SECONDS);
         std::vector<long> uuid = generateRandomUUID();
         int entityId = dropped.entityId;
         const int ITEM_ENTITY_TYPE_ID = 58;
