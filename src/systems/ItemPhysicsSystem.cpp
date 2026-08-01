@@ -9,11 +9,18 @@
 #include <algorithm>
 
 namespace {
+    // Real vanilla item hitbox: 0.25 x 0.25 x 0.25 (EntityType.ITEM's fixed,
+    // version-stable dimensions) -- only the horizontal footprint matters
+    // here, since items already rest at an exact-integer Y (see onTick's
+    // resting logic) and never straddle a Y boundary the way they can
+    // straddle an X/Z one.
+    constexpr double ITEM_HALF_WIDTH = 0.125;
+
     // Height proxy for flow-gradient purposes, built from this project's own
     // level/distance abstractions (FluidBlocks.hpp) rather than reproducing
     // vanilla's fractional height formula -- sufficient for direction, which
-    // is all this single-column, no-buoyancy item model needs. -1 means "not
-    // part of this fluid's flow network" (a different fluid type, or a
+    // is all this single-Y-layer, no-buoyancy item model needs. -1 means
+    // "not part of this fluid's flow network" (a different fluid type, or a
     // genuinely solid block that blocks the edge).
     int FlowHeight(Int32 blockId, Fluid::Type matchType) {
         if (blockId == AIR_BLOCK_STATE_ID) return 0; // open edge -- pulls flow outward, matches vanilla
@@ -26,28 +33,27 @@ namespace {
         return Fluid::distanceOf(blockId);
     }
 
-    // Real vanilla sweeps entities (dropped items included) along with a
-    // flowing current -- the actual mechanic behind "water auto farms"
-    // collecting drops at one spot -- and the real client already simulates
-    // this locally from the block state alone, with no server involvement.
-    // Without a server-side equivalent, ItemEntityManager's authoritative
-    // tracked position (what TryPickupNearbyItems' distance check and the
-    // despawn sweep both use) stays wherever the item was originally dropped
-    // even though the client visibly slides it along the current -- a real
-    // reported bug (could see the item moved client-side, but had to walk to
-    // where it USED to be to actually pick it up).
-    bool ComputeFluidPush(World& world, int blockX, int blockY, int blockZ, Int32 fluidBlockId, double& outVx, double& outVz) {
-        Fluid::Type type = Fluid::typeOf(fluidBlockId);
-        if (type == Fluid::Type::None) return false;
+    // One fluid cell's own raw (unnormalized, unscaled) flow-direction
+    // vector -- the weighted sum of unit vectors toward each of its 4
+    // horizontal neighbors, by how much lower/higher that neighbor's height
+    // is. This is the per-cell piece real vanilla's FluidState.getFlow
+    // computes; an entity whose hitbox overlaps several cells averages
+    // several of these together (see ComputeFluidPush) rather than trusting
+    // only the single cell under its own reported position.
+    bool ComputeCellFlow(World& world, int cellX, int cellZ, int blockY, Fluid::Type type, double& outVx, double& outVz) {
+        int chunkX = floorDiv16(cellX), chunkZ = floorDiv16(cellZ);
+        std::shared_ptr<Chunk> chunk = world.getCachedChunk(chunkX, chunkZ);
+        if (!chunk) return false;
+        Int32 cellId = chunk->getBlock(cellX - chunkX * 16, blockY, cellZ - chunkZ * 16);
+        if (Fluid::typeOf(cellId) != type) return false; // this cell isn't (this) fluid -- doesn't contribute
 
-        int baseHeight = (Fluid::isSource(fluidBlockId) || Fluid::isFalling(fluidBlockId))
-                       ? 8 : Fluid::distanceOf(fluidBlockId);
+        int baseHeight = (Fluid::isSource(cellId) || Fluid::isFalling(cellId)) ? 8 : Fluid::distanceOf(cellId);
 
         static constexpr int dx[4] = {1, -1, 0, 0};
         static constexpr int dz[4] = {0, 0, 1, -1};
         double vx = 0.0, vz = 0.0;
         for (int i = 0; i < 4; i++) {
-            int nx = blockX + dx[i], nz = blockZ + dz[i];
+            int nx = cellX + dx[i], nz = cellZ + dz[i];
             int nChunkX = floorDiv16(nx), nChunkZ = floorDiv16(nz);
             std::shared_ptr<Chunk> nChunk = world.getCachedChunk(nChunkX, nChunkZ);
             if (!nChunk) continue;
@@ -60,16 +66,84 @@ namespace {
             vz += dz[i] * diff;
         }
         if (vx == 0.0 && vz == 0.0) return false; // symmetric surroundings (e.g. still water) -- no net push
+        outVx = vx;
+        outVz = vz;
+        return true;
+    }
 
+    // Real vanilla sweeps entities (dropped items included) along with a
+    // flowing current -- the actual mechanic behind "water auto farms"
+    // collecting drops at one spot -- and the real client already simulates
+    // this locally from the block state alone, with no server involvement.
+    // Without a server-side equivalent, ItemEntityManager's authoritative
+    // tracked position (what TryPickupNearbyItems' distance check and the
+    // despawn sweep both use) stays wherever the item was originally dropped
+    // even though the client visibly slides it along the current -- a real
+    // reported bug (could see the item moved client-side, but had to walk to
+    // where it USED to be to actually pick it up).
+    //
+    // Decompile-confirmed against the real client
+    // (Entity.updateFluidHeightAndDoFluidPushing): it averages the flow
+    // vector across every block cell the entity's actual bounding box
+    // overlaps, not a single point under its reported position -- for a
+    // 0.25-wide item that's normally one cell, but straddling a block
+    // boundary can touch up to 4. Sampling only the item's own single column
+    // (this project's first version) was a real, disclosed approximation
+    // gap versus this real per-cell averaging.
+    bool ComputeFluidPush(World& world, double entityX, double entityZ, int blockY, Int32 fluidBlockId,
+                          double entityVx, double entityVz, double& outVx, double& outVz) {
+        Fluid::Type type = Fluid::typeOf(fluidBlockId);
+        if (type == Fluid::Type::None) return false;
+
+        int minX = static_cast<int>(std::floor(entityX - ITEM_HALF_WIDTH));
+        int maxX = static_cast<int>(std::floor(entityX + ITEM_HALF_WIDTH));
+        int minZ = static_cast<int>(std::floor(entityZ - ITEM_HALF_WIDTH));
+        int maxZ = static_cast<int>(std::floor(entityZ + ITEM_HALF_WIDTH));
+
+        double sumVx = 0.0, sumVz = 0.0;
+        int sampleCount = 0;
+        for (int cx = minX; cx <= maxX; cx++) {
+            for (int cz = minZ; cz <= maxZ; cz++) {
+                double cvx, cvz;
+                if (ComputeCellFlow(world, cx, cz, blockY, type, cvx, cvz)) {
+                    sumVx += cvx;
+                    sumVz += cvz;
+                    sampleCount++;
+                }
+            }
+        }
+        if (sampleCount == 0) return false; // no overlapped cell is (this) fluid with a real gradient
+
+        double vx = sumVx / sampleCount, vz = sumVz / sampleCount;
         double length = std::sqrt(vx * vx + vz * vz);
+        if (length == 0.0) return false; // averaged out to nothing (e.g. still water) -- no net push
+
         // Real vanilla constants, decompile-verified against the actual 1.21
         // client (Entity.updateFluidHeightAndDoFluidPushing's call sites):
         // water pushes at 0.014, lava at 0.0023333333333333335 in a
         // non-ultrawarm dimension (this project has no Nether, so that's the
         // only lava rate that applies -- the Nether rate is a separate 0.007).
         const double FLOW_SPEED = (type == Fluid::Type::Lava) ? 0.0023333333333333335 : 0.014;
-        outVx = (vx / length) * FLOW_SPEED;
-        outVz = (vz / length) * FLOW_SPEED;
+        double pushVx = (vx / length) * FLOW_SPEED;
+        double pushVz = (vz / length) * FLOW_SPEED;
+
+        // Real vanilla's minimum-speed floor: once the entity is already
+        // nearly stationary and the computed push is weaker than 0.0045,
+        // it's boosted up to exactly that magnitude in the same direction --
+        // without this, lava's much weaker 0.0023 constant (the only case
+        // this ever actually changes, since water's 0.014 already clears the
+        // floor on its own) would leave a resting item barely moving instead
+        // of visibly riding the current.
+        const double MIN_PUSH_SPEED = 0.0045;
+        const double NEAR_STATIONARY = 0.003;
+        double pushLength = std::sqrt(pushVx * pushVx + pushVz * pushVz);
+        if (std::abs(entityVx) < NEAR_STATIONARY && std::abs(entityVz) < NEAR_STATIONARY && pushLength < MIN_PUSH_SPEED) {
+            pushVx = (pushVx / pushLength) * MIN_PUSH_SPEED;
+            pushVz = (pushVz / pushLength) * MIN_PUSH_SPEED;
+        }
+
+        outVx = pushVx;
+        outVz = pushVz;
         return true;
     }
 }
@@ -140,8 +214,8 @@ void ItemPhysicsSystem::onTick(Int64 tickCount) {
             Fluid::Type fluidType = Fluid::typeOf(fluidBlockId);
             newY = fluidBlockY + 1;
             double pushAx = 0.0, pushAz = 0.0;
-            bool pushed = ComputeFluidPush(world, static_cast<int>(std::floor(entity.x)), fluidBlockY,
-                                            static_cast<int>(std::floor(entity.z)), fluidBlockId, pushAx, pushAz);
+            bool pushed = ComputeFluidPush(world, entity.x, entity.z, fluidBlockY, fluidBlockId,
+                                            entity.vx, entity.vz, pushAx, pushAz);
             double vx = entity.vx + (pushed ? pushAx : 0.0);
             double vz = entity.vz + (pushed ? pushAz : 0.0);
             const double FLUID_MOVEMENT_DRAG = (fluidType == Fluid::Type::Lava) ? 0.95 : 0.99;
