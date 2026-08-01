@@ -212,7 +212,8 @@ void Console::processInput() {
             } else if (c == 27) { // ESC sequence (arrow keys, etc.) - swallow, no editing yet
                 char seq[2];
                 if (read(STDIN_FILENO, &seq[0], 1) > 0 && seq[0] == '[') {
-                    read(STDIN_FILENO, &seq[1], 1);
+                    ssize_t seqN = read(STDIN_FILENO, &seq[1], 1);
+                    if (seqN < 0) continue;
                 }
             } else if (std::isprint(static_cast<unsigned char>(c)) &&
                        static_cast<int>(prompt.size() + inputBuffer.size()) < termCols - 1) {
