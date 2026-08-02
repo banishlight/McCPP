@@ -68,5 +68,4 @@ So that I can help diagnose the issue.
 
 
 ## Known Issues
-- Player model hats are not given to player, but seen by other players.
-- ~~Lava texture is displayed as water?~~ Fixed 2026-07-26 (missing fluid tag sync)
+- Items entities moving through what have a lot of rubberbanding movement
