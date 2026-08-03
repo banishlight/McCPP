@@ -35,6 +35,8 @@ class Player {
         // sub-range, not a separate copy.
         static constexpr int TOTAL_SLOTS = 46;
         static constexpr int HOTBAR_START = 36;
+        static constexpr int MAIN_STORAGE_START = 9;
+        static constexpr int MAIN_STORAGE_SIZE = 27;
         Player();
         string getUsername() const;
         void setUsername(const string& username);
@@ -113,14 +115,17 @@ class Player {
         // Read-only capacity check (existing partial stack with room, or an
         // empty slot) -- callers should check this before claiming a ground
         // item, so a claim never has to be rolled back for lack of space.
-        // Hotbar-only (matches addItemToHotbar's scope below).
+        // Hotbar then main storage (matches addItemToInventory's scope/order
+        // below).
         bool hasRoomFor(Int32 itemId) const;
         // Merges into an existing partial stack of itemId first, then the
-        // first empty slot, both within the hotbar sub-range only (widening
-        // ground-item pickup to main storage is a deliberate non-goal here).
-        // Returns leftover count that didn't fit (0 on full success) and
-        // appends the index of every slot it changed to changedSlots.
-        Int32 addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& changedSlots);
+        // first empty slot -- each phase checks the hotbar before main
+        // storage, mirroring real vanilla's own raw inventory indexing
+        // (hotbar occupies the first 9 slots there, storage the rest, and
+        // pickup always searches in that order). Returns leftover count that
+        // didn't fit (0 on full success) and appends the absolute slot index
+        // (not hotbar-relative) of every slot it changed to changedSlots.
+        Int32 addItemToInventory(Int32 itemId, Int32 count, std::vector<int>& changedSlots);
         // The server's authoritative view of the mouse cursor's held stack
         // (Click_Container_p, Play.cpp) -- itemId -1 means nothing carried.
         const InventorySlot& getCarriedItem() const;

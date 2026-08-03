@@ -212,11 +212,18 @@ bool Player::hasRoomFor(Int32 itemId) const {
         if (slot.itemId == -1) return true;
         if (slot.itemId == itemId && slot.count < maxStack) return true;
     }
+    for (int i = 0; i < MAIN_STORAGE_SIZE; i++) {
+        const InventorySlot& slot = _slots[MAIN_STORAGE_START + i];
+        if (slot.itemId == -1) return true;
+        if (slot.itemId == itemId && slot.count < maxStack) return true;
+    }
     return false;
 }
 
-Int32 Player::addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& changedSlots) {
+Int32 Player::addItemToInventory(Int32 itemId, Int32 count, std::vector<int>& changedSlots) {
     Int32 maxStack = ItemProperties::getMaxStackSize(itemId);
+    // Merge into an existing stack -- hotbar before main storage -- then
+    // fall back to the first empty slot, hotbar before main storage again.
     for (int i = 0; i < HOTBAR_SIZE && count > 0; i++) {
         InventorySlot& slot = _slots[HOTBAR_START + i];
         if (slot.itemId != itemId) continue;
@@ -225,7 +232,17 @@ Int32 Player::addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& chang
         Int32 added = std::min(room, count);
         slot.count += added;
         count -= added;
-        changedSlots.push_back(i);
+        changedSlots.push_back(HOTBAR_START + i);
+    }
+    for (int i = 0; i < MAIN_STORAGE_SIZE && count > 0; i++) {
+        InventorySlot& slot = _slots[MAIN_STORAGE_START + i];
+        if (slot.itemId != itemId) continue;
+        Int32 room = maxStack - slot.count;
+        if (room <= 0) continue;
+        Int32 added = std::min(room, count);
+        slot.count += added;
+        count -= added;
+        changedSlots.push_back(MAIN_STORAGE_START + i);
     }
     for (int i = 0; i < HOTBAR_SIZE && count > 0; i++) {
         InventorySlot& slot = _slots[HOTBAR_START + i];
@@ -233,7 +250,15 @@ Int32 Player::addItemToHotbar(Int32 itemId, Int32 count, std::vector<int>& chang
         Int32 added = std::min(maxStack, count);
         slot = {itemId, added};
         count -= added;
-        changedSlots.push_back(i);
+        changedSlots.push_back(HOTBAR_START + i);
+    }
+    for (int i = 0; i < MAIN_STORAGE_SIZE && count > 0; i++) {
+        InventorySlot& slot = _slots[MAIN_STORAGE_START + i];
+        if (slot.itemId != -1) continue;
+        Int32 added = std::min(maxStack, count);
+        slot = {itemId, added};
+        count -= added;
+        changedSlots.push_back(MAIN_STORAGE_START + i);
     }
     return count;
 }

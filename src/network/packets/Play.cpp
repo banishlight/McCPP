@@ -2013,7 +2013,7 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
         if (!manager.tryClaim(entity.entityId)) continue; // someone else got it first
 
         std::vector<int> changedSlots;
-        player.addItemToHotbar(entity.itemId, entity.count, changedSlots); // guaranteed to fit -- hasRoomFor already checked
+        player.addItemToInventory(entity.itemId, entity.count, changedSlots); // guaranteed to fit -- hasRoomFor already checked
 
         int entityId = entity.entityId;
         int collectorId = player.getEntityId();
@@ -2026,9 +2026,8 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
         });
 
         for (int slot : changedSlots) {
-            int containerSlot = 36 + slot; // player inventory: hotbar occupies slots 36-44
-            InventorySlot updated = player.getHotbar()[slot]; // copy -- getHotbar() returns by value now
-            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), containerSlot, updated.itemId, updated.count));
+            InventorySlot updated = player.getSlot(slot); // copy: changedSlots now holds absolute slot indices (hotbar or main storage)
+            cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), slot, updated.itemId, updated.count));
         }
     }
 }
