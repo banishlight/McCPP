@@ -12,6 +12,7 @@
 #include <ItemBlockMapping.hpp>
 #include <BlockDropTable.hpp>
 #include <ItemProperties.hpp>
+#include <Recipe.hpp>
 #include <EntityIdAllocator.hpp>
 #include <entities/ItemEntityManager.hpp>
 #include <entities/FallingBlockEntityManager.hpp>
@@ -2717,9 +2718,20 @@ void Set_Creative_Mode_Slot_p::deserialize(std::vector<Byte> in_buff, PacketCont
     }
 
     if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+    // Never trust a client-claimed direct write to the crafting result slot
+    // -- a real client's Creative screen never renders the 2x2 grid at all,
+    // so this should never actually happen, but nothing here should rely on
+    // that alone.
+    if (slot == 0) return;
     player.setSlot(slot, item.present ? item.itemId : -1, item.present ? item.count : 0);
     int threshold = cont.connection.getCompressionThreshold();
     cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), slot, item.present ? item.itemId : -1, item.present ? item.count : 0));
+
+    if (slot >= 1 && slot <= 4) {
+        Recipe::RecomputeCraftingResult(player);
+        InventorySlot result = player.getSlot(0);
+        cont.connection.addPacket(std::make_shared<Set_Container_Slot_p>(threshold, 0, player.advanceContainerStateId(), 0, result.itemId, result.count));
+    }
 }
 
 namespace {
@@ -2750,8 +2762,36 @@ namespace {
     // window" (drop from cursor); otherwise picks up/places/merges/swaps
     // between the cursor and the clicked slot. See docs/network-protocol.md's
     // Click Container section for the exact button semantics this mirrors.
+    // Slot 0 (crafting result) is a derived value, not real storage: nothing
+    // can ever be placed/swapped into it, and taking it (left OR right click
+    // -- unlike an ordinary stack, the result is never half-split) requires
+    // the cursor to be empty or already hold the same item with room for the
+    // WHOLE result stack -- otherwise vanilla blocks the take entirely
+    // rather than partially filling it.
+    void HandleTakeCraftingResult(Player& player, const InventorySlot& cursor) {
+        InventorySlot result = player.getSlot(0);
+        if (result.itemId < 0) return; // nothing to take
+        if (cursor.itemId >= 0) {
+            if (cursor.itemId != result.itemId) return;
+            if (cursor.count + result.count > ItemProperties::getMaxStackSize(result.itemId)) return;
+        }
+        Int32 newCursorCount = (cursor.itemId >= 0 ? cursor.count : 0) + result.count;
+        player.setCarriedItem(result.itemId, newCursorCount);
+        for (int i = 1; i <= 4; i++) {
+            InventorySlot ingredient = player.getSlot(i);
+            if (ingredient.itemId < 0) continue;
+            Int32 newCount = ingredient.count - 1;
+            player.setSlot(i, newCount > 0 ? ingredient.itemId : -1, newCount);
+        }
+        Recipe::RecomputeCraftingResult(player); // may produce another result immediately if ingredients remain
+    }
+
     void HandleNormalClick(Player& player, int slot, int button) {
         InventorySlot cursor = player.getCarriedItem();
+        if (slot == 0) {
+            HandleTakeCraftingResult(player, cursor);
+            return;
+        }
         if (slot == -999) {
             if (cursor.itemId < 0 || cursor.count <= 0) return;
             if (button == 0) {
@@ -2858,10 +2898,33 @@ namespace {
     // (matches real vanilla's well-known shift-click-to-equip behavior);
     // everything else (and armor/shield when that slot is already occupied)
     // falls back to the complementary region (hotbar/offhand <-> main
-    // storage). Slots 0-8 (crafting grid, no gameplay meaning yet) default to
-    // main storage.
+    // storage). Slots 1-8 (crafting grid ingredients, armor -- no gameplay
+    // meaning yet) default to main storage. Slot 0 (crafting result) is
+    // handled separately, above the generic logic -- see the slot==0 branch.
     void HandleShiftClick(Player& player, int slot) {
         if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        if (slot == 0) {
+            // Repeatedly craft-and-move the result into main storage then
+            // hotbar until ingredients run out or there's no room left.
+            // MAX_SHIFT_CRAFT_ITERATIONS is a pure safety net, not expected
+            // to ever bind in practice (a max-64-stack result and this
+            // project's 4 recipes converge almost immediately).
+            constexpr int MAX_SHIFT_CRAFT_ITERATIONS = 64;
+            for (int i = 0; i < MAX_SHIFT_CRAFT_ITERATIONS; i++) {
+                InventorySlot result = player.getSlot(0);
+                if (result.itemId < 0) break;
+                Int32 leftover = MergeIntoRange(player, result.itemId, result.count, 9, Player::HOTBAR_START + Player::HOTBAR_SIZE);
+                if (leftover == result.count) break; // nothing fit -- no room
+                for (int g = 1; g <= 4; g++) {
+                    InventorySlot ingredient = player.getSlot(g);
+                    if (ingredient.itemId < 0) continue;
+                    Int32 newCount = ingredient.count - 1;
+                    player.setSlot(g, newCount > 0 ? ingredient.itemId : -1, newCount);
+                }
+                Recipe::RecomputeCraftingResult(player);
+            }
+            return;
+        }
         InventorySlot source = player.getSlot(slot);
         if (source.itemId < 0) return;
 
@@ -2902,6 +2965,9 @@ namespace {
         } else {
             return;
         }
+        // Slot 0 (crafting result) can't be number-key-swapped in real
+        // vanilla -- it's a derived value, not a real stored stack.
+        if (slot == 0 || targetSlot == 0) return;
         if (targetSlot == slot) return;
         InventorySlot a = player.getSlot(slot);
         InventorySlot b = player.getSlot(targetSlot);
@@ -2913,6 +2979,9 @@ namespace {
     // Button 0 = drop one (Q), button 1 = drop the entire stack (Ctrl+Q).
     void HandleDropClick(Player& player, int slot, int button) {
         if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        // Dropping directly from the crafting result via Q isn't a real
+        // vanilla interaction -- it has to be taken to the cursor first.
+        if (slot == 0) return;
         InventorySlot source = player.getSlot(slot);
         if (source.itemId < 0 || source.count <= 0) return;
         if (button == 0) {
@@ -2935,7 +3004,9 @@ namespace {
         if (cursor.itemId < 0) return;
         Int32 needed = ItemProperties::getMaxStackSize(cursor.itemId) - cursor.count;
         if (needed <= 0) return;
-        for (int i = 0; i < Player::TOTAL_SLOTS && needed > 0; i++) {
+        // Start at 1, not 0: the crafting result is a derived value, not a
+        // real stored stack to fold into the cursor.
+        for (int i = 1; i < Player::TOTAL_SLOTS && needed > 0; i++) {
             InventorySlot s = player.getSlot(i);
             if (s.itemId != cursor.itemId) continue;
             Int32 taken = std::min(s.count, needed);
@@ -2998,6 +3069,12 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
         case 6: HandleDoubleClick(player, button); break;
         default: break;
     }
+
+    // Any click could have changed the crafting grid's contents (directly,
+    // via shift-click pulling ingredients out, etc.) -- recompute the result
+    // slot unconditionally rather than tracking exactly which modes could
+    // affect it. Covered for free by the full resync just below.
+    Recipe::RecomputeCraftingResult(player);
 
     // Always resync the full inventory + cursor rather than diff exactly
     // which slots each mode touched (several above can touch anywhere from 1

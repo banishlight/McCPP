@@ -9,6 +9,7 @@
 #include <ItemBlockMapping.hpp>
 #include <FluidBlocks.hpp>
 #include <PlayerDataPersistence.hpp>
+#include <Recipe.hpp>
 #include <OpsList.hpp>
 #include <Console.hpp>
 #include <cmath>
@@ -266,6 +267,10 @@ void Acknowledge_Finish_Config_p::deserialize(std::vector<Byte> in_buff, PacketC
         // isn't implemented -- see docs/general-documentation.md, "Minimal inventory").
         player.setHotbarSlot(0, STONE_ITEM_ID, 64);
     }
+    // Covers a returning player whose persisted result slot might be stale
+    // (e.g. if this feature's matching logic changes later) -- a harmless
+    // no-op against a new player's empty grid.
+    Recipe::RecomputeCraftingResult(player);
 
     // Guarantee the player's own standing chunk is generated/loaded + lit +
     // cached BEFORE they're teleported there -- previously invisible since
