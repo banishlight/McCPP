@@ -16,7 +16,7 @@ namespace {
     };
 
     struct ShapedRecipe {
-        int width, height; // <= 2 each for Stage A
+        int width, height; // <= 2 each -- this project's crafting grid is 2x2
         std::vector<IngredientSet> cells; // row-major, size width*height
         Int32 resultItemId, resultCount;
     };
