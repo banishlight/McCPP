@@ -68,4 +68,4 @@ So that I can help diagnose the issue.
 
 
 ## Known Issues
-- Items entities moving through what have a lot of rubberbanding movement
+- Item entities moving in the world have rubberbanding movement
