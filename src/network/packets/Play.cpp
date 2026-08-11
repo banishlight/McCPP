@@ -1980,18 +1980,20 @@ void ResolveCropGrowth(World& world, int x, int y, int z) {
 }
 
 void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
-    // A single spherical radius around player.getY() (the FEET position)
-    // was wrong: real vanilla pickup is really "does the item overlap the
-    // player's whole body volume" -- a 0.6-wide, ~1.8-tall box from the
-    // player's feet up to over their head, not a 1-block sphere centered on
-    // the feet. Horizontal reach and vertical reach need separate checks, or
-    // any item sitting near head height (dy approaching 1.8 on its own)
-    // fails the combined dx^2+dy^2+dz^2 radius before dx/dz are even
-    // considered -- a real, reported bug (items adjacent to the player's
-    // head were never pickup-able, only ones down near their feet).
-    const double PICKUP_HORIZONTAL_RADIUS_SQUARED = 1.0; // ~1 block, approximates vanilla's horizontal reach
+    // Real AABB overlap between the player's actual hitbox (0.6 wide, 1.8
+    // tall) and the item entity's actual hitbox (0.25 wide/tall/deep) --
+    // real vanilla item pickup is exactly this overlap test, not a fixed
+    // "reach radius." A prior fixed-radius approximation (a 1-block
+    // horizontal circle combined with a tall vertical window) let items get
+    // picked up from further away, and while still visibly airborne, than
+    // real vanilla allows -- also a genuine bug risk on its own: it widened
+    // how often a nearby pickup can land mid-click and desync a player's own
+    // in-flight inventory click (see Click_Container_p's stateId check).
+    const double PLAYER_HALF_WIDTH = 0.3; // real vanilla player hitbox: 0.6 wide
+    const double ITEM_HALF_WIDTH = 0.125; // real vanilla item hitbox: 0.25 wide
+    const double HORIZONTAL_OVERLAP = PLAYER_HALF_WIDTH + ITEM_HALF_WIDTH;
     const double PLAYER_HEIGHT = 1.8; // real vanilla standing hitbox height
-    const double PICKUP_VERTICAL_MARGIN = 0.5; // slop above/below the hitbox itself, matching vanilla's own inflate
+    const double ITEM_HEIGHT = 0.25; // real vanilla item hitbox height
 
     ItemEntityManager& manager = ItemEntityManager::getInstance();
     auto now = std::chrono::steady_clock::now();
@@ -2006,9 +2008,11 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player) {
 
         double dx = entity.x - player.getX();
         double dz = entity.z - player.getZ();
-        if (dx * dx + dz * dz > PICKUP_HORIZONTAL_RADIUS_SQUARED) continue;
-        if (entity.y < player.getY() - PICKUP_VERTICAL_MARGIN ||
-            entity.y > player.getY() + PLAYER_HEIGHT + PICKUP_VERTICAL_MARGIN) continue;
+        if (std::abs(dx) >= HORIZONTAL_OVERLAP || std::abs(dz) >= HORIZONTAL_OVERLAP) continue;
+        // entity.y is the bottom of the item's hitbox (matches
+        // ItemPhysicsSystem's resting-position convention); player.getY()
+        // is the bottom of theirs -- real interval overlap, not a radius.
+        if (entity.y + ITEM_HEIGHT <= player.getY() || entity.y >= player.getY() + PLAYER_HEIGHT) continue;
 
         if (!player.hasRoomFor(entity.itemId)) continue;
         if (!manager.tryClaim(entity.entityId)) continue; // someone else got it first
@@ -3017,6 +3021,58 @@ namespace {
         }
         player.setCarriedItem(cursor.itemId, cursor.count);
     }
+
+    // Mode 5 end: distributes the carried stack across every slot painted
+    // during the drag. A slot only qualifies if it's empty or already holds
+    // the same item -- matches real vanilla's own paint-target restriction
+    // (dragging over an incompatible slot never adds it to the painted
+    // list in the first place; this project isn't given that client-side
+    // filtering, so it's enforced here instead, on the server's own view
+    // of each slot rather than trusting the client's).
+    void HandleDragEnd(Player& player) {
+        InventorySlot cursor = player.getCarriedItem();
+        const std::vector<int>& slots = player.getDragSlots();
+        if (cursor.itemId < 0 || slots.empty()) return;
+
+        std::vector<int> eligible;
+        for (int s : slots) {
+            if (s == 0) continue; // crafting result -- never a valid drag target
+            InventorySlot existing = player.getSlot(s);
+            if (existing.itemId == -1 || existing.itemId == cursor.itemId) eligible.push_back(s);
+        }
+        if (eligible.empty()) return;
+
+        Int32 maxStack = ItemProperties::getMaxStackSize(cursor.itemId);
+        Int32 remaining = cursor.count;
+
+        if (player.isDragRightClick()) {
+            // Right-click drag: one item per slot, until the cursor runs out.
+            for (int s : eligible) {
+                if (remaining <= 0) break;
+                InventorySlot existing = player.getSlot(s);
+                if (existing.count >= maxStack) continue;
+                player.setSlot(s, cursor.itemId, existing.count + 1);
+                remaining -= 1;
+            }
+        } else {
+            // Left-click drag: split as evenly as possible -- each eligible
+            // slot gets the same floor(count/slots) share (capped by its own
+            // remaining room); any leftover, including whatever didn't fit,
+            // stays on the cursor rather than being distributed unevenly.
+            Int32 perSlot = cursor.count / static_cast<Int32>(eligible.size());
+            if (perSlot > 0) {
+                for (int s : eligible) {
+                    InventorySlot existing = player.getSlot(s);
+                    Int32 room = maxStack - existing.count;
+                    Int32 added = std::min(room, perSlot);
+                    if (added <= 0) continue;
+                    player.setSlot(s, cursor.itemId, existing.count + added);
+                    remaining -= added;
+                }
+            }
+        }
+        player.setCarriedItem(remaining > 0 ? cursor.itemId : -1, remaining);
+    }
 }
 
 void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -3044,8 +3100,11 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
     if (stateId != player.getContainerStateId()) {
         // Stale/desynced client view -- ignore the click and resync fully,
         // exactly matching docs/network-protocol.md's documented behavior.
+        // Re-sends the CURRENT id, not a freshly advanced one: nothing new
+        // actually happened here, this is just re-informing the client of
+        // the state it should already have had.
         cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
-            threshold, player.getInventory(), player.advanceContainerStateId(), player.getCarriedItem()));
+            threshold, player.getInventory(), player.getContainerStateId(), player.getCarriedItem()));
         return;
     }
 
@@ -3056,15 +3115,36 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
         case 3: break; // middle-click clone -- only meaningful in non-player-inventory windows, which don't exist in this project
         case 4: HandleDropClick(player, slot, button); break;
         case 5:
-            // *** CHECKLIST: drag/paint-dragging across multiple slots ***
-            // Real vanilla sends this as a 3-packet sequence (start at Slot
-            // -999 with button 0/4/8 for left/right/middle, one packet per
-            // painted slot with button 1/5/9, end at Slot -999 with button
-            // 2/6/10) -- needs a real per-player "in-progress drag" session
-            // (accumulated slot list + which button started it) tracked
-            // across those packets, a genuine scope jump from every other
-            // mode here (each fully resolved within its own single packet).
-            // Deliberately a no-op until that's built.
+            // Drag/paint-dragging across multiple slots: real vanilla sends
+            // this as a 3-packet sequence -- start (slot -999, button 0 left
+            // / 4 right), one packet per slot painted over (button 1 left /
+            // 5 right), end (slot -999, button 2 left / 6 right). Middle-
+            // click drag (button 8/9/10) is Creative-tab-palette-only in a
+            // non-player window, which doesn't exist in this project -- left
+            // as a no-op, same scope line as Mode 3.
+            if (slot == -999) {
+                if (button == 0 || button == 4) {
+                    player.beginDrag(button == 4);
+                } else if (button == 2 || button == 6) {
+                    bool endedRight = (button == 6);
+                    if (player.isDragActive() && player.isDragRightClick() == endedRight) {
+                        HandleDragEnd(player);
+                    }
+                    player.clearDrag();
+                }
+            } else if (button == 1 || button == 5) {
+                bool progressRight = (button == 5);
+                // Out-of-order packets (a progress packet with no active
+                // session, or one that doesn't match the button that started
+                // it) reset the drag entirely -- matches the documented real
+                // vanilla behavior for a malformed painting sequence.
+                if (player.isDragActive() && player.isDragRightClick() == progressRight &&
+                    slot >= 0 && slot < Player::TOTAL_SLOTS) {
+                    player.addDragSlot(slot);
+                } else {
+                    player.clearDrag();
+                }
+            }
             break;
         case 6: HandleDoubleClick(player, button); break;
         default: break;
@@ -3079,9 +3159,20 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
     // Always resync the full inventory + cursor rather than diff exactly
     // which slots each mode touched (several above can touch anywhere from 1
     // to all 46 slots) -- simpler and safer than per-slot bookkeeping, at a
-    // bandwidth cost that's negligible for a hobby server.
+    // bandwidth cost that's negligible for a hobby server. Deliberately does
+    // NOT advance the state id here: this is the response to the player's
+    // OWN click, which they already know about, not an out-of-band change --
+    // per docs/network-protocol.md's Click Container section, the state id
+    // should only change when something the client didn't predict happens
+    // (e.g. a background item pickup), so a real vanilla client can fire off
+    // several clicks in a row (splitting a stack across multiple slots via
+    // repeated right-clicks, for instance) without each one needing a full
+    // round trip first. Advancing it unconditionally here was a real bug:
+    // any click sent before the previous one's response arrived would carry
+    // an already-stale id and get silently dropped, which is exactly what
+    // "rubberbanding, sometimes needs multiple tries" looks like.
     cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
-        threshold, player.getInventory(), player.advanceContainerStateId(), player.getCarriedItem()));
+        threshold, player.getInventory(), player.getContainerStateId(), player.getCarriedItem()));
 }
 
 void Set_Held_Item_serverbound_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

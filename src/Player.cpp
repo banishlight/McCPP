@@ -278,3 +278,33 @@ int Player::getContainerStateId() const {
 int Player::advanceContainerStateId() {
     return ++_containerStateId;
 }
+
+bool Player::isDragActive() const {
+    return _dragActive;
+}
+
+bool Player::isDragRightClick() const {
+    return _dragRightClick;
+}
+
+void Player::beginDrag(bool rightClick) {
+    _dragActive = true;
+    _dragRightClick = rightClick;
+    _dragSlots.clear();
+}
+
+void Player::addDragSlot(int slot) {
+    for (int existing : _dragSlots) {
+        if (existing == slot) return;
+    }
+    _dragSlots.push_back(slot);
+}
+
+const std::vector<int>& Player::getDragSlots() const {
+    return _dragSlots;
+}
+
+void Player::clearDrag() {
+    _dragActive = false;
+    _dragSlots.clear();
+}

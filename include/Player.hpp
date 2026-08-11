@@ -139,6 +139,22 @@ class Player {
         // id against getContainerStateId() before trusting the click.
         int getContainerStateId() const;
         int advanceContainerStateId();
+        // Mode 5 (drag/paint) click handling: real vanilla splits one drag
+        // gesture across several packets -- a start (slot -999), one per
+        // slot painted over, and an end (slot -999) -- so the server has to
+        // remember which slots were painted and which mouse button started
+        // the gesture across that whole sequence. beginDrag resets the
+        // accumulated slot list; addDragSlot appends a slot (ignored if
+        // already present, since real vanilla never re-paints the same
+        // slot twice in one gesture, but nothing here should trust that
+        // blindly); clearDrag ends the session (called whether it finished
+        // normally or was reset by an out-of-order packet).
+        bool isDragActive() const;
+        bool isDragRightClick() const;
+        void beginDrag(bool rightClick);
+        void addDragSlot(int slot);
+        const std::vector<int>& getDragSlots() const;
+        void clearDrag();
     private:
         string _username;
         std::vector<long> _uuid;
@@ -162,4 +178,7 @@ class Player {
         int _selectedSlot = 0;
         InventorySlot _carriedItem{};
         int _containerStateId = 0;
+        bool _dragActive = false;
+        bool _dragRightClick = false;
+        std::vector<int> _dragSlots;
 };
