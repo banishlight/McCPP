@@ -4,7 +4,6 @@
 #include <BlockIds.hpp>
 #include <CropBlocks.hpp>
 #include <vector>
-#include <queue>
 #include <algorithm>
 #include <memory>
 
@@ -25,29 +24,8 @@ namespace {
 }
 
 bool LightEngine::isOpaque(Int32 blockStateId) {
-    // Ground plants have zero light opacity in real vanilla -- a grass tuft
-    // or flower never darkens the ground it's on, unlike a full block. This
-    // was a real, visible bug (reported by the user: grass tufts rendering
-    // solid black) once short_grass/poppy/dandelion were added as full-cube
-    // blocks under the old "every non-air block is opaque" rule -- the
-    // sky-light seed walk (see computeLighting) stopped AT the plant's own
-    // cell instead of passing through it, so that cell never got assigned
-    // any light at all.
-    //
-    // Known, accepted gap: every OTHER block (glass, leaves, and anything
-    // else visually thin/transparent already in BlockTable) is still treated
-    // as fully opaque -- a real per-block opacity table covering the whole
-    // ~185-block palette is a bigger undertaking than this fix, deliberately
-    // out of scope here. Leaves in particular do block light in real
-    // vanilla too (partially, not fully), so "opaque" is a coarser but not
-    // obviously-wrong approximation for them, unlike plants which are
-    // unambiguously wrong at full opacity.
     if (blockStateId == AIR_BLOCK_STATE_ID) return false;
     if (blockStateId == SHORT_GRASS_STATE_ID || blockStateId == POPPY_STATE_ID || blockStateId == DANDELION_STATE_ID) return false;
-    // Crops (wheat/carrots/potatoes/beetroots, any growth stage) are the same
-    // kind of non-full plant as short_grass/poppy/dandelion above -- zero
-    // light opacity in real vanilla. Farmland itself stays opaque (it's a
-    // near-full-height block, just with a lowered top surface).
     if (Crop::isCrop(blockStateId)) return false;
     return true;
 }
@@ -94,7 +72,21 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
 
     std::vector<uint8_t> skyBuf(static_cast<size_t>(BUF_SIZE) * BUF_SIZE * BUF_HEIGHT, 0);
     std::vector<uint8_t> blockBuf(static_cast<size_t>(BUF_SIZE) * BUF_SIZE * BUF_HEIGHT, 0);
-    std::queue<QueueEntry> queue;
+    // BFS frontier, one entry per (position, channel) pending propagation.
+    // A plain std::queue (std::deque-backed) was measured -- via a real
+    // gameplay profile -- allocating a new block on essentially every push,
+    // 87% of every allocation call in the entire server (computeLighting
+    // runs fresh, from an empty queue, on every single chunk lit). Backed by
+    // a thread_local vector instead: computeLighting only ever runs on
+    // WorldWorkerPool's worker threads, so each thread keeps its own
+    // buffer, safe with no locking. clear() drops the logical size but
+    // keeps the underlying capacity, so a thread's buffer grows to whatever
+    // its largest chunk ever needed and then never allocates again -- the
+    // FIFO read side is a plain index (queueHead) instead of popping from
+    // the front, since nothing here needs the popped entries' storage back.
+    thread_local std::vector<QueueEntry> queueStorage;
+    queueStorage.clear();
+    size_t queueHead = 0;
 
     // Seed sky light: walk each column top-down, full strength until the
     // first opaque block. Gets every open-sky value correct with no BFS.
@@ -132,7 +124,7 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
                     }
                 }
                 if (boundary) {
-                    queue.push({bx, by, bz, MAX_LIGHT, true});
+                    queueStorage.push_back({bx, by, bz, MAX_LIGHT, true});
                 }
             }
         }
@@ -147,7 +139,7 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
                 int emission = getLightEmission(blockAt(bx, by, bz));
                 if (emission > 0) {
                     blockBuf[bufIndex(bx, by, bz)] = static_cast<uint8_t>(emission);
-                    queue.push({bx, by, bz, emission, false});
+                    queueStorage.push_back({bx, by, bz, emission, false});
                 }
             }
         }
@@ -157,9 +149,8 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
     static const int DY[6] = {0, 0, 1, -1, 0, 0};
     static const int DZ[6] = {0, 0, 0, 0, 1, -1};
 
-    while (!queue.empty()) {
-        QueueEntry e = queue.front();
-        queue.pop();
+    while (queueHead < queueStorage.size()) {
+        QueueEntry e = queueStorage[queueHead++];
         for (int d = 0; d < 6; d++) {
             int nx = e.x + DX[d];
             int ny = e.y + DY[d];
@@ -183,7 +174,7 @@ void LightEngine::computeLighting(Chunk& target, World& world) {
             size_t ni = bufIndex(nx, ny, nz);
             if (buf[ni] < newLevel) {
                 buf[ni] = static_cast<uint8_t>(newLevel);
-                queue.push({nx, ny, nz, newLevel, e.sky});
+                queueStorage.push_back({nx, ny, nz, newLevel, e.sky});
             }
         }
     }

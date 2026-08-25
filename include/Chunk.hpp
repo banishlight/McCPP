@@ -45,6 +45,17 @@ class Chunk {
         void setBiomeId(Int32 biomeId);
     private:
         int index(int localX, int worldY, int localZ) const;
+        // Light levels are only ever 0-15 (4 bits) -- real vanilla packs two
+        // per byte for exactly this reason (its own on-disk "nibble arrays"),
+        // and this project's own Chunk stored one full byte per value before
+        // this, doubling both light arrays' memory for no reason. i's parity
+        // picks the low or high nibble of byte i/2; the convention (which
+        // half holds an even vs. odd index) doesn't matter for correctness
+        // since nothing outside these two helpers ever reads the raw bytes,
+        // but it mirrors vanilla's own NibbleArray layout anyway.
+        static constexpr int LIGHT_ARRAY_SIZE = SECTION_COUNT * 4096;
+        int getNibble(const std::array<uint8_t, LIGHT_ARRAY_SIZE / 2>& arr, int i) const;
+        void setNibble(std::array<uint8_t, LIGHT_ARRAY_SIZE / 2>& arr, int i, int value);
         int _chunkX;
         int _chunkZ;
         // Int16, not Int32: real vanilla 1.21 has ~27,000 block states total,
@@ -52,7 +63,7 @@ class Chunk {
         // shortcut specific to today's 4-block palette -- it's safe for the
         // entire real game. Cuts this array (2/3 of a Chunk's size) in half.
         std::array<Int16, SECTION_COUNT * 4096> _blocks{}; // defaults to 0 (air)
-        std::array<uint8_t, SECTION_COUNT * 4096> _skyLight{};
-        std::array<uint8_t, SECTION_COUNT * 4096> _blockLight{};
+        std::array<uint8_t, LIGHT_ARRAY_SIZE / 2> _skyLight{};
+        std::array<uint8_t, LIGHT_ARRAY_SIZE / 2> _blockLight{};
         Int32 _biomeId = 0;
 };

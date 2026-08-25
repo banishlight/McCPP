@@ -31,20 +31,34 @@ Int32 Chunk::getBlock(int localX, int worldY, int localZ) const {
     return static_cast<Int32>(_blocks[index(localX, worldY, localZ)]);
 }
 
+int Chunk::getNibble(const std::array<uint8_t, LIGHT_ARRAY_SIZE / 2>& arr, int i) const {
+    uint8_t byte = arr[i / 2];
+    return (i % 2 == 0) ? (byte & 0x0F) : (byte >> 4);
+}
+
+void Chunk::setNibble(std::array<uint8_t, LIGHT_ARRAY_SIZE / 2>& arr, int i, int value) {
+    uint8_t& byte = arr[i / 2];
+    if (i % 2 == 0) {
+        byte = (byte & 0xF0) | (static_cast<uint8_t>(value) & 0x0F);
+    } else {
+        byte = (byte & 0x0F) | (static_cast<uint8_t>(value) << 4);
+    }
+}
+
 void Chunk::setSkyLight(int localX, int worldY, int localZ, int level) {
-    _skyLight[index(localX, worldY, localZ)] = static_cast<uint8_t>(level);
+    setNibble(_skyLight, index(localX, worldY, localZ), level);
 }
 
 int Chunk::getSkyLight(int localX, int worldY, int localZ) const {
-    return _skyLight[index(localX, worldY, localZ)];
+    return getNibble(_skyLight, index(localX, worldY, localZ));
 }
 
 void Chunk::setBlockLight(int localX, int worldY, int localZ, int level) {
-    _blockLight[index(localX, worldY, localZ)] = static_cast<uint8_t>(level);
+    setNibble(_blockLight, index(localX, worldY, localZ), level);
 }
 
 int Chunk::getBlockLight(int localX, int worldY, int localZ) const {
-    return _blockLight[index(localX, worldY, localZ)];
+    return getNibble(_blockLight, index(localX, worldY, localZ));
 }
 
 Int32 Chunk::getBiomeId() const {
