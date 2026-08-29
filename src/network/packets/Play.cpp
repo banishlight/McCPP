@@ -730,9 +730,28 @@ std::vector<Byte> Acknowledge_Block_Change_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
+namespace {
+    // {"text": value} as network NBT -- the simplest valid text component,
+    // sufficient since this server never generates colored/translated chat.
+    std::vector<Byte> makeTextComponentNbt(const string& value) {
+        NbtTag comp = NbtTag::makeCompound();
+        comp.put("text", NbtTag::makeString(value));
+        return comp.serializeNetwork();
+    }
+}
+
 Set_Container_Content_p::Set_Container_Content_p(int threshold, const std::array<InventorySlot, Player::TOTAL_SLOTS>& inventory, int stateId, const InventorySlot& carriedItem) {
     _threshold = threshold;
-    _inventory = inventory;
+    _windowId = 0;
+    _inventory.assign(inventory.begin(), inventory.end());
+    _stateId = stateId;
+    _carriedItem = carriedItem;
+}
+
+Set_Container_Content_p::Set_Container_Content_p(int threshold, int windowId, const std::vector<InventorySlot>& slots, int stateId, const InventorySlot& carriedItem) {
+    _threshold = threshold;
+    _windowId = windowId;
+    _inventory = slots;
     _stateId = stateId;
     _carriedItem = carriedItem;
 }
@@ -741,19 +760,20 @@ std::vector<Byte> Set_Container_Content_p::serialize() const {
     #ifdef DEBUG
         Console::getConsole().Entry("Set_Container_Content_p::serialize(): Sending.");
     #endif
-    // Player inventory (Window ID 0) container-slot layout: 0 = crafting
-    // result, 1-4 = crafting grid, 5-8 = armor, 9-35 = main inventory,
-    // 36-44 = hotbar, 45 = offhand -- see Player.hpp's TOTAL_SLOTS/
-    // HOTBAR_START comment, the same layout Player's own array uses, so no
-    // hotbar-relative translation is needed here anymore.
+    // Window ID 0's container-slot layout: 0 = crafting result, 1-4 =
+    // crafting grid, 5-8 = armor, 9-35 = main inventory, 36-44 = hotbar, 45 =
+    // offhand -- see Player.hpp's TOTAL_SLOTS/HOTBAR_START comment, the same
+    // layout Player's own array uses, so no hotbar-relative translation is
+    // needed here anymore. A crafting-table window has its own distinct
+    // layout instead -- see BuildCraftingTableWindowView.
     std::vector<Byte> packet_data;
-    packet_data.push_back(0x00); // Window ID: 0 = player inventory
+    packet_data.push_back(static_cast<Byte>(_windowId));
     std::vector<Byte> stateId = varIntSerialize(_stateId);
     packet_data.insert(packet_data.end(), stateId.begin(), stateId.end());
-    std::vector<Byte> count = varIntSerialize(Player::TOTAL_SLOTS);
+    std::vector<Byte> count = varIntSerialize(static_cast<Int32>(_inventory.size()));
     packet_data.insert(packet_data.end(), count.begin(), count.end());
-    for (int i = 0; i < Player::TOTAL_SLOTS; i++) {
-        std::vector<Byte> slotBytes = packSlot(_inventory[i].itemId, _inventory[i].count);
+    for (const InventorySlot& slot : _inventory) {
+        std::vector<Byte> slotBytes = packSlot(slot.itemId, slot.count);
         packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
     }
     std::vector<Byte> carried = packSlot(_carriedItem.itemId, _carriedItem.count);
@@ -784,6 +804,42 @@ std::vector<Byte> Set_Container_Slot_p::serialize() const {
     packet_data.push_back(static_cast<Byte>(slot16 & 0xFF));
     std::vector<Byte> slotBytes = packSlot(_itemId, _count);
     packet_data.insert(packet_data.end(), slotBytes.begin(), slotBytes.end());
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Close_Container_p::Close_Container_p(int threshold, int windowId) {
+    _threshold = threshold;
+    _windowId = windowId;
+}
+
+// deserialize() is defined further down, alongside Click_Container_p and its
+// other window-handling helpers -- it needs CloseCraftingTableWindow, which
+// lives in that same anonymous namespace.
+
+std::vector<Byte> Close_Container_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Close_Container_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data{ static_cast<Byte>(_windowId) };
+    return assemblePacket(getID(), _threshold, packet_data);
+}
+
+Open_Screen_p::Open_Screen_p(int threshold, int windowId, int windowType, const string& title) {
+    _threshold = threshold;
+    _windowId = windowId;
+    _windowType = windowType;
+    _title = title;
+}
+
+std::vector<Byte> Open_Screen_p::serialize() const {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Open_Screen_p::serialize(): Sending.");
+    #endif
+    std::vector<Byte> packet_data = varIntSerialize(_windowId);
+    std::vector<Byte> windowType = varIntSerialize(_windowType);
+    packet_data.insert(packet_data.end(), windowType.begin(), windowType.end());
+    std::vector<Byte> title = makeTextComponentNbt(_title);
+    packet_data.insert(packet_data.end(), title.begin(), title.end());
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
@@ -1201,15 +1257,6 @@ std::vector<Byte> Player_Info_Remove_p::serialize() const {
     return assemblePacket(getID(), _threshold, packet_data);
 }
 
-namespace {
-    // {"text": value} as network NBT -- the simplest valid text component,
-    // sufficient since this server never generates colored/translated chat.
-    std::vector<Byte> makeTextComponentNbt(const string& value) {
-        NbtTag comp = NbtTag::makeCompound();
-        comp.put("text", NbtTag::makeString(value));
-        return comp.serializeNetwork();
-    }
-}
 
 Disconnect_play_p::Disconnect_play_p(int threshold, const string& reason) {
     _threshold = threshold;
@@ -2245,6 +2292,17 @@ namespace {
     }
 }
 
+// BuildCraftingTableWindowView is forward-declared here: defined near
+// Click_Container_p's other window-handling helpers (this translation
+// unit's other anonymous-namespace block), but needed here too -- opening a
+// crafting table (Use_Item_On_p, below) needs the same window-content view
+// Click_Container_p resyncs with. CloseCraftingTableWindow (used just below,
+// for the close-on-break case) is declared externally in Play.hpp instead,
+// since ConnectionManager.cpp needs it too.
+namespace {
+    std::vector<InventorySlot> BuildCraftingTableWindowView(Player& player);
+}
+
 void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
     #ifdef DEBUG
         Console::getConsole().Entry("Player_Action_p::deserialize(): Received.");
@@ -2329,6 +2387,20 @@ void Player_Action_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont
             return std::make_shared<Block_Update_p>(broadcastThreshold, loc.x, loc.y, loc.z, AIR_BLOCK_STATE_ID);
         });
         cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+
+        // Breaking the crafting table THIS player currently has open force-
+        // closes their window (matches real vanilla) -- a different player
+        // breaking someone else's open table is an accepted, documented gap,
+        // not handled here.
+        if (previousBlock == CRAFTING_TABLE_BLOCK_STATE_ID && player.getOpenWindowId() != 0) {
+            int openX, openY, openZ;
+            player.getOpenCraftingTablePos(openX, openY, openZ);
+            if (openX == loc.x && openY == loc.y && openZ == loc.z) {
+                int openWindowId = player.getOpenWindowId();
+                CloseCraftingTableWindow(player);
+                cont.connection.addPacket(std::make_shared<Close_Container_p>(threshold, openWindowId));
+            }
+        }
 
         // The block just vacated might have been the only thing holding up a
         // sand/gravel block directly above it...
@@ -2626,6 +2698,21 @@ void Use_Item_On_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) 
             ConsumeOneFromHeldSlot(cont, threshold, player, selectedSlot, held);
             return;
         }
+
+        // Right-clicking an existing crafting table opens its 3x3 window --
+        // real minecraft:crafting menu type id (12) confirmed via a fresh
+        // server.jar --reports run, not guessed (see docs/network-protocol.md's
+        // Open Screen section; crafter_3x3 sits before crafting in the real
+        // minecraft:menu registry, which shifts this off the naive guess of 11).
+        if (clickedBlock == CRAFTING_TABLE_BLOCK_STATE_ID) {
+            const int CRAFTING_MENU_TYPE_ID = 12;
+            int windowId = player.openCraftingTableWindow(loc.x, loc.y, loc.z);
+            cont.connection.addPacket(std::make_shared<Open_Screen_p>(threshold, windowId, CRAFTING_MENU_TYPE_ID, "Crafting"));
+            cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
+                threshold, windowId, BuildCraftingTableWindowView(player), player.getContainerStateId(), player.getCarriedItem()));
+            cont.connection.addPacket(std::make_shared<Acknowledge_Block_Change_p>(threshold, sequence));
+            return;
+        }
     }
 
     // Water/lava buckets aren't in BlockTable (they have no real placeable
@@ -2772,8 +2859,12 @@ namespace {
     // the cursor to be empty or already hold the same item with room for the
     // WHOLE result stack -- otherwise vanilla blocks the take entirely
     // rather than partially filling it.
-    void HandleTakeCraftingResult(Player& player, const InventorySlot& cursor) {
-        InventorySlot result = player.getSlot(0);
+    // resultSlot is either 0 (the player's own 2x2 grid) or
+    // Player::CRAFTING_TABLE_RESULT_SLOT (an open crafting table's 3x3 grid)
+    // -- the two share this logic entirely except which grid range gets
+    // decremented and which Recipe recompute function applies afterward.
+    void HandleTakeCraftingResult(Player& player, const InventorySlot& cursor, int resultSlot) {
+        InventorySlot result = player.getSlot(resultSlot);
         if (result.itemId < 0) return; // nothing to take
         if (cursor.itemId >= 0) {
             if (cursor.itemId != result.itemId) return;
@@ -2781,19 +2872,25 @@ namespace {
         }
         Int32 newCursorCount = (cursor.itemId >= 0 ? cursor.count : 0) + result.count;
         player.setCarriedItem(result.itemId, newCursorCount);
-        for (int i = 1; i <= 4; i++) {
-            InventorySlot ingredient = player.getSlot(i);
+        bool isCraftingTable = (resultSlot == Player::CRAFTING_TABLE_RESULT_SLOT);
+        int gridStart = isCraftingTable ? Player::CRAFTING_TABLE_GRID_START : 1;
+        int gridSize = isCraftingTable ? Player::CRAFTING_TABLE_GRID_SIZE : 4;
+        for (int i = 0; i < gridSize; i++) {
+            int gi = gridStart + i;
+            InventorySlot ingredient = player.getSlot(gi);
             if (ingredient.itemId < 0) continue;
             Int32 newCount = ingredient.count - 1;
-            player.setSlot(i, newCount > 0 ? ingredient.itemId : -1, newCount);
+            player.setSlot(gi, newCount > 0 ? ingredient.itemId : -1, newCount);
         }
-        Recipe::RecomputeCraftingResult(player); // may produce another result immediately if ingredients remain
+        // May produce another result immediately if ingredients remain.
+        if (isCraftingTable) Recipe::RecomputeCraftingTableResult(player);
+        else Recipe::RecomputeCraftingResult(player);
     }
 
     void HandleNormalClick(Player& player, int slot, int button) {
         InventorySlot cursor = player.getCarriedItem();
-        if (slot == 0) {
-            HandleTakeCraftingResult(player, cursor);
+        if (slot == 0 || slot == Player::CRAFTING_TABLE_RESULT_SLOT) {
+            HandleTakeCraftingResult(player, cursor, slot);
             return;
         }
         if (slot == -999) {
@@ -2808,7 +2905,7 @@ namespace {
             }
             return;
         }
-        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        if (slot < 0 || slot >= Player::ALL_SLOTS) return;
         InventorySlot target = player.getSlot(slot);
 
         if (cursor.itemId < 0) {
@@ -2906,26 +3003,31 @@ namespace {
     // meaning yet) default to main storage. Slot 0 (crafting result) is
     // handled separately, above the generic logic -- see the slot==0 branch.
     void HandleShiftClick(Player& player, int slot) {
-        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
-        if (slot == 0) {
+        if (slot < 0 || slot >= Player::ALL_SLOTS) return;
+        if (slot == 0 || slot == Player::CRAFTING_TABLE_RESULT_SLOT) {
             // Repeatedly craft-and-move the result into main storage then
             // hotbar until ingredients run out or there's no room left.
             // MAX_SHIFT_CRAFT_ITERATIONS is a pure safety net, not expected
             // to ever bind in practice (a max-64-stack result and this
-            // project's 4 recipes converge almost immediately).
+            // project's few recipes converge almost immediately).
             constexpr int MAX_SHIFT_CRAFT_ITERATIONS = 64;
+            bool isCraftingTable = (slot == Player::CRAFTING_TABLE_RESULT_SLOT);
+            int gridStart = isCraftingTable ? Player::CRAFTING_TABLE_GRID_START : 1;
+            int gridSize = isCraftingTable ? Player::CRAFTING_TABLE_GRID_SIZE : 4;
             for (int i = 0; i < MAX_SHIFT_CRAFT_ITERATIONS; i++) {
-                InventorySlot result = player.getSlot(0);
+                InventorySlot result = player.getSlot(slot);
                 if (result.itemId < 0) break;
                 Int32 leftover = MergeIntoRange(player, result.itemId, result.count, 9, Player::HOTBAR_START + Player::HOTBAR_SIZE);
                 if (leftover == result.count) break; // nothing fit -- no room
-                for (int g = 1; g <= 4; g++) {
-                    InventorySlot ingredient = player.getSlot(g);
+                for (int g = 0; g < gridSize; g++) {
+                    int gi = gridStart + g;
+                    InventorySlot ingredient = player.getSlot(gi);
                     if (ingredient.itemId < 0) continue;
                     Int32 newCount = ingredient.count - 1;
-                    player.setSlot(g, newCount > 0 ? ingredient.itemId : -1, newCount);
+                    player.setSlot(gi, newCount > 0 ? ingredient.itemId : -1, newCount);
                 }
-                Recipe::RecomputeCraftingResult(player);
+                if (isCraftingTable) Recipe::RecomputeCraftingTableResult(player);
+                else Recipe::RecomputeCraftingResult(player);
             }
             return;
         }
@@ -2960,7 +3062,7 @@ namespace {
     // Mode 2: number-key swap (button 0-8 -> hotbar index, 40 -> offhand) --
     // full swap with the clicked slot, no merging.
     void HandleNumberKeySwap(Player& player, int slot, int button) {
-        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
+        if (slot < 0 || slot >= Player::ALL_SLOTS) return;
         int targetSlot;
         if (button >= 0 && button <= 8) {
             targetSlot = Player::HOTBAR_START + button;
@@ -2969,9 +3071,10 @@ namespace {
         } else {
             return;
         }
-        // Slot 0 (crafting result) can't be number-key-swapped in real
-        // vanilla -- it's a derived value, not a real stored stack.
-        if (slot == 0 || targetSlot == 0) return;
+        // A crafting result (slot 0, or an open crafting table's result slot)
+        // can't be number-key-swapped in real vanilla -- it's a derived
+        // value, not a real stored stack.
+        if (slot == 0 || slot == Player::CRAFTING_TABLE_RESULT_SLOT || targetSlot == 0) return;
         if (targetSlot == slot) return;
         InventorySlot a = player.getSlot(slot);
         InventorySlot b = player.getSlot(targetSlot);
@@ -2982,10 +3085,10 @@ namespace {
     // Mode 4: drop key -- acts directly on the clicked slot, cursor untouched.
     // Button 0 = drop one (Q), button 1 = drop the entire stack (Ctrl+Q).
     void HandleDropClick(Player& player, int slot, int button) {
-        if (slot < 0 || slot >= Player::TOTAL_SLOTS) return;
-        // Dropping directly from the crafting result via Q isn't a real
+        if (slot < 0 || slot >= Player::ALL_SLOTS) return;
+        // Dropping directly from a crafting result via Q isn't a real
         // vanilla interaction -- it has to be taken to the cursor first.
-        if (slot == 0) return;
+        if (slot == 0 || slot == Player::CRAFTING_TABLE_RESULT_SLOT) return;
         InventorySlot source = player.getSlot(slot);
         if (source.itemId < 0 || source.count <= 0) return;
         if (button == 0) {
@@ -3036,7 +3139,7 @@ namespace {
 
         std::vector<int> eligible;
         for (int s : slots) {
-            if (s == 0) continue; // crafting result -- never a valid drag target
+            if (s == 0 || s == Player::CRAFTING_TABLE_RESULT_SLOT) continue; // crafting result -- never a valid drag target
             InventorySlot existing = player.getSlot(s);
             if (existing.itemId == -1 || existing.itemId == cursor.itemId) eligible.push_back(s);
         }
@@ -3073,6 +3176,56 @@ namespace {
         }
         player.setCarriedItem(remaining > 0 ? cursor.itemId : -1, remaining);
     }
+
+    // Maps a crafting-table window's own slot numbering onto the logical
+    // slot index the handlers above already understand: window slot 0 -> the
+    // table's result slot, 1-9 -> its 3x3 grid, 10-45 -> the player's own
+    // shared main storage/hotbar (slots 9-44, a flat -1 offset). windowId 0
+    // (the player's own inventory) and -999 (outside the window) pass
+    // through unchanged. Real vanilla's crafting-table window layout, not
+    // guessed -- see docs/network-protocol.md's Inventory reference.
+    Int32 TranslateWindowSlot(int windowId, Int32 slot) {
+        if (windowId == 0 || slot == -999) return slot;
+        if (slot == 0) return Player::CRAFTING_TABLE_RESULT_SLOT;
+        if (slot >= 1 && slot <= Player::CRAFTING_TABLE_GRID_SIZE) {
+            return Player::CRAFTING_TABLE_GRID_START + (slot - 1);
+        }
+        if (slot >= 10 && slot <= 45) return slot - 1;
+        return -1; // out of range for this window -- rejected by the normal slot bounds checks
+    }
+
+    // The 46-slot window-ordered view real vanilla sends for a crafting
+    // table: result, 3x3 grid, then the player's own shared main
+    // storage/hotbar -- mirrors TranslateWindowSlot's mapping in reverse.
+    std::vector<InventorySlot> BuildCraftingTableWindowView(Player& player) {
+        std::vector<InventorySlot> view(Player::TOTAL_SLOTS);
+        view[0] = player.getSlot(Player::CRAFTING_TABLE_RESULT_SLOT);
+        for (int i = 0; i < Player::CRAFTING_TABLE_GRID_SIZE; i++) {
+            view[1 + i] = player.getSlot(Player::CRAFTING_TABLE_GRID_START + i);
+        }
+        for (int i = 10; i < Player::TOTAL_SLOTS; i++) {
+            view[i] = player.getSlot(i - 1);
+        }
+        return view;
+    }
+}
+
+// Declared in Play.hpp (external linkage, not anonymous-namespace-scoped
+// like the helpers above) since ConnectionManager.cpp needs it too, for the
+// disconnect-mid-craft case. Still free to call MergeIntoRange/
+// SpawnDroppedItemEntity above despite their internal linkage -- linkage
+// only restricts visibility across translation units, not within this one.
+void CloseCraftingTableWindow(Player& player) {
+    for (int i = 0; i < Player::CRAFTING_TABLE_GRID_SIZE; i++) {
+        int gi = Player::CRAFTING_TABLE_GRID_START + i;
+        InventorySlot ingredient = player.getSlot(gi);
+        if (ingredient.itemId < 0) continue;
+        Int32 leftover = MergeIntoRange(player, ingredient.itemId, ingredient.count, 9, Player::HOTBAR_START + Player::HOTBAR_SIZE);
+        if (leftover > 0) SpawnDroppedItemEntity(player, ingredient.itemId, leftover);
+        player.setSlot(gi, -1, 0);
+    }
+    player.setSlot(Player::CRAFTING_TABLE_RESULT_SLOT, -1, 0);
+    player.closeCraftingTableWindow();
 }
 
 void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
@@ -3081,7 +3234,7 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
     #endif
     Byte windowId = deserializeByte(in_buff);
     Int32 stateId = deserializeVarInt(in_buff);
-    Int16 slot = deserializeShort(in_buff);
+    Int16 rawSlot = deserializeShort(in_buff);
     Byte button = deserializeByte(in_buff);
     Int32 mode = deserializeVarInt(in_buff);
     // The trailing array-of-changed-slots and carried-item fields are
@@ -3095,7 +3248,22 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
     Player& player = cont.connection.getPlayer();
     int threshold = cont.connection.getCompressionThreshold();
 
-    if (windowId != 0) return; // only the player inventory window exists in this project
+    // Window 0 (the player's own inventory) is always valid; any other id
+    // must match the crafting table window this player currently has open --
+    // otherwise it's a stale click against an already-closed window, which
+    // real vanilla's own documented behavior says to just ignore.
+    if (windowId != 0 && windowId != player.getOpenWindowId()) return;
+    bool isCraftingTable = (windowId != 0);
+
+    auto resync = [&]() {
+        if (isCraftingTable) {
+            cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
+                threshold, windowId, BuildCraftingTableWindowView(player), player.getContainerStateId(), player.getCarriedItem()));
+        } else {
+            cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
+                threshold, player.getInventory(), player.getContainerStateId(), player.getCarriedItem()));
+        }
+    };
 
     if (stateId != player.getContainerStateId()) {
         // Stale/desynced client view -- ignore the click and resync fully,
@@ -3103,10 +3271,11 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
         // Re-sends the CURRENT id, not a freshly advanced one: nothing new
         // actually happened here, this is just re-informing the client of
         // the state it should already have had.
-        cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
-            threshold, player.getInventory(), player.getContainerStateId(), player.getCarriedItem()));
+        resync();
         return;
     }
+
+    Int32 slot = TranslateWindowSlot(windowId, rawSlot);
 
     switch (mode) {
         case 0: HandleNormalClick(player, slot, button); break;
@@ -3139,7 +3308,7 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
                 // it) reset the drag entirely -- matches the documented real
                 // vanilla behavior for a malformed painting sequence.
                 if (player.isDragActive() && player.isDragRightClick() == progressRight &&
-                    slot >= 0 && slot < Player::TOTAL_SLOTS) {
+                    slot >= 0 && slot < Player::ALL_SLOTS) {
                     player.addDragSlot(slot);
                 } else {
                     player.clearDrag();
@@ -3150,11 +3319,14 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
         default: break;
     }
 
-    // Any click could have changed the crafting grid's contents (directly,
-    // via shift-click pulling ingredients out, etc.) -- recompute the result
-    // slot unconditionally rather than tracking exactly which modes could
-    // affect it. Covered for free by the full resync just below.
+    // Any click could have changed a crafting grid's contents (directly, via
+    // shift-click pulling ingredients out, etc.) -- recompute both result
+    // slots unconditionally rather than tracking exactly which modes could
+    // affect which grid. RecomputeCraftingTableResult is a harmless no-op
+    // against an all-empty 3x3 grid whenever no table window is open (see
+    // Recipe.hpp). Covered for free by the full resync just below.
     Recipe::RecomputeCraftingResult(player);
+    Recipe::RecomputeCraftingTableResult(player);
 
     // Always resync the full inventory + cursor rather than diff exactly
     // which slots each mode touched (several above can touch anywhere from 1
@@ -3171,8 +3343,21 @@ void Click_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& co
     // any click sent before the previous one's response arrived would carry
     // an already-stale id and get silently dropped, which is exactly what
     // "rubberbanding, sometimes needs multiple tries" looks like.
-    cont.connection.addPacket(std::make_shared<Set_Container_Content_p>(
-        threshold, player.getInventory(), player.getContainerStateId(), player.getCarriedItem()));
+    resync();
+}
+
+void Close_Container_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {
+    #ifdef DEBUG
+        Console::getConsole().Entry("Close_Container_p::deserialize(): Received.");
+    #endif
+    Byte windowId = deserializeByte(in_buff);
+    Player& player = cont.connection.getPlayer();
+    if (windowId != 0 && windowId == player.getOpenWindowId()) {
+        CloseCraftingTableWindow(player);
+    }
+    // windowId == 0 (closing their own inventory) or a stale/mismatched id
+    // needs no server-side action -- the player's own inventory is never
+    // considered "open"/"closed" server-side (see Open_Screen_p's doc).
 }
 
 void Set_Held_Item_serverbound_p::deserialize(std::vector<Byte> in_buff, PacketContext& cont) {

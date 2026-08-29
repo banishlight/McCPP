@@ -164,19 +164,29 @@ const std::array<InventorySlot, Player::TOTAL_SLOTS>& Player::getInventory() con
 
 const InventorySlot& Player::getSlot(int index) const {
     static const InventorySlot EMPTY{};
-    if (index < 0 || index >= TOTAL_SLOTS) {
+    if (index < 0 || index >= ALL_SLOTS) {
         Console::getConsole().Error("Player::getSlot(): index out of range.");
         return EMPTY;
     }
-    return _slots[index];
+    if (index < TOTAL_SLOTS) return _slots[index];
+    if (index == CRAFTING_TABLE_RESULT_SLOT) return _craftingTableSlots[0];
+    return _craftingTableSlots[1 + (index - CRAFTING_TABLE_GRID_START)];
 }
 
 void Player::setSlot(int index, Int32 itemId, Int32 count) {
-    if (index < 0 || index >= TOTAL_SLOTS) {
+    if (index < 0 || index >= ALL_SLOTS) {
         Console::getConsole().Error("Player::setSlot(): index out of range.");
         return;
     }
-    _slots[index] = {itemId, count};
+    if (index < TOTAL_SLOTS) {
+        _slots[index] = {itemId, count};
+        return;
+    }
+    if (index == CRAFTING_TABLE_RESULT_SLOT) {
+        _craftingTableSlots[0] = {itemId, count};
+        return;
+    }
+    _craftingTableSlots[1 + (index - CRAFTING_TABLE_GRID_START)] = {itemId, count};
 }
 
 std::array<InventorySlot, Player::HOTBAR_SIZE> Player::getHotbar() const {
@@ -307,4 +317,28 @@ const std::vector<int>& Player::getDragSlots() const {
 void Player::clearDrag() {
     _dragActive = false;
     _dragSlots.clear();
+}
+
+int Player::getOpenWindowId() const {
+    return _openWindowId;
+}
+
+int Player::openCraftingTableWindow(int x, int y, int z) {
+    _nextWindowId++;
+    if (_nextWindowId > 100) _nextWindowId = 1;
+    _openWindowId = _nextWindowId;
+    _openCraftingTableX = x;
+    _openCraftingTableY = y;
+    _openCraftingTableZ = z;
+    return _openWindowId;
+}
+
+void Player::closeCraftingTableWindow() {
+    _openWindowId = 0;
+}
+
+void Player::getOpenCraftingTablePos(int& x, int& y, int& z) const {
+    x = _openCraftingTableX;
+    y = _openCraftingTableY;
+    z = _openCraftingTableZ;
 }

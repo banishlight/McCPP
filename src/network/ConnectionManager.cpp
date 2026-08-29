@@ -86,6 +86,15 @@ void ConnectionManager::processConnection(std::shared_ptr<Connection> conn) {
                 for (auto& [x, z] : conn->getPlayer().getLoadedChunks()) {
                     world.chunkViewerRemoved(x, z);
                 }
+                // A crafting table window's grid/result slots are never
+                // persisted (PlayerDataPersistence only loops the real
+                // 46-slot inventory) -- return its contents to the player's
+                // own inventory first, or they'd just silently vanish on
+                // disconnect. No packet needs sending: the connection is
+                // already gone.
+                if (conn->getPlayer().getOpenWindowId() != 0) {
+                    CloseCraftingTableWindow(conn->getPlayer());
+                }
                 // Persist this player's final position/rotation/gamemode/hotbar so
                 // they resume here next join -- Player is a plain value member of
                 // Connection, so it's still fully populated at this point.

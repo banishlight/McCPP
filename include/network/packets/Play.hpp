@@ -180,11 +180,18 @@ class Acknowledge_Block_Change_p : public Play_Packet, public Outgoing_Packet {
 };
 class Set_Container_Content_p : public Play_Packet, public Outgoing_Packet {
     public:
+        // Window ID 0, the player's own 46-slot inventory.
         Set_Container_Content_p(int threshold, const std::array<InventorySlot, Player::TOTAL_SLOTS>& inventory, int stateId, const InventorySlot& carriedItem);
+        // Arbitrary window id + an already window-ordered slot list (e.g. a
+        // crafting table's 46-slot view -- result, 3x3 grid, then the
+        // player's own shared main storage/hotbar) -- see
+        // BuildCraftingTableWindowView in Play.cpp.
+        Set_Container_Content_p(int threshold, int windowId, const std::vector<InventorySlot>& slots, int stateId, const InventorySlot& carriedItem);
         int getID() const override { return _PACKET_ID; }
         std::vector<Byte> serialize() const override;
     private:
-        std::array<InventorySlot, Player::TOTAL_SLOTS> _inventory; // snapshot, not a Player& -- serialize() may run later, off the caller's thread
+        int _windowId = 0;
+        std::vector<InventorySlot> _inventory; // snapshot, not a Player& -- serialize() may run later, off the caller's thread
         int _stateId;
         InventorySlot _carriedItem;
         static int constexpr _PACKET_ID = 0x13;
@@ -505,6 +512,16 @@ void TryPickupNearbyItems(PacketContext& cont, int threshold, Player& player);
 // right after a connection enters Play state.
 void BroadcastPlayerJoin(PacketContext& cont, Player& joiningPlayer);
 
+// Shared cleanup for every way a crafting table window can end: the client
+// closing it (Close_Container_p), the server force-closing it (the table
+// broken while open, Player_Action_p), or the player disconnecting mid-craft
+// (ConnectionManager). Returns the grid's contents to main storage/hotbar,
+// dropping anything that doesn't fit as a real item entity at the player's
+// position, clears the grid+result, and resets the open-window id. Never
+// sends any packet itself -- callers that need the client to see the window
+// close (the break case) send a clientbound Close_Container_p separately.
+void CloseCraftingTableWindow(Player& player);
+
 // Grants (or revokes) the client-side ability to fly/instant-break for a
 // given gamemode -- used both at join and by /gamemode, see Player_Abilities_p.
 // Creative grants Allow Flying but not Flying itself (matches vanilla: the
@@ -621,16 +638,51 @@ class Set_Creative_Mode_Slot_p : public Play_Packet, public Incoming_Packet {
 };
 // Real interactive inventory manipulation (drag/drop, shift-click, number-key
 // swap, double-click collect, drop key) for the player's own 46-slot
-// inventory -- see docs/network-protocol.md's Click Container section.
-// Deliberately does not implement Mode 5 (drag/paint across multiple slots,
-// a real cross-packet gesture) -- see the checklist comment above its
-// handling in Play.cpp.
+// inventory, and for a currently-open crafting table's window -- see
+// docs/network-protocol.md's Click Container section.
 class Click_Container_p : public Play_Packet, public Incoming_Packet {
     public:
         int getID() const override { return _PACKET_ID; }
         void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
     private:
         static int constexpr _PACKET_ID = 0x0E;
+};
+// Serverbound: sent when the client closes a window (the in-game "done"/X
+// button, or pressing Escape). Clientbound: sent when the SERVER force-closes
+// a window (e.g. its crafting table block was broken out from under it).
+class Close_Container_p : public Play_Packet, public Incoming_Packet, public Outgoing_Packet {
+    public:
+        // Defaults let the incoming-packet registry default-construct this
+        // (only its deserialize() is ever called there); real clientbound
+        // use always passes explicit values.
+        Close_Container_p(int threshold = 0, int windowId = 0);
+        int getID() const override { return _PACKET_ID; }
+        void deserialize(std::vector<Byte> in_buff, PacketContext& cont) override;
+        std::vector<Byte> serialize() const override;
+    private:
+        int _windowId = 0;
+        // Serverbound (0x0F) and clientbound (0x12) are different packet IDs
+        // on the wire despite sharing a class -- getID() only ever serves the
+        // clientbound direction (it's what serialize()/assemblePacket use);
+        // serverbound dispatch is registered directly by the literal 0x0F in
+        // Packet.cpp's PlayVec table, the same way every other incoming
+        // packet is, never through getID().
+        static int constexpr _PACKET_ID = 0x12; // clientbound
+};
+// Sent to the client when it should open a non-inventory window -- currently
+// only ever a crafting table. See docs/network-protocol.md's Open Screen
+// section; window type is the real minecraft:menu registry id (confirmed via
+// a fresh server.jar --reports run, not guessed).
+class Open_Screen_p : public Play_Packet, public Outgoing_Packet {
+    public:
+        Open_Screen_p(int threshold, int windowId, int windowType, const string& title);
+        int getID() const override { return _PACKET_ID; }
+        std::vector<Byte> serialize() const override;
+    private:
+        int _windowId;
+        int _windowType;
+        string _title;
+        static int constexpr _PACKET_ID = 0x33;
 };
 class Set_Held_Item_serverbound_p : public Play_Packet, public Incoming_Packet {
     public:

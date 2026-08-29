@@ -37,6 +37,17 @@ class Player {
         static constexpr int HOTBAR_START = 36;
         static constexpr int MAIN_STORAGE_START = 9;
         static constexpr int MAIN_STORAGE_SIZE = 27;
+        // A crafting table's own exclusive slots (its 3x3 grid + result) --
+        // logically past the end of the real 46-slot inventory above, so
+        // every existing TOTAL_SLOTS-bounded loop (persistence, double-click,
+        // etc.) stays correct without changes; only getSlot/setSlot know
+        // these indices exist. Physically backed by a separate small array,
+        // not an extension of _slots, since a crafting table's grid is
+        // per-open-window and never persisted (see PlayerDataPersistence).
+        static constexpr int CRAFTING_TABLE_RESULT_SLOT = 46;
+        static constexpr int CRAFTING_TABLE_GRID_START = 47;
+        static constexpr int CRAFTING_TABLE_GRID_SIZE = 9;
+        static constexpr int ALL_SLOTS = CRAFTING_TABLE_GRID_START + CRAFTING_TABLE_GRID_SIZE; // 56
         Player();
         string getUsername() const;
         void setUsername(const string& username);
@@ -96,12 +107,13 @@ class Player {
         int getCenterChunkZ() const;
         void setCenterChunk(int chunkX, int chunkZ);
         // Full 46-slot inventory (crafting/armor/main-storage/hotbar/offhand,
-        // see TOTAL_SLOTS above). No Click Container handling yet, so
-        // non-Creative slots can only ever be set server-side (e.g. the
-        // starting stack seeded at join) or via the Creative direct-set path
-        // -- a Survival client can't rearrange its own inventory server-side
-        // yet.
+        // see TOTAL_SLOTS above).
         const std::array<InventorySlot, TOTAL_SLOTS>& getInventory() const;
+        // getSlot/setSlot additionally accept indices up to ALL_SLOTS-1
+        // (CRAFTING_TABLE_RESULT_SLOT/CRAFTING_TABLE_GRID_START..+9) for a
+        // currently-open crafting table window -- see those constants above.
+        // getInventory() intentionally does NOT include this range: it's
+        // never part of the player's own persisted inventory.
         const InventorySlot& getSlot(int index) const;
         void setSlot(int index, Int32 itemId, Int32 count);
         // Thin views over the hotbar sub-range (indices HOTBAR_START..
@@ -155,6 +167,21 @@ class Player {
         void addDragSlot(int slot);
         const std::vector<int>& getDragSlots() const;
         void clearDrag();
+        // A second, non-player-owned container window -- currently only ever
+        // a crafting table. 0 = no such window open (Click_Container_p only
+        // accepts window id 0, the player's own inventory). Window ids are
+        // scoped to this one client's session (never compared across
+        // players), so a simple wrapping counter matches real vanilla's own
+        // documented server behavior (docs/network-protocol.md, Open Screen).
+        // openCraftingTableWindow assigns a fresh id and remembers the
+        // table's position (for closing it if that block is later broken);
+        // closeCraftingTableWindow only resets the id -- it does not move or
+        // drop the grid's contents, since that needs World/item-entity
+        // access the Player class doesn't have.
+        int getOpenWindowId() const;
+        int openCraftingTableWindow(int x, int y, int z);
+        void closeCraftingTableWindow();
+        void getOpenCraftingTablePos(int& x, int& y, int& z) const;
     private:
         string _username;
         std::vector<long> _uuid;
@@ -175,10 +202,14 @@ class Player {
         int _centerChunkX = 0; // matches the fixed spawn chunk (0,0)
         int _centerChunkZ = 0;
         std::array<InventorySlot, TOTAL_SLOTS> _slots{};
+        std::array<InventorySlot, CRAFTING_TABLE_GRID_SIZE + 1> _craftingTableSlots{}; // index 0 = result, 1-9 = grid
         int _selectedSlot = 0;
         InventorySlot _carriedItem{};
         int _containerStateId = 0;
         bool _dragActive = false;
         bool _dragRightClick = false;
         std::vector<int> _dragSlots;
+        int _openWindowId = 0;
+        int _nextWindowId = 1; // wraps 1-100, matching Notchian server behavior
+        int _openCraftingTableX = 0, _openCraftingTableY = 0, _openCraftingTableZ = 0;
 };

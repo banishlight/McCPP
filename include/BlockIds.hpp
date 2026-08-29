@@ -56,3 +56,7 @@ static constexpr Int32 WHEAT_BASE_STATE_ID = 4278;
 static constexpr Int32 CARROTS_BASE_STATE_ID = 8595;
 static constexpr Int32 POTATOES_BASE_STATE_ID = 8603;
 static constexpr Int32 BEETROOT_BASE_STATE_ID = 12509;
+// Needed symbolically by Use_Item_On_p's crafting-table-open branch -- a
+// direct-ID comparison, same reasoning as the other direct-comparison
+// constants above. Already an ordinary BlockTable/ItemTable row otherwise.
+static constexpr Int32 CRAFTING_TABLE_BLOCK_STATE_ID = 4277;

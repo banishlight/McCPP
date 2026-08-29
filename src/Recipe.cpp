@@ -15,8 +15,13 @@ namespace {
         }
     };
 
+    // Largest grid any caller matches against today (a crafting table's
+    // 3x3) -- width/height below are bounded by whatever grid Match/
+    // Match3x3 actually pass in, not by this recipe's own footprint.
+    constexpr int MAX_GRID_CELLS = 9;
+
     struct ShapedRecipe {
-        int width, height; // <= 2 each -- this project's crafting grid is 2x2
+        int width, height; // <= 3 each -- the largest grid this project has (crafting table, 3x3)
         std::vector<IngredientSet> cells; // row-major, size width*height
         Int32 resultItemId, resultCount;
     };
@@ -101,15 +106,19 @@ namespace {
         return table;
     }
 
-    bool tryMatchShaped(const ShapedRecipe& r, const Recipe::Grid2x2& grid, Int32& outItemId, Int32& outCount) {
-        int maxAnchorX = 2 - r.width;
-        int maxAnchorY = 2 - r.height;
+    // gridWidth/gridHeight describe the grid being matched against (2x2 for
+    // the personal grid, 3x3 for a crafting table) -- independent of the
+    // recipe's own (usually smaller) width/height, which is tried at every
+    // valid anchor offset within the grid.
+    bool tryMatchShaped(const ShapedRecipe& r, int gridWidth, int gridHeight, const InventorySlot* grid, Int32& outItemId, Int32& outCount) {
+        int maxAnchorX = gridWidth - r.width;
+        int maxAnchorY = gridHeight - r.height;
         for (int ax = 0; ax <= maxAnchorX; ax++) {
             for (int ay = 0; ay <= maxAnchorY; ay++) {
                 bool ok = true;
-                for (int gy = 0; gy < 2 && ok; gy++) {
-                    for (int gx = 0; gx < 2 && ok; gx++) {
-                        Int32 cellItem = grid[gy * 2 + gx].itemId;
+                for (int gy = 0; gy < gridHeight && ok; gy++) {
+                    for (int gx = 0; gx < gridWidth && ok; gx++) {
+                        Int32 cellItem = grid[gy * gridWidth + gx].itemId;
                         int rx = gx - ax, ry = gy - ay;
                         if (rx >= 0 && rx < r.width && ry >= 0 && ry < r.height) {
                             if (!r.cells[ry * r.width + rx].matches(cellItem)) ok = false;
@@ -130,40 +139,49 @@ namespace {
 
     // Small backtracking assignment of occupied grid cells to required
     // ingredients -- a greedy first-fit isn't safe in general bipartite
-    // matching, but a full backtrack over at most 4 cells is free.
-    bool assignShapeless(const ShapelessRecipe& r, const Recipe::Grid2x2& grid, std::array<bool, 4>& used, size_t ingredientIdx) {
+    // matching, but a full backtrack over at most MAX_GRID_CELLS cells is free.
+    bool assignShapeless(const ShapelessRecipe& r, int gridSize, const InventorySlot* grid, std::array<bool, MAX_GRID_CELLS>& used, size_t ingredientIdx) {
         if (ingredientIdx == r.ingredients.size()) return true;
-        for (int cell = 0; cell < 4; cell++) {
+        for (int cell = 0; cell < gridSize; cell++) {
             if (used[cell] || grid[cell].itemId == -1) continue;
             if (!r.ingredients[ingredientIdx].matches(grid[cell].itemId)) continue;
             used[cell] = true;
-            if (assignShapeless(r, grid, used, ingredientIdx + 1)) return true;
+            if (assignShapeless(r, gridSize, grid, used, ingredientIdx + 1)) return true;
             used[cell] = false;
         }
         return false;
     }
 
-    bool tryMatchShapeless(const ShapelessRecipe& r, const Recipe::Grid2x2& grid, Int32& outItemId, Int32& outCount) {
+    bool tryMatchShapeless(const ShapelessRecipe& r, int gridSize, const InventorySlot* grid, Int32& outItemId, Int32& outCount) {
         int occupiedCount = 0;
-        for (const InventorySlot& slot : grid) if (slot.itemId != -1) occupiedCount++;
+        for (int i = 0; i < gridSize; i++) if (grid[i].itemId != -1) occupiedCount++;
         if (occupiedCount != static_cast<int>(r.ingredients.size())) return false;
 
-        std::array<bool, 4> used = { false, false, false, false };
-        if (!assignShapeless(r, grid, used, 0)) return false;
+        std::array<bool, MAX_GRID_CELLS> used{};
+        if (!assignShapeless(r, gridSize, grid, used, 0)) return false;
         outItemId = r.resultItemId;
         outCount = r.resultCount;
         return true;
     }
+
+    bool matchGrid(int gridWidth, int gridHeight, const InventorySlot* grid, Int32& outResultItemId, Int32& outResultCount) {
+        for (const ShapedRecipe& r : getShapedRecipes()) {
+            if (tryMatchShaped(r, gridWidth, gridHeight, grid, outResultItemId, outResultCount)) return true;
+        }
+        int gridSize = gridWidth * gridHeight;
+        for (const ShapelessRecipe& r : getShapelessRecipes()) {
+            if (tryMatchShapeless(r, gridSize, grid, outResultItemId, outResultCount)) return true;
+        }
+        return false;
+    }
 }
 
 bool Recipe::Match(const Grid2x2& grid, Int32& outResultItemId, Int32& outResultCount) {
-    for (const ShapedRecipe& r : getShapedRecipes()) {
-        if (tryMatchShaped(r, grid, outResultItemId, outResultCount)) return true;
-    }
-    for (const ShapelessRecipe& r : getShapelessRecipes()) {
-        if (tryMatchShapeless(r, grid, outResultItemId, outResultCount)) return true;
-    }
-    return false;
+    return matchGrid(2, 2, grid.data(), outResultItemId, outResultCount);
+}
+
+bool Recipe::Match3x3(const Grid3x3& grid, Int32& outResultItemId, Int32& outResultCount) {
+    return matchGrid(3, 3, grid.data(), outResultItemId, outResultCount);
 }
 
 void Recipe::RecomputeCraftingResult(Player& player) {
@@ -173,5 +191,18 @@ void Recipe::RecomputeCraftingResult(Player& player) {
         player.setSlot(0, itemId, count);
     } else {
         player.setSlot(0, -1, 0);
+    }
+}
+
+void Recipe::RecomputeCraftingTableResult(Player& player) {
+    Grid3x3 grid;
+    for (int i = 0; i < Player::CRAFTING_TABLE_GRID_SIZE; i++) {
+        grid[i] = player.getSlot(Player::CRAFTING_TABLE_GRID_START + i);
+    }
+    Int32 itemId, count;
+    if (Match3x3(grid, itemId, count)) {
+        player.setSlot(Player::CRAFTING_TABLE_RESULT_SLOT, itemId, count);
+    } else {
+        player.setSlot(Player::CRAFTING_TABLE_RESULT_SLOT, -1, 0);
     }
 }
