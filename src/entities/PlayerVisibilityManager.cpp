@@ -2,6 +2,7 @@
 #include <network/Connection.hpp>
 #include <network/ConnectionManager.hpp>
 #include <network/packets/Play.hpp>
+#include <network/PacketUtils.hpp>
 #include <Player.hpp>
 #include <Chunk.hpp>
 #include <cmath>
@@ -127,13 +128,12 @@ void PlayerVisibilityManager::broadcastMovement(std::shared_ptr<Connection> move
     std::set<int> viewerEntityIds = findViewersOf(moverEntityId);
     if (viewerEntityIds.empty()) return;
 
-    double dx = newX - oldX, dy = newY - oldY, dz = newZ - oldZ;
     // Update Entity Position('s delta fields) can't represent a move beyond
     // 8 blocks in any axis -- fall back to an absolute Teleport Entity then.
-    bool withinDeltaRange = std::abs(dx) <= 7.99 && std::abs(dy) <= 7.99 && std::abs(dz) <= 7.99;
-    Int16 deltaX = static_cast<Int16>(dx * 4096.0);
-    Int16 deltaY = static_cast<Int16>(dy * 4096.0);
-    Int16 deltaZ = static_cast<Int16>(dz * 4096.0);
+    Int16 deltaX = 0, deltaY = 0, deltaZ = 0;
+    bool withinDeltaRange = encodePositionDelta(oldX, newX, deltaX)
+                         && encodePositionDelta(oldY, newY, deltaY)
+                         && encodePositionDelta(oldZ, newZ, deltaZ);
 
     std::vector<std::shared_ptr<Connection>> connections = ConnectionManager::getInstance().getActiveConnections();
     for (auto& viewerConn : connections) {

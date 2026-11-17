@@ -33,12 +33,10 @@ class ItemEntityManager {
         // entity was already removed (picked up/despawned) since the caller's
         // last snapshot() -- same race-tolerant stance as tryClaim.
         void updatePosition(int entityId, double x, double y, double z, double vx, double vy, double vz, int chunkX, int chunkZ);
-        // Records that (x,y,z) was just sent to clients -- the baseline
-        // ItemPhysicsSystem's fluid-push delta broadcasting needs, separate
-        // from the internally-tracked current position, since those
-        // corrections aren't sent every tick. Same silently-no-ops-if-gone
-        // stance as updatePosition.
-        void markPositionBroadcast(int entityId, double x, double y, double z);
+        // Stores the item's updated EntityTracker state after a tick's
+        // broadcast decision. Same silently-no-ops-if-gone stance as
+        // updatePosition.
+        void setTrackerState(int entityId, const EntityTracker::State& tracker);
         // Snapshot for callers to iterate outside the lock -- mirrors
         // ConnectionManager::getActiveConnections().
         std::vector<ItemEntity> snapshot();

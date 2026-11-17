@@ -3,6 +3,7 @@
 #include <Player.hpp>
 #include <atomic>
 #include <mutex>
+#include <condition_variable>
 #include <memory>
 
 // Forward declaration
@@ -61,6 +62,9 @@ class Connection : public std::enable_shared_from_this<Connection> {
         std::shared_ptr<Socket> _socket;
         std::vector<std::shared_ptr<Outgoing_Packet>> _sendQueue;
         std::mutex _sendQueueMutex;
+        // Signalled by addPacket so an idle connection loop sends right away
+        // instead of finishing its poll wait first.
+        std::condition_variable _sendQueueCv;
         std::vector<std::shared_ptr<Chunk>> _pendingChunks;
         std::mutex _pendingChunksMutex;
         // atomic: read from the tick thread (getState(), Keep Alive) while

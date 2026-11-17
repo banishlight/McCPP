@@ -31,7 +31,7 @@ bool isFalling(Int32 blockStateId) {
     return blockStateId == baseId(type) + 8;
 }
 
-int distanceOf(Int32 blockStateId) {
+int amountOf(Int32 blockStateId) {
     Type type = typeOf(blockStateId);
     if (type == Type::None) return -1;
     int level = blockStateId - baseId(type);

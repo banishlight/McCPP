@@ -245,46 +245,81 @@ bool World::setBlock(int worldX, int worldY, int worldZ, Int32 blockStateId) {
     int localZ = worldZ - chunkZ * 16;
 
     // Optimistic concurrency, not a single held lock across the whole
-    // function: LightEngine::computeLighting reads a 3x3-chunk neighborhood
-    // via this same class's own locked accessors (getCachedChunk/
-    // getOrGenerateTerrain), so it can't run while _chunkCacheMutex is held
-    // by this call too (std::mutex isn't recursive) -- widening the lock
-    // would deadlock. Instead: snapshot the current chunk, edit+relight a
-    // copy OUTSIDE the lock, then re-acquire the lock and only install the
-    // result if nobody else's setBlock replaced this exact chunk in the
-    // meantime; if they did, retry against the newer snapshot (our own edit
-    // gets re-applied on top of it, so nothing is lost either way).
+    // function: snapshot the affected chunks, edit + relight copies OUTSIDE
+    // the lock, then re-acquire it and only install the results if nobody
+    // else's setBlock replaced any of those exact chunks in the meantime; if
+    // they did, retry against the newer snapshots (our own edit gets
+    // re-applied on top, so nothing is lost either way).
     //
     // Without this, two concurrent setBlock calls on DIFFERENT positions in
     // the SAME chunk -- e.g. a player tilling/planting while
     // CropGrowthSystem's tick thread independently updates a nearby
     // farmland/crop a moment later -- silently lose whichever edit's cache
     // write lands first: a real, reported bug (tilled farmland rendered
-    // correctly client-side via the broadcast, since that part always ran,
-    // but never actually persisted server-side, so it reverted to its real,
-    // untouched state on the very next edit to that chunk, or on rejoin).
-    // Fluids/other earlier features never hit this in practice since they
-    // didn't drive frequent, chunk-dense background setBlock calls from the
-    // tick thread the way farming's per-tile moisture/growth checks do.
+    // correctly client-side via the broadcast, but never actually persisted
+    // server-side, so it reverted on the very next edit to that chunk, or on
+    // rejoin).
+    //
+    // Lighting is patched incrementally around the changed block
+    // (LightEngine::updateForBlockChange) rather than recomputed for the
+    // whole chunk -- a full recompute costs ~20ms, which a spreading fluid
+    // making dozens of edits per tick turned into multi-hundred-millisecond
+    // ticks. The patch can reach into neighboring chunks, so those are
+    // copied and installed too, but only when their light actually changed.
     for (;;) {
-        std::shared_ptr<Chunk> base;
+        std::shared_ptr<Chunk> bases[3][3];
         {
             std::lock_guard<std::mutex> lock(_chunkCacheMutex);
-            auto it = _chunkCache.find({chunkX, chunkZ});
-            if (it == _chunkCache.end()) return false;
-            base = it->second;
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    auto it = _chunkCache.find({chunkX + dx, chunkZ + dz});
+                    if (it != _chunkCache.end()) bases[dz + 1][dx + 1] = it->second;
+                }
+            }
         }
+        if (!bases[1][1]) return false;
 
-        std::shared_ptr<Chunk> edited = std::make_shared<Chunk>(*base);
-        edited->setBlock(localX, worldY, localZ, blockStateId);
-        LightEngine::computeLighting(*edited, *this);
+        const Int32 oldBlock = bases[1][1]->getBlock(localX, worldY, localZ);
+        std::shared_ptr<Chunk> edited[3][3];
+        edited[1][1] = std::make_shared<Chunk>(*bases[1][1]);
+        edited[1][1]->setBlock(localX, worldY, localZ, blockStateId);
+
+        bool touched[3][3] = {};
+        if (LightEngine::affectsLight(oldBlock, blockStateId)) {
+            Chunk* region[3][3] = {};
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    if (!bases[i][j]) continue;
+                    if (!edited[i][j]) edited[i][j] = std::make_shared<Chunk>(*bases[i][j]);
+                    region[i][j] = edited[i][j].get();
+                }
+            }
+            LightEngine::updateForBlockChange(region, worldX, worldY, worldZ, oldBlock, touched);
+        }
+        touched[1][1] = true; // the edited chunk itself is always installed
 
         std::lock_guard<std::mutex> lock(_chunkCacheMutex);
-        auto it = _chunkCache.find({chunkX, chunkZ});
-        if (it == _chunkCache.end()) return false; // evicted while we were relighting
-        if (it->second != base) continue;          // someone else's edit landed first -- retry against it
+        bool conflict = false;
+        for (int i = 0; i < 3 && !conflict; i++) {
+            for (int j = 0; j < 3 && !conflict; j++) {
+                if (!touched[i][j]) continue;
+                auto it = _chunkCache.find({chunkX + j - 1, chunkZ + i - 1});
+                if (i == 1 && j == 1 && it == _chunkCache.end()) return false; // evicted meanwhile
+                if (it != _chunkCache.end() && it->second != bases[i][j]) conflict = true;
+            }
+        }
+        if (conflict) continue; // someone else's edit landed first -- retry against it
 
-        it->second = edited;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (!touched[i][j]) continue;
+                auto it = _chunkCache.find({chunkX + j - 1, chunkZ + i - 1});
+                if (it == _chunkCache.end()) continue; // neighbor evicted meanwhile; its light is moot
+                it->second = edited[i][j];
+            }
+        }
+        // Only the edited chunk's blocks changed; neighbors only got new
+        // light, which isn't saved, so they don't need marking dirty.
         auto cleanIt = _cleanChunks.find({chunkX, chunkZ});
         if (cleanIt != _cleanChunks.end()) {
             _cleanChunks.erase(cleanIt);

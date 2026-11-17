@@ -5,6 +5,7 @@
 #include <cstring>
 #include <sstream>
 #include <iomanip>
+#include <cmath>
 
 std::vector<Byte> varIntSerialize(int num){ 
     std::vector<Byte> result;
@@ -318,4 +319,12 @@ Byte angleSerialize(float degrees) {
     // out-of-360-range value is undefined behavior in C++.
     int scaled = static_cast<int>(degrees * (256.0f / 360.0f));
     return static_cast<Byte>(scaled);
+}
+bool encodePositionDelta(double from, double to, Int16& out) {
+    // Round half up (floor(x + 0.5)), matching Java's Math.round.
+    auto snap = [](double v) { return static_cast<Int64>(std::floor(v * 4096.0 + 0.5)); };
+    Int64 delta = snap(to) - snap(from);
+    if (delta < INT16_MIN || delta > INT16_MAX) return false;
+    out = static_cast<Int16>(delta);
+    return true;
 }

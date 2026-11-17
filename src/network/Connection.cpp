@@ -116,7 +116,12 @@ std::vector<Byte> Connection::serializePacket(std::shared_ptr<Outgoing_Packet> p
 void Connection::receivePacket() {
     if (_socket->isValid()) {
         if (!_socket->packetAvailable())  {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // Nothing to read: wait up to 10ms before polling the socket
+            // again, but wake as soon as there's something to send so
+            // outgoing packets (e.g. a tick's entity updates) leave
+            // immediately rather than after a random 0-10ms delay.
+            std::unique_lock<std::mutex> lock(_sendQueueMutex);
+            _sendQueueCv.wait_for(lock, std::chrono::milliseconds(10), [this] { return !_sendQueue.empty(); });
             return;
         }
         #ifdef DEBUG
@@ -174,8 +179,11 @@ void Connection::addPacket(std::shared_ptr<Outgoing_Packet> packet) {
         Console::getConsole().Error("Connection::addPacket(): Cannot add a null packet to the send queue.");
         return;
     }
-    std::lock_guard<std::mutex> lock(_sendQueueMutex);
-    _sendQueue.push_back(packet);
+    {
+        std::lock_guard<std::mutex> lock(_sendQueueMutex);
+        _sendQueue.push_back(packet);
+    }
+    _sendQueueCv.notify_one();
 }
 
 int Connection::getCompressionThreshold() const {

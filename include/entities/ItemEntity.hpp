@@ -1,6 +1,7 @@
 #pragma once
 #include <Standards.hpp>
 #include <chrono>
+#include <entities/EntityTracker.hpp>
 
 // Server-side record of a dropped item entity -- Spawn_Entity_p/Set_Entity_Metadata_p
 // alone only tell clients what to render, nothing durable on the server side.
@@ -16,11 +17,9 @@ struct ItemEntity {
     // ITEM_PICKUP_DELAY_BREAK_SECONDS/ITEM_PICKUP_DELAY_TOSS_SECONDS
     // (ItemEntityManager.hpp).
     double pickupDelaySeconds;
-    // Last position actually sent to clients -- distinct from x/y/z (the
-    // internally-tracked current position, updated every tick) since
-    // ItemPhysicsSystem's fluid-push corrections aren't broadcast every
-    // tick. Needed as the baseline for Update_Entity_Position_p's delta
-    // encoding. Initialized to the spawn position (Spawn_Entity_p already
-    // told clients that much).
-    double lastBroadcastX, lastBroadcastY, lastBroadcastZ;
+    // What clients were last told about this item's movement (position
+    // baseline for delta packets, last velocity, on-ground state) -- see
+    // EntityTracker. Starts from what the spawn packet and any immediate
+    // follow-up velocity packet carried.
+    EntityTracker::State tracker;
 };

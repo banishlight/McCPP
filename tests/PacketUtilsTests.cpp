@@ -60,3 +60,27 @@ TEST(StringRoundTrip) {
         CHECK_EQ(data[0], static_cast<Byte>(0x99));
     }
 }
+
+TEST(PositionDeltasDoNotAccumulateRoundingError) {
+    // Many tiny moves, each smaller than one 1/4096 step, must add up to the
+    // same total as one big move -- the client sums these deltas.
+    double position = 10.0;
+    long long total = 0;
+    for (int i = 0; i < 1000; i++) {
+        double next = position + 0.00013;
+        Int16 delta;
+        REQUIRE(encodePositionDelta(position, next, delta));
+        total += delta;
+        position = next;
+    }
+    Int16 direct;
+    REQUIRE(encodePositionDelta(10.0, position, direct));
+    CHECK_EQ(total, static_cast<long long>(direct));
+}
+
+TEST(PositionDeltaRejectsMovesBeyondEightBlocks) {
+    Int16 delta;
+    CHECK(encodePositionDelta(0.0, 7.9, delta));
+    CHECK(!encodePositionDelta(0.0, 8.5, delta));
+    CHECK(!encodePositionDelta(0.0, -8.5, delta));
+}

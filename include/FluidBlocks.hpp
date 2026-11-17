@@ -9,9 +9,11 @@
 // order, so level = stateId - <fluid's level-0 state ID> (see BlockIds.hpp).
 //
 // Level 0 is the source: permanent, never changes on its own.
-// Levels 1-7 are flowing, and are backwards from "distance from source" --
-// distance 1 (adjacent to a source) is level 7, distance 7 (about to
-// disappear) is level 1, i.e. level = 8 - distance.
+// Levels 1-7 are flowing, and equal the distance-equivalent cost from the
+// source -- level 1 is adjacent to a source (tallest flowing water), level 7
+// is about to disappear (shallowest), i.e. level = distance. The fluid's
+// "amount" (its surface height in eighths of a block) runs the other way:
+// amount = 8 - level.
 // Level 8 is falling: a vertical column with open space below it, fed
 // continuously from above, which looks/acts full regardless of how far it is
 // horizontally from the originating source.
@@ -36,9 +38,10 @@ namespace Fluid {
     Type typeOf(Int32 blockStateId);
     bool isSource(Int32 blockStateId);
     bool isFalling(Int32 blockStateId);
-    // Only meaningful for flowing (non-source, non-falling) blocks; returns
-    // -1 otherwise.
-    int distanceOf(Int32 blockStateId);
+    // Surface height in eighths of a block (8 - level): 7 adjacent to a
+    // source, 1 at the far edge. Only meaningful for flowing (non-source,
+    // non-falling) blocks; returns -1 otherwise.
+    int amountOf(Int32 blockStateId);
     // How much the distance-equivalent cost increases per block of
     // horizontal spread away from a source: 1 for water, 2 for lava
     // (Overworld rate -- this project has no Nether to need a different one).

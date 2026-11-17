@@ -46,4 +46,11 @@ string uuidToDashedHexString(const std::vector<long>& uuid);
 // Rotation, Set Head Rotation, Teleport Entity, Spawn Entity's pitch/yaw).
 Byte angleSerialize(float degrees);
 
+// Wire position delta (Update Entity Position and friends) for one axis, in
+// 1/4096-block units. Both positions are snapped to the 1/4096 grid before
+// subtracting -- the same way the client applies it -- so rounding never
+// accumulates across many small updates. Returns false when the move is too
+// large for a 16-bit delta (about 8 blocks); send an absolute teleport then.
+bool encodePositionDelta(double from, double to, Int16& out);
+
 std::vector<Byte> assemblePacket(int id, int threshold, const std::vector<Byte>& data);

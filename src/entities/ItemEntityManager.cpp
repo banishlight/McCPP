@@ -10,7 +10,9 @@ ItemEntityManager& ItemEntityManager::getInstance() {
 ItemEntity ItemEntityManager::spawn(Int32 itemId, Int32 count, double x, double y, double z, int chunkX, int chunkZ,
                                      double vx, double vy, double vz, double pickupDelaySeconds) {
     ItemEntity entity{EntityIdAllocator::next(), itemId, count, x, y, z, vx, vy, vz, chunkX, chunkZ,
-                       std::chrono::steady_clock::now(), pickupDelaySeconds, x, y, z};
+                       std::chrono::steady_clock::now(), pickupDelaySeconds, EntityTracker::State{}};
+    entity.tracker.sentX = x; entity.tracker.sentY = y; entity.tracker.sentZ = z;
+    entity.tracker.sentVx = vx; entity.tracker.sentVy = vy; entity.tracker.sentVz = vz;
     std::lock_guard<std::mutex> lock(_mutex);
     _entities.push_back(entity);
     return entity;
@@ -37,13 +39,13 @@ void ItemEntityManager::updatePosition(int entityId, double x, double y, double 
     it->chunkX = chunkX; it->chunkZ = chunkZ;
 }
 
-void ItemEntityManager::markPositionBroadcast(int entityId, double x, double y, double z) {
+void ItemEntityManager::setTrackerState(int entityId, const EntityTracker::State& tracker) {
     std::lock_guard<std::mutex> lock(_mutex);
     auto it = std::find_if(_entities.begin(), _entities.end(), [entityId](const ItemEntity& e) {
         return e.entityId == entityId;
     });
     if (it == _entities.end()) return;
-    it->lastBroadcastX = x; it->lastBroadcastY = y; it->lastBroadcastZ = z;
+    it->tracker = tracker;
 }
 
 std::vector<ItemEntity> ItemEntityManager::snapshot() {

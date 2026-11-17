@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <cstring>
 #include <fcntl.h> // for non-blocking fd
+#include <netinet/tcp.h> // TCP_NODELAY
 
 int Socket::fetchVarInt() {
     int value = 0;
@@ -55,6 +56,14 @@ int Socket::fetchVarInt() {
 // fd is the file descriptor accepted from the server socket
 Socket::Socket(int fd) {
     _fd = fd;
+    // Send small packets immediately instead of letting the OS hold them back
+    // to coalesce (Nagle's algorithm). Per-tick entity updates are exactly
+    // the small, frequent writes Nagle delays, and delayed or bunched-up
+    // arrivals show up client-side as jerky entity movement.
+    int noDelay = 1;
+    if (_fd >= 0 && setsockopt(_fd, IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay)) != 0) {
+        Console::getConsole().Error("Socket::Socket(): Failed to set TCP_NODELAY: " + std::string(strerror(errno)));
+    }
     // if (isValid()) setBlocking(true);
     // else Console::getConsole().Error("Socket::Socket(): Invalid socket file descriptor: " + std::to_string(fd));
 }
