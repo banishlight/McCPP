@@ -22,6 +22,10 @@ TEST_SRC := $(shell find $(TEST_DIR) -name '*.cpp')
 TEST_OBJ := $(TEST_SRC:$(TEST_DIR)/%.cpp=$(TEST_BUILD_DIR)/%.o)
 TEST_DEPS := $(TEST_OBJ:.o=.d)
 
+# Every server object except the one defining main(), so tests can call into
+# real server code
+LIB_OBJ := $(filter-out $(BUILD_DIR)/MinecraftServer.o, $(OBJ))
+
 # Rules
 .PHONY: default clean directories debug clang linux windows test test-directories
 
@@ -45,16 +49,18 @@ debug: linux
 clang: CXX := clang++ 
 clang: linux
 
-# Test targets
+# Test targets -- builds the suite and runs it; pass a name filter with
+# `make test FILTER=VarInt`
 test: CXXFLAGS += -D LINUX
 test: LDFLAGS += -lssl -lcrypto
-test: test-directories $(TEST_TARGET) 
+test: test-directories $(TEST_TARGET)
+	./$(TEST_TARGET) $(FILTER)
 
 # Link the final executable
 $(TARGET): $(OBJ)
 	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
 
-$(TEST_TARGET): $(TEST_OBJ)
+$(TEST_TARGET): $(TEST_OBJ) $(LIB_OBJ)
 	$(CXX) $(TEST_OBJ) $(LIB_OBJ) -o $@ $(LDFLAGS)
 
 # Compile each source file into an object file
@@ -80,3 +86,4 @@ clean:
 
 # Include dependency files
 -include $(DEPS)
+-include $(TEST_DEPS)
